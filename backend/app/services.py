@@ -295,7 +295,11 @@ def create_booking(db: Session, payload: schemas.BookingCreate) -> models.RoomBo
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người tạo cuộc họp mới được đặt phòng")
     if meeting.status != models.MeetingStatus.SCHEDULED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể đặt phòng cho cuộc họp đã hủy")
-    room = db.get(models.Room, payload.room_id)
+    room = db.scalar(
+        select(models.Room)
+        .where(models.Room.id == payload.room_id)
+        .with_for_update()
+    )
     if not room or not room.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
     if meeting.booking and meeting.booking.status == models.BookingStatus.ACTIVE:

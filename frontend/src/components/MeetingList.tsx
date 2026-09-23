@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Meeting, Room } from "../types";
 import { api } from "../services/api";
 
@@ -10,26 +10,55 @@ interface Props {
 export function MeetingList({ meetings, onChanged }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
+  const [editing, setEditing] = useState<Meeting | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
+  const [editParticipants, setEditParticipants] = useState("");
+
+  useEffect(() => {
+    if (!editing) return;
+    setEditTitle(editing.title);
+    setEditDescription(editing.description ?? "");
+    setEditStart(toLocalInput(editing.start_time));
+    setEditEnd(toLocalInput(editing.end_time));
+    setEditParticipants(editing.participants.map((participant) => participant.email).join("; "));
+  }, [editing]);
+
+  const toLocalInput = (value: string) => {
+    const date = new Date(value);
+    const offset = date.getTimezoneOffset();
+    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    try {
+      await api.updateMeeting(editing.id, {
+        requester_email: editing.organizer_email,
+        title: editTitle,
+        description: editDescription,
+        start_time: new Date(editStart).toISOString(),
+        end_time: new Date(editEnd).toISOString(),
+        participant_emails: editParticipants.split(/[;,\n]/).map((value) => value.trim()).filter(Boolean),
+      });
+      setMessage(`Đã cập nhật cuộc họp #${editing.id}.`);
+      setEditing(null);
+      onChanged();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể cập nhật cuộc họp");
+    }
+  };
 
   const cancel = async (meeting: Meeting) => {
+    if (!window.confirm(`Bạn có chắc muốn hủy cuộc họp "${meeting.title}"?`)) return;
     try {
       await api.cancelMeeting(meeting.id, meeting.organizer_email);
       setMessage(`Đã hủy cuộc họp #${meeting.id}.`);
       onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể hủy cuộc họp");
-    }
-  };
-
-  const rename = async (meeting: Meeting) => {
-    const title = window.prompt("Tên cuộc họp mới", meeting.title);
-    if (!title || title === meeting.title) return;
-    try {
-      await api.updateMeeting(meeting.id, { requester_email: meeting.organizer_email, title });
-      setMessage(`Đã cập nhật cuộc họp #${meeting.id}.`);
-      onChanged();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không thể cập nhật cuộc họp");
     }
   };
 
@@ -83,11 +112,36 @@ export function MeetingList({ meetings, onChanged }: Props) {
                 <span>{meeting.booking ? meeting.booking.room.name : "Chưa đặt phòng"}</span>
                 {meeting.recurrence && <span>Lặp {meeting.recurrence === "weekly" ? "hằng tuần" : "hằng tháng"}</span>}
               </div>
+              {meeting.participants.length > 0 && (
+                <div className="participants">
+                  <strong>Lời mời</strong>
+                  {meeting.participants.map((participant) => (
+                    <span key={participant.id} className={`participant ${participant.status}`}>
+                      {participant.email} · {participant.status === "invited" ? "Đã mời" : participant.status === "accepted" ? "Đã xác nhận" : "Từ chối"}
+                    </span>
+                  ))}
+                </div>
+              )}
               {meeting.status === "scheduled" && (
                 <div className="item-actions">
-                  <button onClick={() => rename(meeting)}>Đổi tên</button>
+                  <button onClick={() => setEditing(meeting)}>Chỉnh sửa</button>
                   {!meeting.booking && <button onClick={() => findRooms(meeting)}>Tìm phòng trống</button>}
                   <button className="danger" onClick={() => cancel(meeting)}>Hủy lịch</button>
+                </div>
+              )}
+              {editing?.id === meeting.id && (
+                <div className="edit-form">
+                  <label>Tên cuộc họp<input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} /></label>
+                  <label>Mô tả<textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} /></label>
+                  <div className="edit-grid">
+                    <label>Bắt đầu<input type="datetime-local" value={editStart} onChange={(event) => setEditStart(event.target.value)} /></label>
+                    <label>Kết thúc<input type="datetime-local" value={editEnd} onChange={(event) => setEditEnd(event.target.value)} /></label>
+                  </div>
+                  <label>Người tham dự<input value={editParticipants} onChange={(event) => setEditParticipants(event.target.value)} placeholder="email1; email2" /></label>
+                  <div className="item-actions">
+                    <button className="primary-action" onClick={saveEdit}>Lưu thay đổi</button>
+                    <button onClick={() => setEditing(null)}>Đóng</button>
+                  </div>
                 </div>
               )}
               {rooms[meeting.id] && rooms[meeting.id].length > 0 && (
@@ -110,4 +164,3 @@ export function MeetingList({ meetings, onChanged }: Props) {
     </section>
   );
 }
-

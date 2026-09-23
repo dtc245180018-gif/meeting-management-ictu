@@ -7,7 +7,12 @@ import type { Meeting } from "./types";
 export default function App() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [filterEmail, setFilterEmail] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | Meeting["status"]>("all");
+  const [filterFrom, setFilterFrom] = useState("");
+  const [filterTo, setFilterTo] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
   const [error, setError] = useState("");
+  const pageSize = 5;
 
   const loadMeetings = useCallback(async () => {
     try {
@@ -24,11 +29,22 @@ export default function App() {
 
   const visibleMeetings = useMemo(() => {
     const email = filterEmail.trim().toLowerCase();
-    if (!email) return meetings;
-    return meetings.filter(
-      (meeting) => meeting.organizer_email === email || meeting.participants.some((person) => person.email === email),
-    );
-  }, [meetings, filterEmail]);
+    const from = filterFrom ? new Date(`${filterFrom}T00:00:00`) : null;
+    const to = filterTo ? new Date(`${filterTo}T23:59:59`) : null;
+    return meetings.filter((meeting) => {
+      const date = new Date(meeting.start_time);
+      const matchesEmail = !email || meeting.organizer_email === email || meeting.participants.some((person) => person.email === email);
+      const matchesStatus = filterStatus === "all" || meeting.status === filterStatus;
+      return matchesEmail && matchesStatus && (!from || date >= from) && (!to || date <= to);
+    });
+  }, [meetings, filterEmail, filterStatus, filterFrom, filterTo]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [filterEmail, filterStatus, filterFrom, filterTo]);
+
+  const pagedMeetings = visibleMeetings.slice((historyPage - 1) * pageSize, historyPage * pageSize);
+  const totalPages = Math.max(1, Math.ceil(visibleMeetings.length / pageSize));
 
   const scheduled = meetings.filter((meeting) => meeting.status === "scheduled").length;
   const booked = meetings.filter((meeting) => meeting.booking?.status === "active").length;
@@ -65,6 +81,19 @@ export default function App() {
           </div>
         </section>
 
+        <section className="sprint-brief" aria-labelledby="sprint-brief-title">
+          <div className="brief-card">
+            <span className="eyebrow">Tầm nhìn sản phẩm</span>
+            <h2 id="sprint-brief-title">Họp đúng lúc, đúng chỗ, tối ưu nguồn lực.</h2>
+            <p>Trở thành giải pháp quản lý lịch họp số 1, giúp tổ chức họp thông minh, tiết kiệm thời gian và sử dụng tài nguyên hiệu quả.</p>
+          </div>
+          <div className="brief-card sprint-goal">
+            <span className="eyebrow">Mục tiêu Sprint 1</span>
+            <h2>Hoàn thiện luồng MVP quản lý cuộc họp</h2>
+            <p>Tạo và quản lý lịch, mời người tham dự, tìm thời gian phù hợp, xem phòng trống và đặt phòng không trùng lịch.</p>
+          </div>
+        </section>
+
         {error && <div className="error-banner">{error}. Hãy kiểm tra Backend tại cổng 8000.</div>}
 
         <div className="workspace">
@@ -73,11 +102,25 @@ export default function App() {
             <div className="filter-card">
               <div>
                 <span className="eyebrow">US06 · Lịch sử cá nhân</span>
-                <strong>Lọc theo email</strong>
+                <strong>Lọc lịch sử cuộc họp</strong>
               </div>
               <input type="email" value={filterEmail} onChange={(event) => setFilterEmail(event.target.value)} placeholder="member@ictu.edu.vn" />
+              <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as typeof filterStatus)}>
+                <option value="all">Tất cả trạng thái</option>
+                <option value="scheduled">Đã lên lịch</option>
+                <option value="cancelled">Đã hủy</option>
+              </select>
+              <input type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} aria-label="Từ ngày" />
+              <input type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} aria-label="Đến ngày" />
             </div>
-            <MeetingList meetings={visibleMeetings} onChanged={loadMeetings} />
+            <MeetingList meetings={pagedMeetings} onChanged={loadMeetings} />
+            {totalPages > 1 && (
+              <div className="pagination" aria-label="Phân trang lịch sử">
+                <button disabled={historyPage === 1} onClick={() => setHistoryPage((page) => page - 1)}>Trước</button>
+                <span>Trang {historyPage} / {totalPages}</span>
+                <button disabled={historyPage === totalPages} onClick={() => setHistoryPage((page) => page + 1)}>Sau</button>
+              </div>
+            )}
           </div>
         </div>
       </main>

@@ -35,7 +35,7 @@ export function MeetingForm({ onCreated }: Props) {
     setMessage("");
     try {
       const created = await api.createMeeting({ ...form, participant_emails: participants });
-      setMessage(`Đã tạo ${created.length} lịch họp thành công.`);
+      setMessage(`Đã tạo ${created.length} lịch họp thành công và ghi nhận ${participants.length} lời mời người tham dự.`);
       setForm(initialForm);
       setParticipantText("");
       setSuggestions([]);
@@ -136,4 +136,3 @@ export function MeetingForm({ onCreated }: Props) {
     </section>
   );
 }
-
