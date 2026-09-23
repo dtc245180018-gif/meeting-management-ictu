@@ -36,23 +36,27 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand-mark">M</div>
-        <div>
-          <strong>Meeting Management</strong>
-          <span>ICTU · Nhóm 4</span>
+        <div className="topbar-inner">
+          <a className="brand" href="#" aria-label="Meeting Management ICTU">
+            <span className="brand-mark">ICTU</span>
+            <span className="brand-copy">
+              <strong>Meeting Management</strong>
+              <span>Trường Đại học Công nghệ Thông tin và Truyền thông</span>
+            </span>
+          </a>
+          <nav aria-label="Điều hướng chính">
+            <a href="#create">Tạo lịch</a>
+            <a href="#meetings">Danh sách cuộc họp</a>
+          </nav>
         </div>
-        <nav>
-          <a href="#create">Tạo lịch</a>
-          <a href="#meetings">Danh sách</a>
-        </nav>
       </header>
 
       <main>
         <section className="hero">
           <div>
-            <span className="eyebrow light">SPRINT 1 · AGILE SCRUM</span>
-            <h1>Tổ chức cuộc họp<br />nhanh và không trùng lịch.</h1>
-            <p>Tạo lịch, mời thành viên, tìm giờ rảnh chung và đặt phòng trong một luồng thống nhất.</p>
+            <span className="eyebrow light">ICTU MEETING · SPRINT 1</span>
+            <h1>Lịch họp rõ ràng,<br />phối hợp hiệu quả.</h1>
+            <p>Quản lý lịch, thành viên và phòng họp trong một không gian thống nhất dành cho ICTU.</p>
           </div>
           <div className="stats">
             <div><strong>{meetings.length}</strong><span>Tổng lịch</span></div>
@@ -82,4 +86,3 @@ export default function App() {
     </div>
   );
 }
-
