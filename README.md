@@ -47,6 +47,10 @@ Trên Windows PowerShell, kích hoạt môi trường bằng:
 .venv\Scripts\Activate.ps1
 ```
 
+Nếu chạy frontend bằng Vite ở máy local, hãy để backend chạy đồng thời tại cổng
+8000. Frontend sẽ proxy các request `/api` tới backend, nên có thể mở giao diện
+bằng cả `http://localhost:5173` và `http://127.0.0.1:5173`.
+
 ## Chạy Frontend
 
 ```bash
@@ -68,4 +72,3 @@ pytest -q
 - Tên nhánh ví dụ: `feature/us01-create-meeting`.
 - Commit cần nêu rõ mã User Story và nội dung thay đổi.
 - Chỉ hợp nhất khi code đã review và test liên quan chạy đạt.
-

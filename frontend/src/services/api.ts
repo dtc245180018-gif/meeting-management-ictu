@@ -1,15 +1,20 @@
 import type { Booking, Meeting, MeetingInput, Room, SuggestedTime } from "../types";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
+const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
+  } catch {
+    throw new Error("Không thể kết nối Backend tại cổng 8000. Hãy khởi động API rồi thử lại.");
+  }
 
   if (!response.ok) {
     const payload = await response.json().catch(() => null);
@@ -63,4 +68,3 @@ export const api = {
       body: JSON.stringify({ room_id: roomId, meeting_id: meetingId, requester_email: requesterEmail }),
     }),
 };
-
