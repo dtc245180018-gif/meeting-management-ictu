@@ -52,6 +52,7 @@ export default function App() {
 
   const scheduled = meetings.filter((meeting) => meeting.status === "scheduled").length;
   const booked = meetings.filter((meeting) => meeting.booking?.status === "active").length;
+  const cancelledRooms = meetings.filter((meeting) => meeting.booking?.status === "cancelled").length;
 
   const goTo = (nextPage: Page) => {
     setPage(nextPage);
@@ -124,6 +125,7 @@ export default function App() {
             <div><strong>{meetings.length}</strong><span>Tổng lịch</span></div>
             <div><strong>{scheduled}</strong><span>Đang hoạt động</span></div>
             <div><strong>{booked}</strong><span>Đã có phòng</span></div>
+            <div><strong>{cancelledRooms}</strong><span>Phòng đã hủy</span></div>
           </div>
         </section>
         )}
@@ -150,7 +152,7 @@ export default function App() {
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "meetings" && renderMeetings(meetings)}
-          {page === "rooms" && <RoomDirectory meetingsCount={meetings.length} />}
+          {page === "rooms" && <RoomDirectory meetings={meetings} />}
           {page === "history" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
         </div>
       </main>

@@ -144,15 +144,23 @@ main { width: min(1400px, 100%); margin: auto; }
 .room-search { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 12px; align-items: end; margin: 18px 0; }
 .room-search label { display: grid; gap: 6px; color: var(--muted); font-size: .78rem; font-weight: 700; }
 .room-search input { min-width: 0; width: 100%; }
+.room-filter { display: flex; align-items: end; gap: 14px; margin: 16px 0; }
+.room-filter label { display: grid; gap: 6px; min-width: min(320px, 100%); color: var(--muted); font-size: .78rem; font-weight: 700; }
+.room-filter span { padding-bottom: 11px; color: var(--ictu-blue); font-size: .8rem; font-weight: 700; }
 .room-results { display: grid; gap: 8px; margin: 16px 0; padding: 14px; border: 1px solid #c9d6e4; border-radius: 8px; background: #f0f4f8; }
 .room-result, .room-catalog { display: grid; gap: 8px; }
 .room-result { grid-template-columns: 1fr auto; padding: 10px 12px; border-radius: 6px; background: #fff; }
 .room-result span, .room-card span, .room-card small { color: var(--muted); font-size: .8rem; }
 .room-catalog { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 18px; }
 .room-card { display: grid; gap: 6px; padding: 15px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.room-card b { width: fit-content; padding: 4px 7px; border-radius: 4px; font-size: .7rem; }
+.room-card.booked { border-top: 3px solid var(--ictu-orange); }
+.room-card.booked b { color: #8a5410; background: #fff1d7; }
+.room-card.free { border-top: 3px solid #2e8b57; }
+.room-card.free b { color: #17633a; background: #e5f5eb; }
 
 .page-layout { display: grid; gap: 18px; width: min(1180px, 100%); margin: 0 auto; padding: 0 4vw 45px; }
-.overview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; width: min(1180px, 100%); margin: 0 auto 30px; padding: 0 4vw; }
+.overview-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; width: min(1180px, 100%); margin: 0 auto 30px; padding: 0 4vw; }
 .overview-card { display: grid; gap: 8px; padding: 18px; border: 1px solid var(--line); border-radius: 4px; background: #fff; box-shadow: 0 7px 20px rgba(32, 65, 100, .05); }
 .overview-card span { color: var(--muted); font-size: .8rem; font-weight: 700; }
 .overview-card strong { color: var(--ictu-navy); font-size: 1.9rem; }
@@ -310,6 +318,9 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .brief-card { padding: 17px 18px; }
   .vision-card { grid-template-columns: 1fr; gap: 8px; padding: 18px; }
   .room-search, .room-catalog { grid-template-columns: 1fr; }
+  .room-filter { align-items: stretch; flex-direction: column; }
+  .room-filter label { min-width: 0; }
+  .room-filter span { padding-bottom: 0; }
   .room-result { grid-template-columns: 1fr; }
   .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .stats div { min-height: 80px; padding: 8px 3px; }

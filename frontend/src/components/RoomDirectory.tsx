@@ -1,18 +1,19 @@
 import { FormEvent, useEffect, useState } from "react";
-import type { Room } from "../types";
+import type { Meeting, Room } from "../types";
 import { api } from "../services/api";
 
 interface Props {
-  meetingsCount: number;
+  meetings: Meeting[];
 }
 
 function toIso(value: string) {
   return new Date(value).toISOString();
 }
 
-export function RoomDirectory({ meetingsCount }: Props) {
+export function RoomDirectory({ meetings }: Props) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [availableRooms, setAvailableRooms] = useState<Room[] | null>(null);
+  const [roomFilter, setRoomFilter] = useState<"" | "all" | "booked" | "free">("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [capacity, setCapacity] = useState("1");
@@ -38,6 +39,18 @@ export function RoomDirectory({ meetingsCount }: Props) {
     }
   };
 
+  const bookedRoomIds = new Set(
+    meetings
+      .filter((meeting) => meeting.booking?.status === "active")
+      .map((meeting) => meeting.booking?.room_id)
+      .filter((roomId): roomId is number => roomId !== undefined),
+  );
+  const filteredRooms = roomFilter === "booked"
+    ? rooms.filter((room) => bookedRoomIds.has(room.id))
+    : roomFilter === "free"
+      ? rooms.filter((room) => !bookedRoomIds.has(room.id))
+      : rooms;
+
   return (
     <section className="card wide-card room-directory">
       <div className="section-heading">
@@ -47,7 +60,18 @@ export function RoomDirectory({ meetingsCount }: Props) {
         </div>
         <span className="counter">{rooms.length} phòng đang hoạt động</span>
       </div>
-      <p className="subtle">Chọn thời gian và sức chứa để xem phòng vật lý đang trống. Muốn đặt phòng, hãy mở cuộc họp tương ứng và chọn “Tìm phòng trống”.</p>
+      <p className="subtle">Chọn bộ lọc để xem danh sách phòng. Muốn tra cứu chính xác theo khung giờ, hãy nhập thời gian và sức chứa bên dưới.</p>
+      <div className="room-filter">
+        <label>Danh sách phòng
+          <select value={roomFilter} onChange={(event) => setRoomFilter(event.target.value as typeof roomFilter)}>
+            <option value="">Chọn trạng thái phòng</option>
+            <option value="all">Tất cả phòng</option>
+            <option value="booked">Phòng đã có lịch</option>
+            <option value="free">Phòng chưa có lịch</option>
+          </select>
+        </label>
+        {roomFilter && <span>{filteredRooms.length} phòng thuộc bộ lọc đã chọn</span>}
+      </div>
       <form className="room-search" onSubmit={search}>
         <label>Từ lúc<input required type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
         <label>Đến lúc<input required type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label>
@@ -61,10 +85,21 @@ export function RoomDirectory({ meetingsCount }: Props) {
           {availableRooms.map((room) => <div className="room-result" key={room.id}><strong>{room.name}</strong><span>{room.capacity} chỗ · {room.location}</span></div>)}
         </div>
       )}
-      <div className="room-catalog">
-        {rooms.map((room) => <article className="room-card" key={room.id}><strong>{room.name}</strong><span>{room.capacity} chỗ ngồi</span><small>{room.location}</small></article>)}
-      </div>
-      <p className="subtle">Hiện có {meetingsCount} lịch họp trong hệ thống để kiểm thử đặt phòng và chống trùng lịch.</p>
+      {roomFilter && (
+        <div className="room-catalog">
+          {filteredRooms.length === 0 && <p className="empty">Không có phòng thuộc trạng thái này.</p>}
+          {filteredRooms.map((room) => {
+            const isBooked = bookedRoomIds.has(room.id);
+            return <article className={`room-card ${isBooked ? "booked" : "free"}`} key={room.id}>
+              <strong>{room.name}</strong>
+              <span>{room.capacity} chỗ ngồi</span>
+              <small>{room.location}</small>
+              <b>{isBooked ? "Đã có lịch" : "Chưa có lịch"}</b>
+            </article>;
+          })}
+        </div>
+      )}
+      <p className="subtle">Hiện có {meetings.length} lịch họp trong hệ thống để kiểm thử đặt phòng và chống trùng lịch.</p>
     </section>
   );
 }
