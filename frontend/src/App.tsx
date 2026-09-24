@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MeetingForm } from "./components/MeetingForm";
 import { MeetingList } from "./components/MeetingList";
+import { RoomDirectory } from "./components/RoomDirectory";
 import { api } from "./services/api";
 import type { Meeting } from "./types";
 
@@ -149,7 +150,7 @@ export default function App() {
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "meetings" && renderMeetings(meetings)}
-          {page === "rooms" && renderMeetings(meetings.filter((meeting) => meeting.status === "scheduled"))}
+          {page === "rooms" && <RoomDirectory meetingsCount={meetings.length} />}
           {page === "history" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
         </div>
       </main>

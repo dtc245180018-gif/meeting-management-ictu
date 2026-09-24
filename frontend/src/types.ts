@@ -13,6 +13,14 @@ export interface Room {
   location: string;
 }
 
+export interface Employee {
+  id: number;
+  full_name: string;
+  email: string;
+  department: string;
+  is_active: boolean;
+}
+
 export interface Booking {
   id: number;
   room_id: number;
@@ -52,4 +60,3 @@ export interface SuggestedTime {
   start_time: string;
   end_time: string;
 }
-

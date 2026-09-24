@@ -1,4 +1,4 @@
-import type { Booking, Meeting, MeetingInput, Room, SuggestedTime } from "../types";
+import type { Booking, Employee, Meeting, MeetingInput, Room, SuggestedTime } from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -61,6 +61,10 @@ export const api = {
     });
     return request<Room[]>(`/rooms/available?${params.toString()}`);
   },
+
+  listRooms: () => request<Room[]>("/rooms"),
+
+  listEmployees: () => request<Employee[]>("/employees"),
 
   bookRoom: (roomId: number, meetingId: number, requesterEmail: string) =>
     request<Booking>("/rooms/bookings", {

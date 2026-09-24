@@ -23,6 +23,16 @@ class RoomOut(BaseModel):
     location: str
 
 
+class EmployeeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    full_name: str
+    email: EmailStr
+    department: str
+    is_active: bool
+
+
 class BookingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -115,4 +125,3 @@ class BookingCreate(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
-

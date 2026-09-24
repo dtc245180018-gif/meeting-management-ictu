@@ -63,6 +63,17 @@ class Participant(Base):
     meeting: Mapped[Meeting] = relationship(back_populates="participants")
 
 
+class Employee(Base):
+    __tablename__ = "employees"
+    __table_args__ = (UniqueConstraint("email", name="uq_employee_email"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    full_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    department: Mapped[str] = mapped_column(String(160), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
 class Room(Base):
     __tablename__ = "rooms"
 

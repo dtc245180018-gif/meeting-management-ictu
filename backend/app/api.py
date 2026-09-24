@@ -57,6 +57,17 @@ def list_rooms(db: Session = Depends(get_db)):
     return list(db.scalars(select(models.Room).where(models.Room.is_active.is_(True)).order_by(models.Room.capacity)).all())
 
 
+@router.get("/employees", response_model=list[schemas.EmployeeOut])
+def list_employees(db: Session = Depends(get_db)):
+    return list(
+        db.scalars(
+            select(models.Employee)
+            .where(models.Employee.is_active.is_(True))
+            .order_by(models.Employee.full_name)
+        ).all()
+    )
+
+
 @router.get("/rooms/available", response_model=list[schemas.RoomOut])
 def list_available_rooms(
     start_time: datetime,

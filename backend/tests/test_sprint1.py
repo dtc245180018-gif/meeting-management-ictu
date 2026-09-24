@@ -133,3 +133,13 @@ def test_available_rooms_booking_and_double_booking(client):
         json={"room_id": room_id, "meeting_id": second["id"], "requester_email": "another@ictu.edu.vn"},
     )
     assert duplicate.status_code == 409
+
+
+def test_room_directory_and_employee_fixture(client):
+    rooms = client.get("/api/rooms")
+    assert rooms.status_code == 200
+    assert {room["name"] for room in rooms.json()} >= {"Phòng A101", "Phòng A203"}
+
+    employees = client.get("/api/employees")
+    assert employees.status_code == 200
+    assert any(employee["email"] == ORGANIZER for employee in employees.json())

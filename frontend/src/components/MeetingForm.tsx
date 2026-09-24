@@ -1,5 +1,5 @@
-import { FormEvent, useMemo, useState } from "react";
-import type { MeetingInput, SuggestedTime } from "../types";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { Employee, MeetingInput, SuggestedTime } from "../types";
 import { api } from "../services/api";
 
 const initialForm: MeetingInput = {
@@ -42,6 +42,11 @@ export function MeetingForm({ onCreated }: Props) {
   const [suggestions, setSuggestions] = useState<SuggestedTime[]>([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+
+  useEffect(() => {
+    void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
+  }, []);
 
   const participants = useMemo(
     () => participantText.split(/[;,\n]/).map((value) => value.trim()).filter(Boolean),
@@ -131,10 +136,10 @@ export function MeetingForm({ onCreated }: Props) {
           <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Nội dung và mục tiêu cuộc họp" />
         </label>
         <label>Người tổ chức
-          <input required type="email" value={form.organizer_email} onChange={(e) => setForm({ ...form, organizer_email: e.target.value })} placeholder="leader@ictu.edu.vn" />
+          <input required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => setForm({ ...form, organizer_email: e.target.value })} placeholder="leader@ictu.edu.vn" />
         </label>
         <label>Người tham dự
-          <input value={participantText} onChange={(e) => setParticipantText(e.target.value)} placeholder="email1; email2" />
+          <input list="ictu-employees" value={participantText} onChange={(e) => setParticipantText(e.target.value)} placeholder="email1; email2" />
         </label>
         <label>Bắt đầu
           <input required type="datetime-local" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
@@ -157,6 +162,7 @@ export function MeetingForm({ onCreated }: Props) {
           <button className="button primary" type="submit" disabled={loading}>{loading ? "Đang xử lý..." : "Tạo lịch họp"}</button>
         </div>
       </form>
+      <datalist id="ictu-employees">{employees.map((employee) => <option key={employee.email} value={employee.email}>{employee.full_name} · {employee.department}</option>)}</datalist>
       {suggestions.length > 0 && (
         <div className="suggestions">
           <strong>Khung giờ đề xuất</strong>

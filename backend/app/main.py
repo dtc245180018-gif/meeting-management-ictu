@@ -25,10 +25,28 @@ def seed_rooms() -> None:
         db.commit()
 
 
+def seed_employees() -> None:
+    with SessionLocal() as db:
+        if db.scalar(select(models.Employee.id).limit(1)):
+            return
+        db.add_all(
+            [
+                models.Employee(full_name="Nguyễn Ngọc Thắng", email="leader@ictu.edu.vn", department="Nhóm dự án ICTU"),
+                models.Employee(full_name="Trần Minh Anh", email="minhanh@ictu.edu.vn", department="Khoa Công nghệ thông tin"),
+                models.Employee(full_name="Lê Hoàng Nam", email="hoangnam@ictu.edu.vn", department="Phòng Đào tạo"),
+                models.Employee(full_name="Phạm Thu Hà", email="thuha@ictu.edu.vn", department="Phòng Hành chính"),
+                models.Employee(full_name="Đỗ Quang Huy", email="quanghuy@ictu.edu.vn", department="Trung tâm CNTT"),
+                models.Employee(full_name="Vũ Mai Linh", email="mailinh@ictu.edu.vn", department="Khoa Hệ thống thông tin"),
+            ]
+        )
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     seed_rooms()
+    seed_employees()
     yield
 
 
@@ -47,4 +65,3 @@ app.include_router(router)
 @app.get("/")
 def root():
     return {"message": "Meeting Management ICTU API", "docs": "/docs"}
-
