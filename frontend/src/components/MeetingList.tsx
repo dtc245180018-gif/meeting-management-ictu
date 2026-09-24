@@ -10,6 +10,7 @@ interface Props {
 export function MeetingList({ meetings, onChanged }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
+  const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [editing, setEditing] = useState<Meeting | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -103,7 +104,17 @@ export function MeetingList({ meetings, onChanged }: Props) {
             <div className="meeting-info">
               <div className="meeting-title-row">
                 <h3>{meeting.title}</h3>
-                <span className={`status ${meeting.status}`}>{meeting.status === "scheduled" ? "Đã lên lịch" : "Đã hủy"}</span>
+                <div className="meeting-controls">
+                  <span className={`status ${meeting.status}`}>{meeting.status === "scheduled" ? "Đã lên lịch" : "Đã hủy"}</span>
+                  {meeting.status === "scheduled" && <button className="more-button" onClick={() => setOpenMenu(openMenu === meeting.id ? null : meeting.id)} aria-label={`Thao tác cho ${meeting.title}`}>⋯</button>}
+                  {openMenu === meeting.id && meeting.status === "scheduled" && (
+                    <div className="more-menu">
+                      {meeting.status === "scheduled" && <button onClick={() => { setEditing(meeting); setOpenMenu(null); }}>Chỉnh sửa</button>}
+                      {meeting.status === "scheduled" && !meeting.booking && <button onClick={() => { findRooms(meeting); setOpenMenu(null); }}>Tìm phòng trống</button>}
+                      {meeting.status === "scheduled" && <button className="menu-danger" onClick={() => { void cancel(meeting); setOpenMenu(null); }}>Hủy lịch</button>}
+                    </div>
+                  )}
+                </div>
               </div>
               <p>{meeting.description || "Không có mô tả"}</p>
               <div className="meta">
@@ -123,11 +134,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
                 </div>
               )}
               {meeting.status === "scheduled" && (
-                <div className="item-actions">
-                  <button onClick={() => setEditing(meeting)}>Chỉnh sửa</button>
-                  {!meeting.booking && <button onClick={() => findRooms(meeting)}>Tìm phòng trống</button>}
-                  <button className="danger" onClick={() => cancel(meeting)}>Hủy lịch</button>
-                </div>
+                <div className="item-actions"><span className="action-hint">Mở ⋯ để thao tác</span></div>
               )}
               {editing?.id === meeting.id && (
                 <div className="edit-form">
