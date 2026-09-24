@@ -13,6 +13,25 @@ const initialForm: MeetingInput = {
   recurrence_count: 1,
 };
 
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function toIsoDateTime(value: string) {
+  return new Date(value).toISOString();
+}
+
+function validateForm(form: MeetingInput, participants: string[]) {
+  if (!form.title.trim() || form.title.trim().length < 3) return "Tên cuộc họp phải có ít nhất 3 ký tự.";
+  if (!emailPattern.test(form.organizer_email.trim())) return "Email người tổ chức không hợp lệ.";
+  if (participants.some((email) => !emailPattern.test(email))) return "Email người tham dự không hợp lệ.";
+  if (!form.start_time || !form.end_time) return "Hãy chọn thời gian bắt đầu và kết thúc.";
+
+  const start = new Date(form.start_time);
+  const end = new Date(form.end_time);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "Thời gian cuộc họp không hợp lệ.";
+  if (end <= start) return "Thời gian kết thúc phải sau thời gian bắt đầu.";
+  return null;
+}
+
 interface Props {
   onCreated: () => void;
 }
@@ -34,7 +53,18 @@ export function MeetingForm({ onCreated }: Props) {
     setLoading(true);
     setMessage("");
     try {
-      const created = await api.createMeeting({ ...form, participant_emails: participants });
+      const validationError = validateForm(form, participants);
+      if (validationError) {
+        setMessage(validationError);
+        return;
+      }
+      const created = await api.createMeeting({
+        ...form,
+        organizer_email: form.organizer_email.trim(),
+        start_time: toIsoDateTime(form.start_time),
+        end_time: toIsoDateTime(form.end_time),
+        participant_emails: participants,
+      });
       setMessage(`Đã tạo ${created.length} lịch họp thành công và ghi nhận ${participants.length} lời mời người tham dự.`);
       setForm(initialForm);
       setParticipantText("");
@@ -48,8 +78,13 @@ export function MeetingForm({ onCreated }: Props) {
   };
 
   const findSuggestions = async () => {
-    if (!form.start_time || !form.end_time || (!form.organizer_email && participants.length === 0)) {
+    const validationError = validateForm({ ...form, title: form.title || "Tìm giờ họp" }, participants);
+    if (validationError === "Tên cuộc họp phải có ít nhất 3 ký tự.") {
       setMessage("Hãy nhập người tổ chức, người tham dự và khoảng thời gian tìm kiếm.");
+      return;
+    }
+    if (validationError) {
+      setMessage(validationError);
       return;
     }
     setLoading(true);
