@@ -11,6 +11,13 @@ export interface Room {
   name: string;
   capacity: number;
   location: string;
+  building?: string;
+  floor?: number;
+  room_type?: string;
+  projector?: boolean;
+  display?: boolean;
+  microphone?: boolean;
+  video_conferencing?: boolean;
 }
 
 export interface Employee {
@@ -36,6 +43,7 @@ export interface Meeting {
   title: string;
   description?: string;
   organizer_email: string;
+  expected_attendees?: number;
   start_time: string;
   end_time: string;
   recurrence?: "weekly" | "monthly";
@@ -52,6 +60,7 @@ export interface MeetingInput {
   start_time: string;
   end_time: string;
   participant_emails: string[];
+  expected_attendees: number;
   recurrence: "weekly" | "monthly" | null;
   recurrence_count: number;
 }

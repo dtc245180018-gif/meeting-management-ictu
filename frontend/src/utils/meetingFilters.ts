@@ -9,8 +9,10 @@ export interface MeetingFilterOptions {
 
 export function filterMeetings(meetings: Meeting[], options: MeetingFilterOptions): Meeting[] {
   const email = options.email?.trim().toLowerCase() ?? "";
-  const from = options.from ? new Date(`${options.from}T00:00:00`) : null;
-  const to = options.to ? new Date(`${options.to}T23:59:59`) : null;
+  // Business dates are ICTU's Asia/Ho_Chi_Minh dates (+07:00), regardless of
+  // the timezone configured on the user's browser.
+  const from = options.from ? new Date(`${options.from}T00:00:00+07:00`) : null;
+  const to = options.to ? new Date(`${options.to}T23:59:59.999+07:00`) : null;
 
   return meetings.filter((meeting) => {
     const date = new Date(meeting.start_time);

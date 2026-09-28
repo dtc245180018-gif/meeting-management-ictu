@@ -38,8 +38,15 @@ export const api = {
       body: JSON.stringify({ requester_email: requesterEmail }),
     }),
 
-  history: (email: string) =>
-    request<Meeting[]>(`/meetings/history?email=${encodeURIComponent(email)}`),
+  history: (email: string, options: { status?: string; dateFrom?: string; dateTo?: string; offset?: number; limit?: number } = {}) => {
+    const params = new URLSearchParams({ email });
+    if (options.status && options.status !== "all") params.set("status", options.status);
+    if (options.dateFrom) params.set("date_from", options.dateFrom);
+    if (options.dateTo) params.set("date_to", options.dateTo);
+    params.set("offset", String(options.offset ?? 0));
+    params.set("limit", String(options.limit ?? 100));
+    return request<Meeting[]>(`/meetings/history?${params.toString()}`);
+  },
 
   suggestTimes: (participantEmails: string[], rangeStart: string, rangeEnd: string, durationMinutes = 60) =>
     request<SuggestedTime[]>("/meetings/suggest-times", {

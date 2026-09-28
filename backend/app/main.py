@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import inspect, select, text
 
 from . import models
 from .api import router
@@ -16,10 +16,10 @@ def seed_rooms() -> None:
             return
         db.add_all(
             [
-                models.Room(name="Phòng A101", capacity=6, location="Tầng 1 - Khu A"),
-                models.Room(name="Phòng A203", capacity=12, location="Tầng 2 - Khu A"),
-                models.Room(name="Phòng B301", capacity=20, location="Tầng 3 - Khu B"),
-                models.Room(name="Hội trường C", capacity=80, location="Tầng 1 - Khu C"),
+                models.Room(name="Phòng A101", capacity=6, location="Tầng 1 - Khu A", building="Khu A", floor=1, room_type="Phòng họp nhỏ", display=True, microphone=True),
+                models.Room(name="Phòng A203", capacity=12, location="Tầng 2 - Khu A", building="Khu A", floor=2, room_type="Phòng họp", projector=True, display=True, microphone=True, video_conferencing=True),
+                models.Room(name="Phòng B301", capacity=20, location="Tầng 3 - Khu B", building="Khu B", floor=3, room_type="Phòng họp lớn", projector=True, display=True, microphone=True, video_conferencing=True),
+                models.Room(name="Hội trường C", capacity=80, location="Tầng 1 - Khu C", building="Khu C", floor=1, room_type="Hội trường", projector=True, display=True, microphone=True, video_conferencing=True),
             ]
         )
         db.commit()
@@ -42,9 +42,34 @@ def seed_employees() -> None:
         db.commit()
 
 
+def apply_schema_migrations() -> None:
+    """Apply the forward-only schema changes used by the Sprint 1 app."""
+    inspector = inspect(engine)
+    with engine.begin() as connection:
+        meeting_columns = {column["name"] for column in inspector.get_columns("meetings")}
+        if "expected_attendees" not in meeting_columns:
+            connection.execute(text("ALTER TABLE meetings ADD COLUMN expected_attendees INTEGER NOT NULL DEFAULT 1"))
+            connection.execute(text("UPDATE meetings SET expected_attendees = 1 + (SELECT COUNT(*) FROM participants WHERE participants.meeting_id = meetings.id)"))
+
+        room_columns = {column["name"] for column in inspector.get_columns("rooms")}
+        additions = {
+            "building": "VARCHAR(120) NOT NULL DEFAULT ''",
+            "floor": "INTEGER NOT NULL DEFAULT 1",
+            "room_type": "VARCHAR(80) NOT NULL DEFAULT 'Phòng họp'",
+            "projector": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "display": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "microphone": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "video_conferencing": "BOOLEAN NOT NULL DEFAULT FALSE",
+        }
+        for name, definition in additions.items():
+            if name not in room_columns:
+                connection.execute(text(f"ALTER TABLE rooms ADD COLUMN {name} {definition}"))
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    apply_schema_migrations()
     seed_rooms()
     seed_employees()
     yield

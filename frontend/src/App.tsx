@@ -14,7 +14,6 @@ export default function App() {
   const [historyMeetings, setHistoryMeetings] = useState<Meeting[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [calendarMode, setCalendarMode] = useState<"all" | "history">("all");
-  const [roomSearch, setRoomSearch] = useState<{ startTime: string; endTime: string; minCapacity: number } | null>(null);
   const [filterEmail, setFilterEmail] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | Meeting["status"]>("all");
   const [filterFrom, setFilterFrom] = useState("");
@@ -46,13 +45,29 @@ export default function App() {
     let active = true;
     setHistoryLoading(true);
     setHistoryMeetings([]);
-    void api.history(email)
-      .then((result) => {
-        if (active) {
-          setHistoryMeetings(result);
-          setError("");
-        }
-      })
+    const dateFrom = filterFrom ? `${filterFrom}T00:00:00+07:00` : undefined;
+    const dateTo = filterTo ? `${filterTo}T23:59:59.999+07:00` : undefined;
+    const loadHistory = async () => {
+      const result: Meeting[] = [];
+      let offset = 0;
+      do {
+        const page = await api.history(email, {
+          status: filterStatus,
+          dateFrom,
+          dateTo,
+          offset,
+          limit: 100,
+        });
+        result.push(...page);
+        offset += page.length;
+        if (page.length < 100) break;
+      } while (active);
+      if (active) {
+        setHistoryMeetings(result);
+        setError("");
+      }
+    };
+    void loadHistory()
       .catch((err: unknown) => {
         if (active) {
           setHistoryMeetings([]);
@@ -66,7 +81,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [page, calendarMode, filterEmail]);
+  }, [page, calendarMode, filterEmail, filterStatus, filterFrom, filterTo]);
 
   const visibleMeetings = useMemo(() => {
     const source = calendarMode === "history" ? historyMeetings : meetings;
@@ -80,24 +95,28 @@ export default function App() {
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [filterEmail, filterStatus, filterFrom, filterTo]);
+  }, [calendarMode, filterEmail, filterStatus, filterFrom, filterTo]);
 
   const pagedMeetings = visibleMeetings.slice((historyPage - 1) * pageSize, historyPage * pageSize);
   const totalPages = Math.max(1, Math.ceil(visibleMeetings.length / pageSize));
 
   const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  const scheduled = meetings.filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time) >= now).length;
+  const businessDate = (value: Date) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(value);
+  const today = businessDate(now);
+  const upcomingMeetings = meetings.filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time) >= now);
+  const scheduled = upcomingMeetings.length;
   const todayMeetings = meetings.filter((meeting) => {
     const start = new Date(meeting.start_time);
-    return meeting.status === "scheduled" && start >= dayStart && start < dayEnd;
+    return meeting.status === "scheduled" && businessDate(start) === today;
   }).length;
-  const booked = meetings.filter((meeting) => meeting.booking?.status === "active").length;
-  const withoutRoom = meetings.filter((meeting) => meeting.status === "scheduled" && !meeting.booking).length;
-  const pendingInvites = meetings.reduce(
+  const booked = upcomingMeetings.filter((meeting) => meeting.booking?.status === "active").length;
+  const withoutRoom = upcomingMeetings.filter((meeting) => !meeting.booking).length;
+  const pendingInvites = upcomingMeetings.reduce(
     (count, meeting) => count + meeting.participants.filter((participant) => participant.status === "invited").length,
     0,
   );
@@ -200,7 +219,8 @@ export default function App() {
         {error && <div className="error-banner">{error}. Hãy kiểm tra Backend tại cổng 8000.</div>}
 
         {page === "overview" && (
-          <section className="overview-grid">
+          <section className="overview-grid" aria-label="Thống kê toàn hệ thống">
+            <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>Thống kê toàn hệ thống · chỉ tính các cuộc họp sắp tới, vì Sprint 1 chưa có đăng nhập cá nhân.</p>
             <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
             <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
             <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={() => goTo("calendar")}>Xem lời mời →</button></div>
@@ -225,9 +245,9 @@ export default function App() {
           </section>
         )}
         <div className="page-layout">
-          {page === "create" && <MeetingForm onCreated={loadMeetings} onRoomsRequested={(search) => { setRoomSearch(search); goTo("rooms"); }} />}
+          {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
-          {page === "rooms" && <RoomDirectory meetings={meetings} initialSearch={roomSearch} />}
+          {page === "rooms" && <RoomDirectory meetings={meetings} />}
         </div>
       </main>
 

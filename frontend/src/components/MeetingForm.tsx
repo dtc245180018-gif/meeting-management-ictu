@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Employee, MeetingInput, SuggestedTime } from "../types";
+import type { Employee, MeetingInput, Room, SuggestedTime } from "../types";
 import { api } from "../services/api";
 
 const initialForm: MeetingInput = {
@@ -9,6 +9,7 @@ const initialForm: MeetingInput = {
   start_time: "",
   end_time: "",
   participant_emails: [],
+  expected_attendees: 1,
   recurrence: null,
   recurrence_count: 1,
 };
@@ -23,6 +24,7 @@ function validateForm(form: MeetingInput, participants: string[]) {
   if (!form.title.trim() || form.title.trim().length < 3) return "Tên cuộc họp phải có ít nhất 3 ký tự.";
   if (!emailPattern.test(form.organizer_email.trim())) return "Email người tổ chức không hợp lệ.";
   if (participants.some((email) => !emailPattern.test(email))) return "Email người tham dự không hợp lệ.";
+  if (form.expected_attendees < participants.length + 1) return "Số người dự kiến phải ít nhất bằng số người được mời và người tổ chức.";
   if (!form.start_time || !form.end_time) return "Hãy chọn thời gian bắt đầu và kết thúc.";
 
   const start = new Date(form.start_time);
@@ -34,19 +36,20 @@ function validateForm(form: MeetingInput, participants: string[]) {
 
 interface Props {
   onCreated: () => void;
-  onRoomsRequested: (search: { startTime: string; endTime: string; minCapacity: number }) => void;
 }
 
-export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
+export function MeetingForm({ onCreated }: Props) {
   const [form, setForm] = useState(initialForm);
   const [participantInput, setParticipantInput] = useState("");
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [participantError, setParticipantError] = useState("");
-  const [expectedAttendees, setExpectedAttendees] = useState("");
   const [suggestions, setSuggestions] = useState<SuggestedTime[]>([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [roomOptions, setRoomOptions] = useState<Room[]>([]);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [roomLoading, setRoomLoading] = useState(false);
 
   useEffect(() => {
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
@@ -80,12 +83,42 @@ export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
     setParticipantInput("");
   };
 
+  const commitPendingParticipant = () => {
+    if (!participantInput.trim()) return true;
+    const emails = participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
+    const invalid = emails.find((email) => !emailPattern.test(email));
+    if (invalid) {
+      setParticipantError(`Email không hợp lệ: ${invalid}`);
+      return false;
+    }
+    setSelectedParticipants((current) => [...new Set([...current, ...emails])]);
+    setParticipantInput("");
+    setParticipantError("");
+    return true;
+  };
+
+  const submittedParticipants = () => {
+    const pending = participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
+    return [...new Set([...selectedParticipants, ...pending])]
+      .filter((email) => email !== form.organizer_email.trim().toLowerCase());
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
     setMessage("");
     try {
-      const validationError = validateForm(form, participants);
+      const currentParticipants = submittedParticipants();
+      const pendingInvalid = participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean).find((email) => !emailPattern.test(email));
+      if (pendingInvalid) {
+        setParticipantError(`Email không hợp lệ: ${pendingInvalid}`);
+        return;
+      }
+      if (participantInput.trim()) {
+        setSelectedParticipants((current) => [...new Set([...current, ...participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean)])]);
+        setParticipantInput("");
+      }
+      const validationError = validateForm(form, currentParticipants);
       if (validationError) {
         setMessage(validationError);
         return;
@@ -95,14 +128,26 @@ export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
         organizer_email: form.organizer_email.trim(),
         start_time: toIsoDateTime(form.start_time),
         end_time: toIsoDateTime(form.end_time),
-        participant_emails: participants,
+        participant_emails: currentParticipants,
       });
-      setMessage(`Đã tạo ${created.length} lịch họp thành công và ghi nhận ${participants.length} lời mời người tham dự.`);
+      if (selectedRoom) {
+        try {
+          for (const meeting of created) {
+            await api.bookRoom(selectedRoom.id, meeting.id, form.organizer_email.trim());
+          }
+          setMessage(`Đã tạo ${created.length} lịch họp, ghi nhận ${currentParticipants.length} lời mời và đặt ${selectedRoom.name} thành công.`);
+        } catch (bookingError) {
+          setMessage(`Đã tạo lịch họp nhưng đặt phòng thất bại: ${bookingError instanceof Error ? bookingError.message : "lỗi không xác định"}. Cuộc họp chưa được xem là hoàn tất đặt phòng.`);
+        }
+      } else {
+        setMessage(`Đã tạo ${created.length} lịch họp thành công và ghi nhận ${currentParticipants.length} lời mời người tham dự.`);
+      }
       setForm(initialForm);
       setParticipantInput("");
       setSelectedParticipants([]);
       setParticipantError("");
-      setExpectedAttendees("");
+      setRoomOptions([]);
+      setSelectedRoom(null);
       setSuggestions([]);
       onCreated();
     } catch (error) {
@@ -156,12 +201,22 @@ export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
       setMessage("Hãy chọn thời gian hợp lệ trước khi tìm phòng.");
       return;
     }
-    const minCapacity = Math.max(Number(expectedAttendees) || 0, participants.length + 1, 1);
-    onRoomsRequested({
-      startTime: form.start_time,
-      endTime: form.end_time,
-      minCapacity,
-    });
+    const currentParticipants = submittedParticipants();
+    const invalid = currentParticipants.find((email) => !emailPattern.test(email));
+    if (invalid) {
+      setParticipantError(`Email không hợp lệ: ${invalid}`);
+      return;
+    }
+    setRoomLoading(true);
+    setMessage("");
+    void api.availableRooms(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time), Math.max(form.expected_attendees, currentParticipants.length + 1, 1))
+      .then((rooms) => {
+        setRoomOptions(rooms);
+        setSelectedRoom(null);
+        setMessage(rooms.length ? `Đã tìm thấy ${rooms.length} phòng phù hợp. Chọn một phòng rồi bấm Tạo lịch họp.` : "Không có phòng phù hợp trong khung giờ và quy mô này.");
+      })
+      .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Không thể tìm phòng phù hợp"))
+      .finally(() => setRoomLoading(false));
   };
 
   return (
@@ -200,6 +255,7 @@ export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
                 addParticipants(participantInput);
               }
             }}
+            onBlur={() => { commitPendingParticipant(); }}
             placeholder="Gõ tên hoặc email rồi nhấn Enter"
             aria-autocomplete="list"
           />
@@ -232,7 +288,7 @@ export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
           <input required type="datetime-local" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
         </label>
         <label>Số người dự kiến
-          <input min={participants.length + 1} type="number" value={expectedAttendees} onChange={(event) => setExpectedAttendees(event.target.value)} placeholder={String(participants.length + 1)} />
+            <input min={participants.length + 1} type="number" value={form.expected_attendees} onChange={(event) => setForm({ ...form, expected_attendees: Number(event.target.value) })} />
         </label>
         <label>Lặp lại
           <select value={form.recurrence ?? ""} onChange={(e) => setForm({ ...form, recurrence: (e.target.value || null) as MeetingInput["recurrence"] })}>
@@ -246,10 +302,21 @@ export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
         </label>
         <div className="full action-row">
           <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading}>Gợi ý giờ trống</button>
-          <button className="button secondary" type="button" onClick={openRoomFinder}>Tìm phòng phù hợp</button>
+          <button className="button secondary" type="button" onClick={openRoomFinder} disabled={roomLoading}>{roomLoading ? "Đang tìm phòng..." : "Tìm phòng phù hợp"}</button>
           <button className="button primary" type="submit" disabled={loading}>{loading ? "Đang xử lý..." : "Tạo lịch họp"}</button>
         </div>
       </form>
+      {roomOptions.length > 0 && (
+        <div className="room-options" aria-label="Phòng phù hợp cho cuộc họp">
+          <strong>Chọn phòng để đặt cùng lúc tạo lịch</strong>
+          {roomOptions.map((room) => (
+            <button className={selectedRoom?.id === room.id ? "selected" : ""} key={room.id} type="button" onClick={() => setSelectedRoom(room)}>
+              <strong>{room.name}{selectedRoom?.id === room.id ? " · Đã chọn" : ""}</strong>
+              <span>{room.capacity} chỗ · {room.location} · {room.room_type}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {participants.length > 0 && <p className="subtle">{participants.length} người sẽ nhận lời mời.</p>}
       {suggestions.length > 0 && (
         <div className="suggestions">

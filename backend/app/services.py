@@ -120,6 +120,7 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
             title=payload.title.strip(),
             description=payload.description,
             organizer_email=str(payload.organizer_email).lower(),
+            expected_attendees=payload.expected_attendees,
             start_time=start_time,
             end_time=end_time,
             recurrence=payload.recurrence,
@@ -151,6 +152,13 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
         if payload.participant_emails is not None
         else [participant.email for participant in meeting.participants]
     )
+    minimum_attendees = len(participant_emails) + 1
+    expected_attendees = payload.expected_attendees if payload.expected_attendees is not None else max(meeting.expected_attendees, minimum_attendees)
+    if payload.expected_attendees is not None and expected_attendees < minimum_attendees:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Số người dự kiến phải ít nhất bằng số người được mời và người tổ chức",
+        )
     ensure_no_person_conflicts(
         db,
         [meeting.organizer_email, *participant_emails],
@@ -165,6 +173,13 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
         ensure_room_available(db, meeting.booking.room_id, new_start, new_end, exclude_booking_id=meeting.booking.id)
         meeting.booking.start_time = new_start
         meeting.booking.end_time = new_end
+    if meeting.booking and meeting.booking.status == models.BookingStatus.ACTIVE:
+        room = db.get(models.Room, meeting.booking.room_id)
+        if room and room.capacity < expected_attendees:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sức chứa phòng đang đặt không đủ; hãy đổi phòng trước khi cập nhật quy mô cuộc họp",
+            )
 
     if payload.title is not None:
         meeting.title = payload.title.strip()
@@ -172,6 +187,7 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
         meeting.description = payload.description
     meeting.start_time = new_start
     meeting.end_time = new_end
+    meeting.expected_attendees = expected_attendees
     if payload.participant_emails is not None:
         desired_emails = set(participant_emails)
         existing_emails = {participant.email for participant in meeting.participants}
@@ -346,7 +362,8 @@ def create_booking(db: Session, payload: schemas.BookingCreate) -> models.RoomBo
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
         if meeting.booking and meeting.booking.status == models.BookingStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cuộc họp đã có phòng")
-        if room.capacity < len(meeting.participants) + 1:
+        required_capacity = max(meeting.expected_attendees, len(meeting.participants) + 1)
+        if room.capacity < required_capacity:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sức chứa phòng không đủ")
         ensure_room_available(db, room.id, meeting.start_time, meeting.end_time)
 

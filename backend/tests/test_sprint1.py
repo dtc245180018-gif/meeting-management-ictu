@@ -244,3 +244,50 @@ def test_room_directory_and_employee_fixture(client):
     employees = client.get("/api/employees")
     assert employees.status_code == 200
     assert any(employee["email"] == ORGANIZER for employee in employees.json())
+
+
+def test_expected_attendees_is_persisted_and_controls_booking_capacity(client):
+    start = future_time(days=6)
+    created = client.post(
+        "/api/meetings",
+        json=meeting_payload(start_time=start, participant_emails=[], expected_attendees=20),
+    )
+    assert created.status_code == 201
+    meeting = created.json()[0]
+    assert meeting["expected_attendees"] == 20
+
+    room = next(room for room in client.get("/api/rooms").json() if room["capacity"] == 6)
+    booking = client.post(
+        "/api/rooms/bookings",
+        json={"room_id": room["id"], "meeting_id": meeting["id"], "requester_email": ORGANIZER},
+    )
+    assert booking.status_code == 409
+
+    small = client.post(
+        "/api/meetings",
+        json=meeting_payload(title="Cuộc họp nhỏ", start_time=start + timedelta(hours=2), participant_emails=[], expected_attendees=2),
+    ).json()[0]
+    assert client.post(
+        "/api/rooms/bookings",
+        json={"room_id": room["id"], "meeting_id": small["id"], "requester_email": ORGANIZER},
+    ).status_code == 201
+    resized = client.patch(
+        f"/api/meetings/{small['id']}",
+        json={"requester_email": ORGANIZER, "expected_attendees": 9},
+    )
+    assert resized.status_code == 409
+
+
+def test_titles_are_trimmed_and_unknown_request_fields_are_rejected(client):
+    invalid_title = client.post("/api/meetings", json=meeting_payload(title="   "))
+    assert invalid_title.status_code == 422
+
+    created = client.post("/api/meetings", json=meeting_payload(title="Họp hợp lệ")).json()[0]
+    invalid_update = client.patch(
+        f"/api/meetings/{created['id']}",
+        json={"requester_email": ORGANIZER, "title": "   "},
+    )
+    assert invalid_update.status_code == 422
+
+    unknown_field = client.post("/api/meetings", json=meeting_payload(unexpected_field=True))
+    assert unknown_field.status_code == 422

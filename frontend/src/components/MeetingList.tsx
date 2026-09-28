@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Meeting, Room } from "../types";
+import type { Employee, Meeting, Room } from "../types";
 import { api } from "../services/api";
 
 interface Props {
@@ -23,7 +23,10 @@ export function MeetingList({ meetings, onChanged }: Props) {
   const [editDescription, setEditDescription] = useState("");
   const [editStart, setEditStart] = useState("");
   const [editEnd, setEditEnd] = useState("");
-  const [editParticipants, setEditParticipants] = useState("");
+  const [editParticipantList, setEditParticipantList] = useState<string[]>([]);
+  const [editParticipantInput, setEditParticipantInput] = useState("");
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [editExpectedAttendees, setEditExpectedAttendees] = useState(1);
 
   useEffect(() => {
     if (!editing) return;
@@ -31,8 +34,20 @@ export function MeetingList({ meetings, onChanged }: Props) {
     setEditDescription(editing.description ?? "");
     setEditStart(toLocalInput(editing.start_time));
     setEditEnd(toLocalInput(editing.end_time));
-    setEditParticipants(editing.participants.map((participant) => participant.email).join("; "));
+    setEditParticipantList(editing.participants.map((participant) => participant.email));
+    setEditParticipantInput("");
+    setEditExpectedAttendees(editing.expected_attendees ?? editing.participants.length + 1);
   }, [editing]);
+
+  useEffect(() => {
+    void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
+  }, []);
+
+  const addEditParticipant = (value: string) => {
+    const emails = value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
+    setEditParticipantList((current) => [...new Set([...current, ...emails])]);
+    setEditParticipantInput("");
+  };
 
   const saveEdit = async () => {
     if (!editing) return;
@@ -43,7 +58,8 @@ export function MeetingList({ meetings, onChanged }: Props) {
         description: editDescription,
         start_time: new Date(editStart).toISOString(),
         end_time: new Date(editEnd).toISOString(),
-        participant_emails: editParticipants.split(/[;,\n]/).map((value) => value.trim()).filter(Boolean),
+        participant_emails: [...new Set([...editParticipantList, ...editParticipantInput.split(/[;,\n]/).map((value) => value.trim().toLowerCase()).filter(Boolean)])],
+        expected_attendees: Math.max(editExpectedAttendees, editParticipantList.length + 1),
       });
       setMessage(`Đã cập nhật cuộc họp #${editing.id}.`);
       setEditing(null);
@@ -66,7 +82,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
 
   const findRooms = async (meeting: Meeting) => {
     try {
-      const result = await api.availableRooms(meeting.start_time, meeting.end_time, meeting.participants.length + 1);
+      const result = await api.availableRooms(meeting.start_time, meeting.end_time, Math.max(meeting.expected_attendees ?? 0, meeting.participants.length + 1));
       setRooms({ ...rooms, [meeting.id]: result });
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể tìm phòng");
@@ -120,7 +136,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
               <p>{meeting.description || "Không có mô tả"}</p>
               <div className="meta">
                 <span>Chủ trì: {meeting.organizer_email}</span>
-                <span>{meeting.participants.length} người tham dự</span>
+                <span>{meeting.expected_attendees ?? meeting.participants.length + 1} người dự kiến · {meeting.participants.length} người tham dự</span>
                 <span>{meeting.booking ? meeting.booking.room.name : "Chưa đặt phòng"}</span>
                 {meeting.recurrence && <span>Lặp {meeting.recurrence === "weekly" ? "hằng tuần" : "hằng tháng"}</span>}
               </div>
@@ -148,7 +164,12 @@ export function MeetingList({ meetings, onChanged }: Props) {
                     <label>Bắt đầu<input type="datetime-local" value={editStart} onChange={(event) => setEditStart(event.target.value)} /></label>
                     <label>Kết thúc<input type="datetime-local" value={editEnd} onChange={(event) => setEditEnd(event.target.value)} /></label>
                   </div>
-                  <label>Người tham dự<input value={editParticipants} onChange={(event) => setEditParticipants(event.target.value)} placeholder="email1; email2" /></label>
+                  <label>Số người dự kiến<input min={meeting.participants.length + 1} type="number" value={editExpectedAttendees} onChange={(event) => setEditExpectedAttendees(Number(event.target.value))} /></label>
+                  <label>Người tham dự
+                    <input value={editParticipantInput} onChange={(event) => { if (/[;,\n]/.test(event.target.value)) addEditParticipant(event.target.value); else setEditParticipantInput(event.target.value); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === "," || event.key === ";") { event.preventDefault(); addEditParticipant(editParticipantInput); } }} onBlur={() => addEditParticipant(editParticipantInput)} placeholder="Gõ tên hoặc email rồi nhấn Enter" />
+                    {editParticipantInput.trim() && <div className="employee-suggestions">{employees.filter((employee) => `${employee.full_name} ${employee.email} ${employee.department}`.toLowerCase().includes(editParticipantInput.trim().toLowerCase()) && !editParticipantList.includes(employee.email)).slice(0, 6).map((employee) => <button type="button" key={employee.email} onMouseDown={(event) => event.preventDefault()} onClick={() => addEditParticipant(employee.email)}><strong>{employee.full_name}</strong><span>{employee.email} · {employee.department}</span></button>)}</div>}
+                    <div className="participant-chips">{editParticipantList.map((email) => <span className="participant-chip" key={email}>{email}<button type="button" aria-label={`Xóa ${email}`} onClick={() => setEditParticipantList((current) => current.filter((item) => item !== email))}>×</button></span>)}</div>
+                  </label>
                   <div className="item-actions">
                     <button className="primary-action" onClick={saveEdit}>Lưu thay đổi</button>
                     <button onClick={() => setEditing(null)}>Đóng</button>
@@ -184,6 +205,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
               <span>Chủ trì: <strong>{details.organizer_email}</strong></span>
               <span>Bắt đầu: <strong>{new Date(details.start_time).toLocaleString("vi-VN")}</strong></span>
               <span>Kết thúc: <strong>{new Date(details.end_time).toLocaleString("vi-VN")}</strong></span>
+              <span>Quy mô dự kiến: <strong>{details.expected_attendees ?? details.participants.length + 1} người</strong></span>
               <span>Phòng: <strong>{details.booking?.room.name ?? "Chưa đặt phòng"}</strong></span>
             </div>
             <div className="participants">
