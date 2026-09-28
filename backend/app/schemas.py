@@ -104,6 +104,7 @@ class MeetingBase(BaseModel):
 class MeetingCreate(MeetingBase):
     recurrence: Literal["weekly", "monthly"] | None = None
     recurrence_count: int = Field(default=1, ge=1, le=24)
+    room_id: int | None = Field(default=None, ge=1)
 
 
 class MeetingUpdate(BaseModel):

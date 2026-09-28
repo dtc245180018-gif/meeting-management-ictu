@@ -276,10 +276,12 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .main-navigation button:hover { background: rgba(255,255,255,.1); color: #fff; }
 .main-navigation button.active { border-bottom-color: #ffc107; color: #fff; background: rgba(255,255,255,.1); }
 .main-navigation button span { font-size: 1rem; }
-.app-shell > main { width: min(1280px, 100%); margin: 0 auto; padding: 24px clamp(16px, 3vw, 28px) 0; }
+.app-shell > main { width: 100%; max-width: none; margin: 0; padding: 24px clamp(16px, 2vw, 32px) 0; }
 .app-shell > main .hero { margin: 0 0 20px; }
 .app-shell > main .sprint-brief { width: auto; margin: 0 0 22px; }
 .app-shell > main .overview-grid { width: auto; margin: 0 0 28px; padding: 0; }
+.app-shell > main .recent-meetings { width: auto; margin: 0 0 30px; padding: 20px 0; }
+.app-shell > main .page-layout { width: 100%; max-width: none; margin: 0; padding: 0 0 45px; }
 .app-shell > footer { border-top: 1px solid #c9d6e4; background: #fff; }
 .hero { min-height: 240px; padding: 30px; border: 1px solid #c9d6e4; border-radius: 8px; color: var(--ink); background: #fff; box-shadow: var(--shadow-sm); }
 .hero::before { display: none; }

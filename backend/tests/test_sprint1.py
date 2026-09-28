@@ -278,6 +278,55 @@ def test_expected_attendees_is_persisted_and_controls_booking_capacity(client):
     assert resized.status_code == 409
 
 
+def test_recurring_meeting_with_room_is_atomic_when_later_occurrence_conflicts(client):
+    first_week = future_time(days=7)
+    room = next(room for room in client.get("/api/rooms").json() if room["capacity"] == 6)
+    blocker = client.post(
+        "/api/meetings",
+        json=meeting_payload(
+            title="Lịch chiếm tuần hai",
+            organizer_email="blocker@ictu.edu.vn",
+            participant_emails=[],
+            start_time=first_week + timedelta(weeks=1),
+            expected_attendees=1,
+        ),
+    ).json()[0]
+    assert client.post(
+        "/api/rooms/bookings",
+        json={"room_id": room["id"], "meeting_id": blocker["id"], "requester_email": "blocker@ictu.edu.vn"},
+    ).status_code == 201
+
+    recurring = client.post(
+        "/api/meetings",
+        json=meeting_payload(
+            title="Lịch lặp atomic",
+            participant_emails=[],
+            start_time=first_week,
+            recurrence="weekly",
+            recurrence_count=2,
+            expected_attendees=1,
+            room_id=room["id"],
+        ),
+    )
+    assert recurring.status_code == 409
+    assert [meeting["title"] for meeting in client.get("/api/meetings").json()] == ["Lịch chiếm tuần hai"]
+
+    successful = client.post(
+        "/api/meetings",
+        json=meeting_payload(
+            title="Lịch lặp atomic thành công",
+            participant_emails=[],
+            start_time=first_week + timedelta(weeks=3),
+            recurrence="weekly",
+            recurrence_count=2,
+            expected_attendees=1,
+            room_id=room["id"],
+        ),
+    )
+    assert successful.status_code == 201
+    assert all(item["booking"]["room_id"] == room["id"] for item in successful.json())
+
+
 def test_titles_are_trimmed_and_unknown_request_fields_are_rejected(client):
     invalid_title = client.post("/api/meetings", json=meeting_payload(title="   "))
     assert invalid_title.status_code == 422

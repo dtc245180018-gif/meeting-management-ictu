@@ -51,6 +51,16 @@ export function MeetingForm({ onCreated }: Props) {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [roomLoading, setRoomLoading] = useState(false);
 
+  const clearRoomSelection = () => {
+    setSelectedRoom(null);
+    setRoomOptions([]);
+  };
+
+  const updateForm = (changes: Partial<MeetingInput>, invalidateRoom = false) => {
+    if (invalidateRoom) clearRoomSelection();
+    setForm((current) => ({ ...current, ...changes }));
+  };
+
   useEffect(() => {
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, []);
@@ -79,6 +89,7 @@ export function MeetingForm({ onCreated }: Props) {
       return;
     }
     setParticipantError("");
+    clearRoomSelection();
     setSelectedParticipants((current) => [...new Set([...current, ...emails])]);
     setParticipantInput("");
   };
@@ -91,6 +102,7 @@ export function MeetingForm({ onCreated }: Props) {
       setParticipantError(`Email không hợp lệ: ${invalid}`);
       return false;
     }
+    clearRoomSelection();
     setSelectedParticipants((current) => [...new Set([...current, ...emails])]);
     setParticipantInput("");
     setParticipantError("");
@@ -115,6 +127,7 @@ export function MeetingForm({ onCreated }: Props) {
         return;
       }
       if (participantInput.trim()) {
+        clearRoomSelection();
         setSelectedParticipants((current) => [...new Set([...current, ...participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean)])]);
         setParticipantInput("");
       }
@@ -129,25 +142,16 @@ export function MeetingForm({ onCreated }: Props) {
         start_time: toIsoDateTime(form.start_time),
         end_time: toIsoDateTime(form.end_time),
         participant_emails: currentParticipants,
+        room_id: selectedRoom?.id ?? null,
       });
-      if (selectedRoom) {
-        try {
-          for (const meeting of created) {
-            await api.bookRoom(selectedRoom.id, meeting.id, form.organizer_email.trim());
-          }
-          setMessage(`Đã tạo ${created.length} lịch họp, ghi nhận ${currentParticipants.length} lời mời và đặt ${selectedRoom.name} thành công.`);
-        } catch (bookingError) {
-          setMessage(`Đã tạo lịch họp nhưng đặt phòng thất bại: ${bookingError instanceof Error ? bookingError.message : "lỗi không xác định"}. Cuộc họp chưa được xem là hoàn tất đặt phòng.`);
-        }
-      } else {
-        setMessage(`Đã tạo ${created.length} lịch họp thành công và ghi nhận ${currentParticipants.length} lời mời người tham dự.`);
-      }
+      setMessage(selectedRoom
+        ? `Đã tạo ${created.length} lịch họp, ghi nhận ${currentParticipants.length} lời mời và đặt ${selectedRoom.name} cho toàn bộ lần lặp thành công.`
+        : `Đã tạo ${created.length} lịch họp thành công và ghi nhận ${currentParticipants.length} lời mời người tham dự.`);
       setForm(initialForm);
       setParticipantInput("");
       setSelectedParticipants([]);
       setParticipantError("");
-      setRoomOptions([]);
-      setSelectedRoom(null);
+      clearRoomSelection();
       setSuggestions([]);
       onCreated();
     } catch (error) {
@@ -190,7 +194,7 @@ export function MeetingForm({ onCreated }: Props) {
       const offset = date.getTimezoneOffset();
       return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
     };
-    setForm({ ...form, start_time: toLocal(suggestion.start_time), end_time: toLocal(suggestion.end_time) });
+    updateForm({ start_time: toLocal(suggestion.start_time), end_time: toLocal(suggestion.end_time) }, true);
     setSuggestions([]);
   };
 
@@ -230,13 +234,13 @@ export function MeetingForm({ onCreated }: Props) {
       </div>
       <form onSubmit={submit} className="form-grid">
         <label className="full">Tên cuộc họp
-          <input required minLength={3} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ví dụ: Daily Meeting Sprint 1" />
+          <input required minLength={3} value={form.title} onChange={(e) => updateForm({ title: e.target.value })} placeholder="Ví dụ: Daily Meeting Sprint 1" />
         </label>
         <label className="full">Mô tả
-          <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Nội dung và mục tiêu cuộc họp" />
+          <textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Nội dung và mục tiêu cuộc họp" />
         </label>
         <label>Người tổ chức
-          <input required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => setForm({ ...form, organizer_email: e.target.value })} placeholder="leader@ictu.edu.vn" />
+          <input required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => updateForm({ organizer_email: e.target.value }, true)} placeholder="leader@ictu.edu.vn" />
         </label>
         <label>Người tham dự
           <input
@@ -245,6 +249,7 @@ export function MeetingForm({ onCreated }: Props) {
               if (/[;,\n]/.test(event.target.value)) {
                 addParticipants(event.target.value);
               } else {
+                clearRoomSelection();
                 setParticipantInput(event.target.value);
                 setParticipantError("");
               }
@@ -274,7 +279,7 @@ export function MeetingForm({ onCreated }: Props) {
               {participants.map((email) => (
                 <span className="participant-chip" key={email}>
                   {email}
-                  <button type="button" aria-label={`Xóa ${email}`} onClick={() => setSelectedParticipants((current) => current.filter((item) => item !== email))}>×</button>
+                  <button type="button" aria-label={`Xóa ${email}`} onClick={() => { clearRoomSelection(); setSelectedParticipants((current) => current.filter((item) => item !== email)); }}>×</button>
                 </span>
               ))}
             </div>
@@ -282,23 +287,23 @@ export function MeetingForm({ onCreated }: Props) {
           {participantError && <small className="field-error">{participantError}</small>}
         </label>
         <label>Bắt đầu
-          <input required type="datetime-local" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
+          <input required type="datetime-local" value={form.start_time} onChange={(e) => updateForm({ start_time: e.target.value }, true)} />
         </label>
         <label>Kết thúc
-          <input required type="datetime-local" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+          <input required type="datetime-local" value={form.end_time} onChange={(e) => updateForm({ end_time: e.target.value }, true)} />
         </label>
         <label>Số người dự kiến
-            <input min={participants.length + 1} type="number" value={form.expected_attendees} onChange={(event) => setForm({ ...form, expected_attendees: Number(event.target.value) })} />
+            <input min={participants.length + 1} type="number" value={form.expected_attendees} onChange={(event) => updateForm({ expected_attendees: Number(event.target.value) }, true)} />
         </label>
         <label>Lặp lại
-          <select value={form.recurrence ?? ""} onChange={(e) => setForm({ ...form, recurrence: (e.target.value || null) as MeetingInput["recurrence"] })}>
+          <select value={form.recurrence ?? ""} onChange={(e) => updateForm({ recurrence: (e.target.value || null) as MeetingInput["recurrence"] }, true)}>
             <option value="">Không lặp</option>
             <option value="weekly">Hằng tuần</option>
             <option value="monthly">Hằng tháng</option>
           </select>
         </label>
         <label>Số lần
-          <input type="number" min={1} max={24} disabled={!form.recurrence} value={form.recurrence_count} onChange={(e) => setForm({ ...form, recurrence_count: Number(e.target.value) })} />
+          <input type="number" min={1} max={24} disabled={!form.recurrence} value={form.recurrence_count} onChange={(e) => updateForm({ recurrence_count: Number(e.target.value) }, true)} />
         </label>
         <div className="full action-row">
           <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading}>Gợi ý giờ trống</button>

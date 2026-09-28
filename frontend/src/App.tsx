@@ -5,6 +5,7 @@ import { RoomDirectory } from "./components/RoomDirectory";
 import { api } from "./services/api";
 import type { Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
+import { loadAllHistory } from "./utils/historyPagination";
 
 type Page = "overview" | "create" | "calendar" | "rooms";
 
@@ -48,20 +49,13 @@ export default function App() {
     const dateFrom = filterFrom ? `${filterFrom}T00:00:00+07:00` : undefined;
     const dateTo = filterTo ? `${filterTo}T23:59:59.999+07:00` : undefined;
     const loadHistory = async () => {
-      const result: Meeting[] = [];
-      let offset = 0;
-      do {
-        const page = await api.history(email, {
+      const result = await loadAllHistory((offset, limit) => api.history(email, {
           status: filterStatus,
           dateFrom,
           dateTo,
           offset,
-          limit: 100,
-        });
-        result.push(...page);
-        offset += page.length;
-        if (page.length < 100) break;
-      } while (active);
+          limit,
+        }));
       if (active) {
         setHistoryMeetings(result);
         setError("");

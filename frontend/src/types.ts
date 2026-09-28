@@ -61,6 +61,7 @@ export interface MeetingInput {
   end_time: string;
   participant_emails: string[];
   expected_attendees: number;
+  room_id?: number | null;
   recurrence: "weekly" | "monthly" | null;
   recurrence_count: number;
 }

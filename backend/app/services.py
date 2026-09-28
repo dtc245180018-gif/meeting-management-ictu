@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar
 from collections import defaultdict
 from datetime import datetime, timedelta
+from contextlib import nullcontext
 from threading import Lock
 from uuid import uuid4
 
@@ -107,32 +108,66 @@ def recurrence_times(payload: schemas.MeetingCreate) -> list[tuple[datetime, dat
 
 
 def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.Meeting]:
-    participant_emails = normalize_emails([str(email) for email in payload.participant_emails], str(payload.organizer_email))
-    people = [str(payload.organizer_email).lower(), *participant_emails]
-    occurrences = recurrence_times(payload)
-    for start_time, end_time in occurrences:
-        ensure_no_person_conflicts(db, people, start_time, end_time)
+    # A selected room makes meeting creation and all recurrence bookings one
+    # atomic unit. The row lock serializes room checks across PostgreSQL; the
+    # in-process lock covers SQLite/TestClient development.
+    room_lock = _room_locks[payload.room_id] if payload.room_id is not None else nullcontext()
+    with room_lock:
+        participant_emails = normalize_emails([str(email) for email in payload.participant_emails], str(payload.organizer_email))
+        people = [str(payload.organizer_email).lower(), *participant_emails]
+        occurrences = recurrence_times(payload)
+        for start_time, end_time in occurrences:
+            ensure_no_person_conflicts(db, people, start_time, end_time)
 
-    recurrence_group = uuid4().hex if len(occurrences) > 1 else None
-    meetings: list[models.Meeting] = []
-    for start_time, end_time in occurrences:
-        meeting = models.Meeting(
-            title=payload.title.strip(),
-            description=payload.description,
-            organizer_email=str(payload.organizer_email).lower(),
-            expected_attendees=payload.expected_attendees,
-            start_time=start_time,
-            end_time=end_time,
-            recurrence=payload.recurrence,
-            recurrence_group=recurrence_group,
-            participants=[models.Participant(email=email) for email in participant_emails],
-        )
-        db.add(meeting)
-        meetings.append(meeting)
+        room: models.Room | None = None
+        if payload.room_id is not None:
+            room = db.scalar(
+                select(models.Room)
+                .where(models.Room.id == payload.room_id)
+                .with_for_update()
+            )
+            if not room or not room.is_active:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
+            required_capacity = max(payload.expected_attendees, len(participant_emails) + 1)
+            if room.capacity < required_capacity:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sức chứa phòng không đủ")
 
-    db.commit()
-    ids = [meeting.id for meeting in meetings]
-    return list(db.scalars(meeting_query().where(models.Meeting.id.in_(ids)).order_by(models.Meeting.start_time)).all())
+            # Check every recurrence before adding any meeting or booking.
+            for index, (start_time, end_time) in enumerate(occurrences):
+                ensure_room_available(db, room.id, start_time, end_time)
+                if any(
+                    start_time < previous_end and end_time > previous_start
+                    for previous_start, previous_end in occurrences[:index]
+                ):
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phòng bị trùng ở một lần lặp của cuộc họp")
+
+        recurrence_group = uuid4().hex if len(occurrences) > 1 else None
+        meetings: list[models.Meeting] = []
+        for start_time, end_time in occurrences:
+            meeting = models.Meeting(
+                title=payload.title.strip(),
+                description=payload.description,
+                organizer_email=str(payload.organizer_email).lower(),
+                expected_attendees=payload.expected_attendees,
+                start_time=start_time,
+                end_time=end_time,
+                recurrence=payload.recurrence,
+                recurrence_group=recurrence_group,
+                participants=[models.Participant(email=email) for email in participant_emails],
+            )
+            db.add(meeting)
+            meetings.append(meeting)
+            if room is not None:
+                meeting.booking = models.RoomBooking(
+                    room_id=room.id,
+                    start_time=start_time,
+                    end_time=end_time,
+                )
+
+        # One commit for both meetings and every requested booking.
+        db.commit()
+        ids = [meeting.id for meeting in meetings]
+        return list(db.scalars(meeting_query().where(models.Meeting.id.in_(ids)).order_by(models.Meeting.start_time)).all())
 
 
 def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate) -> models.Meeting:
