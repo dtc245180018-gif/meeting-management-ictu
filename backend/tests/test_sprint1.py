@@ -327,6 +327,27 @@ def test_recurring_meeting_with_room_is_atomic_when_later_occurrence_conflicts(c
     assert all(item["booking"]["room_id"] == room["id"] for item in successful.json())
 
 
+def test_overlapping_recurrences_are_rejected_without_a_room(client):
+    start = future_time(days=8)
+    response = client.post(
+        "/api/meetings",
+        json=meeting_payload(
+            title="Lịch lặp chồng chéo",
+            participant_emails=[],
+            start_time=start,
+            end_time=(start + timedelta(days=8)).isoformat(),
+            recurrence="weekly",
+            recurrence_count=2,
+            expected_attendees=1,
+            room_id=None,
+        ),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Các lần lặp của cuộc họp bị chồng chéo thời gian"
+    assert client.get("/api/meetings").json() == []
+
+
 def test_titles_are_trimmed_and_unknown_request_fields_are_rejected(client):
     invalid_title = client.post("/api/meetings", json=meeting_payload(title="   "))
     assert invalid_title.status_code == 422

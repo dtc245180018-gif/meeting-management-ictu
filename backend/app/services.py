@@ -107,6 +107,18 @@ def recurrence_times(payload: schemas.MeetingCreate) -> list[tuple[datetime, dat
     return times
 
 
+def ensure_no_occurrence_overlaps(occurrences: list[tuple[datetime, datetime]]) -> None:
+    for index, (start_time, end_time) in enumerate(occurrences):
+        if any(
+            start_time < previous_end and end_time > previous_start
+            for previous_start, previous_end in occurrences[:index]
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Các lần lặp của cuộc họp bị chồng chéo thời gian",
+            )
+
+
 def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.Meeting]:
     # A selected room makes meeting creation and all recurrence bookings one
     # atomic unit. The row lock serializes room checks across PostgreSQL; the
@@ -116,6 +128,7 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
         participant_emails = normalize_emails([str(email) for email in payload.participant_emails], str(payload.organizer_email))
         people = [str(payload.organizer_email).lower(), *participant_emails]
         occurrences = recurrence_times(payload)
+        ensure_no_occurrence_overlaps(occurrences)
         for start_time, end_time in occurrences:
             ensure_no_person_conflicts(db, people, start_time, end_time)
 
@@ -135,11 +148,6 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
             # Check every recurrence before adding any meeting or booking.
             for index, (start_time, end_time) in enumerate(occurrences):
                 ensure_room_available(db, room.id, start_time, end_time)
-                if any(
-                    start_time < previous_end and end_time > previous_start
-                    for previous_start, previous_end in occurrences[:index]
-                ):
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phòng bị trùng ở một lần lặp của cuộc họp")
 
         recurrence_group = uuid4().hex if len(occurrences) > 1 else None
         meetings: list[models.Meeting] = []
