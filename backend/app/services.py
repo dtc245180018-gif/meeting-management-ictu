@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 import calendar
+from collections import defaultdict
 from datetime import datetime, timedelta
+from threading import Lock
 from uuid import uuid4
 
 from fastapi import HTTPException, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import models, schemas
+
+
+# PostgreSQL row locks provide the cross-process guarantee in production. The
+# in-process lock also makes the same invariant hold for SQLite development and
+# concurrent TestClient requests, where SELECT FOR UPDATE is not supported.
+_room_locks: defaultdict[int, Lock] = defaultdict(Lock)
 
 
 def meeting_query():
@@ -66,13 +74,13 @@ def ensure_no_person_conflicts(
         )
 
 
-def add_month(value: datetime) -> datetime:
+def add_month(value: datetime, anchor_day: int | None = None) -> datetime:
     month = value.month + 1
     year = value.year
     if month == 13:
         month = 1
         year += 1
-    day = min(value.day, calendar.monthrange(year, month)[1])
+    day = min(anchor_day or value.day, calendar.monthrange(year, month)[1])
     return value.replace(year=year, month=month, day=day)
 
 
@@ -83,13 +91,17 @@ def recurrence_times(payload: schemas.MeetingCreate) -> list[tuple[datetime, dat
 
     start = payload.start_time
     end = payload.end_time
+    start_anchor_day = start.day
+    end_anchor_day = end.day
     for _ in range(1, payload.recurrence_count):
         if payload.recurrence == "weekly":
             start += timedelta(weeks=1)
             end += timedelta(weeks=1)
         else:
-            start = add_month(start)
-            end = add_month(end)
+            # Always calculate from the original day-of-month. Without the
+            # anchor, Jan 31 -> Feb 28 would drift to Mar 28 instead of Mar 31.
+            start = add_month(start, start_anchor_day)
+            end = add_month(end, end_anchor_day)
         times.append((start, end))
     return times
 
@@ -161,8 +173,20 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
     meeting.start_time = new_start
     meeting.end_time = new_end
     if payload.participant_emails is not None:
-        meeting.participants.clear()
-        meeting.participants.extend(models.Participant(email=email) for email in participant_emails)
+        desired_emails = set(participant_emails)
+        existing_emails = {participant.email for participant in meeting.participants}
+        for participant in list(meeting.participants):
+            if participant.email not in desired_emails:
+                db.delete(participant)
+                meeting.participants.remove(participant)
+        # Flush removals before adding replacement rows. This avoids the
+        # transient UNIQUE(meeting_id, email) violation that caused HTTP 500.
+        db.flush()
+        meeting.participants.extend(
+            models.Participant(email=email)
+            for email in participant_emails
+            if email not in existing_emails
+        )
 
     db.commit()
     return get_meeting_or_404(db, meeting_id)
@@ -179,14 +203,31 @@ def cancel_meeting(db: Session, meeting_id: int, requester_email: str) -> models
     return get_meeting_or_404(db, meeting_id)
 
 
-def list_history(db: Session, email: str) -> list[models.Meeting]:
+def list_history(
+    db: Session,
+    email: str,
+    status_filter: models.MeetingStatus | None = None,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    offset: int = 0,
+    limit: int = 100,
+) -> list[models.Meeting]:
     normalized = email.lower()
+    filters = [or_(models.Meeting.organizer_email == normalized, models.Participant.email == normalized)]
+    if status_filter is not None:
+        filters.append(models.Meeting.status == status_filter)
+    if date_from is not None:
+        filters.append(models.Meeting.start_time >= date_from)
+    if date_to is not None:
+        filters.append(models.Meeting.start_time <= date_to)
     stmt = (
         meeting_query()
         .outerjoin(models.Participant)
-        .where(or_(models.Meeting.organizer_email == normalized, models.Participant.email == normalized))
+        .where(*filters)
         .distinct()
         .order_by(models.Meeting.start_time.desc())
+        .offset(offset)
+        .limit(limit)
     )
     return list(db.scalars(stmt).unique().all())
 
@@ -290,35 +331,36 @@ def available_rooms(db: Session, start_time: datetime, end_time: datetime, min_c
 
 
 def create_booking(db: Session, payload: schemas.BookingCreate) -> models.RoomBooking:
-    meeting = get_meeting_or_404(db, payload.meeting_id)
-    if meeting.organizer_email != str(payload.requester_email).lower():
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người tạo cuộc họp mới được đặt phòng")
-    if meeting.status != models.MeetingStatus.SCHEDULED:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể đặt phòng cho cuộc họp đã hủy")
-    room = db.scalar(
-        select(models.Room)
-        .where(models.Room.id == payload.room_id)
-        .with_for_update()
-    )
-    if not room or not room.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
-    if meeting.booking and meeting.booking.status == models.BookingStatus.ACTIVE:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cuộc họp đã có phòng")
-    if room.capacity < len(meeting.participants) + 1:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sức chứa phòng không đủ")
-    ensure_room_available(db, room.id, meeting.start_time, meeting.end_time)
+    with _room_locks[payload.room_id]:
+        meeting = get_meeting_or_404(db, payload.meeting_id)
+        if meeting.organizer_email != str(payload.requester_email).lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người tạo cuộc họp mới được đặt phòng")
+        if meeting.status != models.MeetingStatus.SCHEDULED:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể đặt phòng cho cuộc họp đã hủy")
+        room = db.scalar(
+            select(models.Room)
+            .where(models.Room.id == payload.room_id)
+            .with_for_update()
+        )
+        if not room or not room.is_active:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
+        if meeting.booking and meeting.booking.status == models.BookingStatus.ACTIVE:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cuộc họp đã có phòng")
+        if room.capacity < len(meeting.participants) + 1:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sức chứa phòng không đủ")
+        ensure_room_available(db, room.id, meeting.start_time, meeting.end_time)
 
-    booking = models.RoomBooking(
-        room_id=room.id,
-        meeting_id=meeting.id,
-        start_time=meeting.start_time,
-        end_time=meeting.end_time,
-    )
-    db.add(booking)
-    db.commit()
-    db.refresh(booking)
-    return db.scalar(
-        select(models.RoomBooking)
-        .options(selectinload(models.RoomBooking.room))
-        .where(models.RoomBooking.id == booking.id)
-    )
+        booking = models.RoomBooking(
+            room_id=room.id,
+            meeting_id=meeting.id,
+            start_time=meeting.start_time,
+            end_time=meeting.end_time,
+        )
+        db.add(booking)
+        db.commit()
+        db.refresh(booking)
+        return db.scalar(
+            select(models.RoomBooking)
+            .options(selectinload(models.RoomBooking.room))
+            .where(models.RoomBooking.id == booking.id)
+        )

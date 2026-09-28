@@ -1,4 +1,9 @@
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor
+
+from fastapi.testclient import TestClient
+
+from app.main import app
 
 
 ORGANIZER = "leader@ictu.edu.vn"
@@ -49,12 +54,61 @@ def test_create_update_cancel_and_history(client):
     assert history.status_code == 200
     assert len(history.json()) == 1
 
+    forbidden_history = client.get("/api/meetings/history", params={"email": "outsider@ictu.edu.vn"})
+    assert forbidden_history.status_code == 200
+    assert forbidden_history.json() == []
+
+    filtered_history = client.get(
+        "/api/meetings/history",
+        params={"email": "member1@ictu.edu.vn", "status": "scheduled", "limit": 1},
+    )
+    assert filtered_history.status_code == 200
+    assert len(filtered_history.json()) == 1
+
     cancelled = client.post(
         f"/api/meetings/{meeting['id']}/cancel",
         json={"requester_email": ORGANIZER},
     )
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
+
+
+def test_update_participants_replaces_invites_without_http_500(client):
+    created = client.post("/api/meetings", json=meeting_payload()).json()[0]
+    original_member = created["participants"][0]
+
+    updated = client.patch(
+        f"/api/meetings/{created['id']}",
+        json={
+            "requester_email": ORGANIZER,
+            "participant_emails": ["member1@ictu.edu.vn", "new-member@ictu.edu.vn"],
+        },
+    )
+
+    assert updated.status_code == 200
+    participants = updated.json()["participants"]
+    assert {participant["email"] for participant in participants} == {
+        "member1@ictu.edu.vn",
+        "new-member@ictu.edu.vn",
+    }
+    assert next(participant["id"] for participant in participants if participant["email"] == original_member["email"]) == original_member["id"]
+
+
+def test_monthly_recurrence_keeps_end_of_month_anchor(client):
+    start = datetime(2027, 1, 31, 9, tzinfo=timezone.utc)
+    response = client.post(
+        "/api/meetings",
+        json=meeting_payload(
+            start_time=start,
+            recurrence="monthly",
+            recurrence_count=4,
+            participant_emails=[],
+        ),
+    )
+
+    assert response.status_code == 201
+    dates = [datetime.fromisoformat(item["start_time"]).date().isoformat() for item in response.json()]
+    assert dates == ["2027-01-31", "2027-02-28", "2027-03-31", "2027-04-30"]
 
 
 def test_recurring_meeting_and_person_conflict(client):
@@ -133,6 +187,53 @@ def test_available_rooms_booking_and_double_booking(client):
         json={"room_id": room_id, "meeting_id": second["id"], "requester_email": "another@ictu.edu.vn"},
     )
     assert duplicate.status_code == 409
+
+
+def test_concurrent_booking_allows_only_one_booking(client):
+    start = future_time(days=5)
+    first = client.post("/api/meetings", json=meeting_payload(start_time=start)).json()[0]
+    room_id = client.get(
+        "/api/rooms/available",
+        params={
+            "start_time": start.isoformat(),
+            "end_time": (start + timedelta(hours=1)).isoformat(),
+            "min_capacity": 3,
+        },
+    ).json()[0]["id"]
+    second = client.post(
+        "/api/meetings",
+        json=meeting_payload(
+            title="Cuộc họp đồng thời",
+            organizer_email="another@ictu.edu.vn",
+            participant_emails=[],
+            start_time=start + timedelta(hours=2),
+        ),
+    ).json()[0]
+
+    def book(meeting_id: int, requester: str) -> int:
+        with TestClient(app) as concurrent_client:
+            return concurrent_client.post(
+                "/api/rooms/bookings",
+                json={"room_id": room_id, "meeting_id": meeting_id, "requester_email": requester},
+            ).status_code
+
+    # Make the second meeting overlap the first after it has been created. The
+    # room lock, followed by the availability check, is the critical section.
+    from app.database import SessionLocal
+    from app import models
+
+    with SessionLocal() as db:
+        db.get(models.Meeting, second["id"]).start_time = start
+        db.get(models.Meeting, second["id"]).end_time = start + timedelta(hours=1)
+        db.commit()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        statuses = sorted(pool.map(
+            lambda args: book(*args),
+            [(first["id"], ORGANIZER), (second["id"], "another@ictu.edu.vn")],
+        ))
+
+    assert statuses == [201, 409]
 
 
 def test_room_directory_and_employee_fixture(client):

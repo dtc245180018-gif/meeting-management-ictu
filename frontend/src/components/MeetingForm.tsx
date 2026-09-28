@@ -34,11 +34,15 @@ function validateForm(form: MeetingInput, participants: string[]) {
 
 interface Props {
   onCreated: () => void;
+  onRoomsRequested: (search: { startTime: string; endTime: string; minCapacity: number }) => void;
 }
 
-export function MeetingForm({ onCreated }: Props) {
+export function MeetingForm({ onCreated, onRoomsRequested }: Props) {
   const [form, setForm] = useState(initialForm);
-  const [participantText, setParticipantText] = useState("");
+  const [participantInput, setParticipantInput] = useState("");
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+  const [participantError, setParticipantError] = useState("");
+  const [expectedAttendees, setExpectedAttendees] = useState("");
   const [suggestions, setSuggestions] = useState<SuggestedTime[]>([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,9 +53,32 @@ export function MeetingForm({ onCreated }: Props) {
   }, []);
 
   const participants = useMemo(
-    () => participantText.split(/[;,\n]/).map((value) => value.trim()).filter(Boolean),
-    [participantText],
+    () => selectedParticipants.filter((email) => email !== form.organizer_email.trim().toLowerCase()),
+    [selectedParticipants, form.organizer_email],
   );
+
+  const employeeSuggestions = useMemo(() => {
+    const query = participantInput.trim().toLowerCase();
+    if (!query) return [];
+    return employees
+      .filter((employee) => employee.email !== form.organizer_email.trim().toLowerCase())
+      .filter((employee) => `${employee.full_name} ${employee.email} ${employee.department}`.toLowerCase().includes(query))
+      .filter((employee) => !selectedParticipants.includes(employee.email))
+      .slice(0, 6);
+  }, [employees, form.organizer_email, participantInput, selectedParticipants]);
+
+  const addParticipants = (value: string) => {
+    const emails = value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
+    if (!emails.length) return;
+    const invalid = emails.find((email) => !emailPattern.test(email));
+    if (invalid) {
+      setParticipantError(`Email không hợp lệ: ${invalid}`);
+      return;
+    }
+    setParticipantError("");
+    setSelectedParticipants((current) => [...new Set([...current, ...emails])]);
+    setParticipantInput("");
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -72,7 +99,10 @@ export function MeetingForm({ onCreated }: Props) {
       });
       setMessage(`Đã tạo ${created.length} lịch họp thành công và ghi nhận ${participants.length} lời mời người tham dự.`);
       setForm(initialForm);
-      setParticipantText("");
+      setParticipantInput("");
+      setSelectedParticipants([]);
+      setParticipantError("");
+      setExpectedAttendees("");
       setSuggestions([]);
       onCreated();
     } catch (error) {
@@ -119,6 +149,21 @@ export function MeetingForm({ onCreated }: Props) {
     setSuggestions([]);
   };
 
+  const openRoomFinder = () => {
+    const start = new Date(form.start_time);
+    const end = new Date(form.end_time);
+    if (!form.start_time || !form.end_time || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      setMessage("Hãy chọn thời gian hợp lệ trước khi tìm phòng.");
+      return;
+    }
+    const minCapacity = Math.max(Number(expectedAttendees) || 0, participants.length + 1, 1);
+    onRoomsRequested({
+      startTime: form.start_time,
+      endTime: form.end_time,
+      minCapacity,
+    });
+  };
+
   return (
     <section className="card">
       <div className="section-heading">
@@ -139,13 +184,55 @@ export function MeetingForm({ onCreated }: Props) {
           <input required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => setForm({ ...form, organizer_email: e.target.value })} placeholder="leader@ictu.edu.vn" />
         </label>
         <label>Người tham dự
-          <input list="ictu-employees" value={participantText} onChange={(e) => setParticipantText(e.target.value)} placeholder="email1; email2" />
+          <input
+            value={participantInput}
+            onChange={(event) => {
+              if (/[;,\n]/.test(event.target.value)) {
+                addParticipants(event.target.value);
+              } else {
+                setParticipantInput(event.target.value);
+                setParticipantError("");
+              }
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === "," || event.key === ";") {
+                event.preventDefault();
+                addParticipants(participantInput);
+              }
+            }}
+            placeholder="Gõ tên hoặc email rồi nhấn Enter"
+            aria-autocomplete="list"
+          />
+          {employeeSuggestions.length > 0 && (
+            <div className="employee-suggestions" role="listbox" aria-label="Gợi ý người tham dự">
+              {employeeSuggestions.map((employee) => (
+                <button key={employee.email} type="button" onClick={() => addParticipants(employee.email)}>
+                  <strong>{employee.full_name}</strong>
+                  <span>{employee.email} · {employee.department}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {participants.length > 0 && (
+            <div className="participant-chips" aria-label="Người tham dự đã chọn">
+              {participants.map((email) => (
+                <span className="participant-chip" key={email}>
+                  {email}
+                  <button type="button" aria-label={`Xóa ${email}`} onClick={() => setSelectedParticipants((current) => current.filter((item) => item !== email))}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+          {participantError && <small className="field-error">{participantError}</small>}
         </label>
         <label>Bắt đầu
           <input required type="datetime-local" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
         </label>
         <label>Kết thúc
           <input required type="datetime-local" value={form.end_time} onChange={(e) => setForm({ ...form, end_time: e.target.value })} />
+        </label>
+        <label>Số người dự kiến
+          <input min={participants.length + 1} type="number" value={expectedAttendees} onChange={(event) => setExpectedAttendees(event.target.value)} placeholder={String(participants.length + 1)} />
         </label>
         <label>Lặp lại
           <select value={form.recurrence ?? ""} onChange={(e) => setForm({ ...form, recurrence: (e.target.value || null) as MeetingInput["recurrence"] })}>
@@ -159,10 +246,11 @@ export function MeetingForm({ onCreated }: Props) {
         </label>
         <div className="full action-row">
           <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading}>Gợi ý giờ trống</button>
+          <button className="button secondary" type="button" onClick={openRoomFinder}>Tìm phòng phù hợp</button>
           <button className="button primary" type="submit" disabled={loading}>{loading ? "Đang xử lý..." : "Tạo lịch họp"}</button>
         </div>
       </form>
-      <datalist id="ictu-employees">{employees.map((employee) => <option key={employee.email} value={employee.email}>{employee.full_name} · {employee.department}</option>)}</datalist>
+      {participants.length > 0 && <p className="subtle">{participants.length} người sẽ nhận lời mời.</p>}
       {suggestions.length > 0 && (
         <div className="suggestions">
           <strong>Khung giờ đề xuất</strong>

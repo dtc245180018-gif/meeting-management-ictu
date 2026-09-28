@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -28,8 +28,18 @@ def list_meetings(db: Session = Depends(get_db)):
 
 
 @router.get("/meetings/history", response_model=list[schemas.MeetingOut])
-def meeting_history(email: str = Query(min_length=3), db: Session = Depends(get_db)):
-    return services.list_history(db, email)
+def meeting_history(
+    email: str = Query(min_length=3),
+    status_filter: models.MeetingStatus | None = Query(default=None, alias="status"),
+    date_from: datetime | None = Query(default=None),
+    date_to: datetime | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    if date_from and date_to and date_to < date_from:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Khoảng thời gian không hợp lệ")
+    return services.list_history(db, email, status_filter, date_from, date_to, offset, limit)
 
 
 @router.post("/meetings/suggest-times", response_model=list[schemas.SuggestedTimeOut])

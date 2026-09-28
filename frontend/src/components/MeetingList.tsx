@@ -7,11 +7,18 @@ interface Props {
   onChanged: () => void;
 }
 
+function toLocalInput(value: string) {
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset();
+  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+}
+
 export function MeetingList({ meetings, onChanged }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [editing, setEditing] = useState<Meeting | null>(null);
+  const [details, setDetails] = useState<Meeting | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editStart, setEditStart] = useState("");
@@ -26,12 +33,6 @@ export function MeetingList({ meetings, onChanged }: Props) {
     setEditEnd(toLocalInput(editing.end_time));
     setEditParticipants(editing.participants.map((participant) => participant.email).join("; "));
   }, [editing]);
-
-  const toLocalInput = (value: string) => {
-    const date = new Date(value);
-    const offset = date.getTimezoneOffset();
-    return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
-  };
 
   const saveEdit = async () => {
     if (!editing) return;
@@ -123,6 +124,9 @@ export function MeetingList({ meetings, onChanged }: Props) {
                 <span>{meeting.booking ? meeting.booking.room.name : "Chưa đặt phòng"}</span>
                 {meeting.recurrence && <span>Lặp {meeting.recurrence === "weekly" ? "hằng tuần" : "hằng tháng"}</span>}
               </div>
+              <div className="item-actions">
+                <button onClick={() => setDetails(meeting)}>Xem chi tiết</button>
+              </div>
               {meeting.participants.length > 0 && (
                 <div className="participants">
                   <strong>Lời mời</strong>
@@ -168,6 +172,28 @@ export function MeetingList({ meetings, onChanged }: Props) {
           </article>
         ))}
       </div>
+      {details && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setDetails(null)}>
+          <div className="detail-modal" role="dialog" aria-modal="true" aria-labelledby="meeting-detail-title" onClick={(event) => event.stopPropagation()}>
+            <div className="section-heading">
+              <div><span className="eyebrow">Chi tiết cuộc họp</span><h2 id="meeting-detail-title">{details.title}</h2></div>
+              <button aria-label="Đóng chi tiết" onClick={() => setDetails(null)}>×</button>
+            </div>
+            <p>{details.description || "Không có mô tả"}</p>
+            <div className="detail-grid">
+              <span>Chủ trì: <strong>{details.organizer_email}</strong></span>
+              <span>Bắt đầu: <strong>{new Date(details.start_time).toLocaleString("vi-VN")}</strong></span>
+              <span>Kết thúc: <strong>{new Date(details.end_time).toLocaleString("vi-VN")}</strong></span>
+              <span>Phòng: <strong>{details.booking?.room.name ?? "Chưa đặt phòng"}</strong></span>
+            </div>
+            <div className="participants">
+              <strong>Người tham dự ({details.participants.length})</strong>
+              {details.participants.length === 0 && <span>Không có người tham dự.</span>}
+              {details.participants.map((participant) => <span className={`participant ${participant.status}`} key={participant.id}>{participant.email} · {participant.status}</span>)}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

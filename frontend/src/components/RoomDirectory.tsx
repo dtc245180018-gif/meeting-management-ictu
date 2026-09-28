@@ -1,23 +1,33 @@
 import { FormEvent, useEffect, useState } from "react";
 import type { Meeting, Room } from "../types";
 import { api } from "../services/api";
+import { filterRooms, getBookedRoomIds } from "../utils/meetingFilters";
 
 interface Props {
   meetings: Meeting[];
+  initialSearch?: { startTime: string; endTime: string; minCapacity: number } | null;
 }
 
 function toIso(value: string) {
   return new Date(value).toISOString();
 }
 
-export function RoomDirectory({ meetings }: Props) {
+export function RoomDirectory({ meetings, initialSearch }: Props) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [availableRooms, setAvailableRooms] = useState<Room[] | null>(null);
-  const [roomFilter, setRoomFilter] = useState<"" | "all" | "booked" | "free">("");
+  const [roomFilter, setRoomFilter] = useState<"all" | "booked" | "free">("all");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [capacity, setCapacity] = useState("1");
+  const [capacity, setCapacity] = useState(String(initialSearch?.minCapacity ?? 1));
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!initialSearch) return;
+    setStartTime(initialSearch.startTime);
+    setEndTime(initialSearch.endTime);
+    setCapacity(String(initialSearch.minCapacity));
+    setAvailableRooms(null);
+  }, [initialSearch]);
 
   useEffect(() => {
     void api.listRooms().then(setRooms).catch((error: unknown) => {
@@ -39,17 +49,12 @@ export function RoomDirectory({ meetings }: Props) {
     }
   };
 
-  const bookedRoomIds = new Set(
-    meetings
-      .filter((meeting) => meeting.booking?.status === "active")
-      .map((meeting) => meeting.booking?.room_id)
-      .filter((roomId): roomId is number => roomId !== undefined),
-  );
-  const filteredRooms = roomFilter === "booked"
-    ? rooms.filter((room) => bookedRoomIds.has(room.id))
-    : roomFilter === "free"
-      ? rooms.filter((room) => !bookedRoomIds.has(room.id))
-      : rooms;
+  const hasSearchWindow = Boolean(startTime && endTime && new Date(endTime) > new Date(startTime));
+  const bookedRoomIds = getBookedRoomIds(meetings, hasSearchWindow ? toIso(startTime) : undefined, hasSearchWindow ? toIso(endTime) : undefined);
+  const catalogRooms = availableRooms
+    ? rooms.filter((room) => availableRooms.some((availableRoom) => availableRoom.id === room.id))
+    : rooms;
+  const filteredRooms = filterRooms(catalogRooms, bookedRoomIds, roomFilter);
 
   return (
     <section className="card wide-card room-directory">
@@ -64,13 +69,12 @@ export function RoomDirectory({ meetings }: Props) {
       <div className="room-filter">
         <label>Danh sách phòng
           <select value={roomFilter} onChange={(event) => setRoomFilter(event.target.value as typeof roomFilter)}>
-            <option value="">Chọn trạng thái phòng</option>
             <option value="all">Tất cả phòng</option>
             <option value="booked">Phòng đã có lịch</option>
             <option value="free">Phòng chưa có lịch</option>
           </select>
         </label>
-        {roomFilter && <span>{filteredRooms.length} phòng thuộc bộ lọc đã chọn</span>}
+        <span>{filteredRooms.length} phòng thuộc bộ lọc đã chọn</span>
       </div>
       <form className="room-search" onSubmit={search}>
         <label>Từ lúc<input required type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
@@ -85,8 +89,7 @@ export function RoomDirectory({ meetings }: Props) {
           {availableRooms.map((room) => <div className="room-result" key={room.id}><strong>{room.name}</strong><span>{room.capacity} chỗ · {room.location}</span></div>)}
         </div>
       )}
-      {roomFilter && (
-        <div className="room-catalog">
+      <div className="room-catalog">
           {filteredRooms.length === 0 && <p className="empty">Không có phòng thuộc trạng thái này.</p>}
           {filteredRooms.map((room) => {
             const isBooked = bookedRoomIds.has(room.id);
@@ -97,8 +100,7 @@ export function RoomDirectory({ meetings }: Props) {
               <b>{isBooked ? "Đã có lịch" : "Chưa có lịch"}</b>
             </article>;
           })}
-        </div>
-      )}
+      </div>
       <p className="subtle">Hiện có {meetings.length} lịch họp trong hệ thống để kiểm thử đặt phòng và chống trùng lịch.</p>
     </section>
   );

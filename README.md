@@ -31,6 +31,10 @@ docker compose up --build
 - API: http://localhost:8000
 - Swagger: http://localhost:8000/docs
 
+Trong Docker, frontend dùng `/api` và Nginx proxy request tới service `backend`;
+không cần trỏ trình duyệt trực tiếp tới hostname `backend`. Có thể đổi
+`VITE_API_URL` trong `.env` khi frontend được triển khai tách khỏi Docker Compose.
+
 ## Chạy Backend không dùng Docker
 
 ```bash
@@ -64,6 +68,15 @@ npm run dev
 ```bash
 cd backend
 pytest -q
+```
+
+## Kiểm thử Frontend
+
+```bash
+cd frontend
+npm run lint
+npm run test
+npm run build
 ```
 
 ## Quy ước Git

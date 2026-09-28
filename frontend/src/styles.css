@@ -165,6 +165,10 @@ main { width: min(1400px, 100%); margin: auto; }
 .overview-card span { color: var(--muted); font-size: .8rem; font-weight: 700; }
 .overview-card strong { color: var(--ictu-navy); font-size: 1.9rem; }
 .overview-card button { width: fit-content; padding: 0; border: 0; color: var(--ictu-blue); background: transparent; font-size: .78rem; font-weight: 800; }
+.recent-meetings { width: min(1180px, 100%); margin: 0 auto 30px; padding: 20px 4vw; }
+.recent-list { display: grid; gap: 8px; }
+.recent-item { display: grid; gap: 3px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.recent-item span { color: var(--muted); font-size: .78rem; }
 .workspace { display: grid; grid-template-columns: minmax(0, .82fr) minmax(0, 1.45fr); gap: 22px; align-items: start; padding: 0 5vw 45px; }
 .content-column { display: grid; gap: 15px; min-width: 0; }
 .card, .filter-card { min-width: 0; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 24px rgba(32, 65, 100, .06); }
@@ -221,6 +225,18 @@ input:disabled { background: #eef2f6; }
 .participant { width: fit-content; padding: 4px 7px; border-radius: 3px; background: #fff6e6; }
 .participant.accepted { background: #e3f6eb; color: #15734a; }
 .participant.declined { background: #fbe7e7; color: #9c3c3c; }
+.participant-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.participant-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #bfd9ea; border-radius: 999px; color: var(--ictu-navy); background: #eef8fe; font-size: .72rem; }
+.participant-chip button { padding: 0 2px; border: 0; color: #7b3f3f; background: transparent; cursor: pointer; font-size: 1rem; line-height: 1; }
+.employee-suggestions { display: grid; gap: 4px; margin-top: 5px; padding: 5px; border: 1px solid #c5ddec; border-radius: 5px; background: #fff; box-shadow: 0 8px 18px rgba(32, 65, 100, .12); }
+.employee-suggestions button { display: grid; gap: 2px; padding: 8px; border: 0; color: var(--ictu-navy); background: transparent; text-align: left; cursor: pointer; }
+.employee-suggestions button:hover { background: #eef8fe; }
+.employee-suggestions span { color: var(--muted); font-size: .72rem; }
+.field-error { color: #a33636; font-size: .72rem; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(12, 38, 64, .42); }
+.detail-modal { width: min(620px, 100%); max-height: 90vh; overflow: auto; padding: 24px; border-radius: 10px; background: #fff; box-shadow: 0 20px 60px rgba(12, 38, 64, .28); }
+.detail-modal .section-heading button { border: 0; color: var(--muted); background: transparent; font-size: 1.5rem; cursor: pointer; }
+.detail-grid { display: grid; gap: 8px; margin: 16px 0; color: var(--muted); font-size: .82rem; }
 .item-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 11px; }
 .item-actions button { padding: 7px 10px; border: 1px solid #cbd9e5; border-radius: 3px; color: #315777; background: #fff; font-size: .76rem; font-weight: 700; }
 .item-actions .primary-action { border-color: var(--ictu-blue); color: #fff; background: var(--ictu-blue); }
@@ -329,6 +345,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .workspace { padding: 0 16px 32px; }
   .page-layout { padding: 0 16px 32px; }
   .overview-grid { grid-template-columns: 1fr; padding: 0 16px; }
+  .recent-meetings { margin: 0 16px 24px; padding: 18px; }
   .card { padding: 18px; }
   .form-grid { grid-template-columns: 1fr; }
   .form-grid .full { grid-column: auto; }

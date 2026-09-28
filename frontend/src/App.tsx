@@ -4,12 +4,17 @@ import { MeetingList } from "./components/MeetingList";
 import { RoomDirectory } from "./components/RoomDirectory";
 import { api } from "./services/api";
 import type { Meeting } from "./types";
+import { filterMeetings } from "./utils/meetingFilters";
 
-type Page = "overview" | "create" | "meetings" | "history" | "rooms";
+type Page = "overview" | "create" | "calendar" | "rooms";
 
 export default function App() {
   const [page, setPage] = useState<Page>("overview");
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [historyMeetings, setHistoryMeetings] = useState<Meeting[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [calendarMode, setCalendarMode] = useState<"all" | "history">("all");
+  const [roomSearch, setRoomSearch] = useState<{ startTime: string; endTime: string; minCapacity: number } | null>(null);
   const [filterEmail, setFilterEmail] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | Meeting["status"]>("all");
   const [filterFrom, setFilterFrom] = useState("");
@@ -31,17 +36,47 @@ export default function App() {
     void loadMeetings();
   }, [loadMeetings]);
 
+  useEffect(() => {
+    const email = filterEmail.trim();
+    if (page !== "calendar" || calendarMode !== "history" || !email || !email.includes("@")) {
+      setHistoryLoading(false);
+      return;
+    }
+
+    let active = true;
+    setHistoryLoading(true);
+    setHistoryMeetings([]);
+    void api.history(email)
+      .then((result) => {
+        if (active) {
+          setHistoryMeetings(result);
+          setError("");
+        }
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setHistoryMeetings([]);
+          setError(err instanceof Error ? err.message : "Không tải được lịch sử cuộc họp");
+        }
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [page, calendarMode, filterEmail]);
+
   const visibleMeetings = useMemo(() => {
-    const email = filterEmail.trim().toLowerCase();
-    const from = filterFrom ? new Date(`${filterFrom}T00:00:00`) : null;
-    const to = filterTo ? new Date(`${filterTo}T23:59:59`) : null;
-    return meetings.filter((meeting) => {
-      const date = new Date(meeting.start_time);
-      const matchesEmail = !email || meeting.organizer_email === email || meeting.participants.some((person) => person.email === email);
-      const matchesStatus = filterStatus === "all" || meeting.status === filterStatus;
-      return matchesEmail && matchesStatus && (!from || date >= from) && (!to || date <= to);
+    const source = calendarMode === "history" ? historyMeetings : meetings;
+    return filterMeetings(source, {
+      email: filterEmail,
+      status: filterStatus,
+      from: filterFrom,
+      to: filterTo,
     });
-  }, [meetings, filterEmail, filterStatus, filterFrom, filterTo]);
+  }, [meetings, historyMeetings, calendarMode, filterEmail, filterStatus, filterFrom, filterTo]);
 
   useEffect(() => {
     setHistoryPage(1);
@@ -50,9 +85,26 @@ export default function App() {
   const pagedMeetings = visibleMeetings.slice((historyPage - 1) * pageSize, historyPage * pageSize);
   const totalPages = Math.max(1, Math.ceil(visibleMeetings.length / pageSize));
 
-  const scheduled = meetings.filter((meeting) => meeting.status === "scheduled").length;
+  const now = new Date();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const scheduled = meetings.filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time) >= now).length;
+  const todayMeetings = meetings.filter((meeting) => {
+    const start = new Date(meeting.start_time);
+    return meeting.status === "scheduled" && start >= dayStart && start < dayEnd;
+  }).length;
   const booked = meetings.filter((meeting) => meeting.booking?.status === "active").length;
-  const cancelledRooms = meetings.filter((meeting) => meeting.booking?.status === "cancelled").length;
+  const withoutRoom = meetings.filter((meeting) => meeting.status === "scheduled" && !meeting.booking).length;
+  const pendingInvites = meetings.reduce(
+    (count, meeting) => count + meeting.participants.filter((participant) => participant.status === "invited").length,
+    0,
+  );
+  const recentMeetings = meetings
+    .filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time) >= now)
+    .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime())
+    .slice(0, 5);
 
   const goTo = (nextPage: Page) => {
     setPage(nextPage);
@@ -61,9 +113,13 @@ export default function App() {
   const renderHistoryFilters = () => (
     <div className="filter-card">
       <div>
-        <span className="eyebrow">US06 · Lịch sử cá nhân</span>
-        <strong>Lọc lịch sử cuộc họp</strong>
+        <span className="eyebrow">US06 · Lịch họp</span>
+        <strong>Lọc cuộc họp</strong>
       </div>
+      <select value={calendarMode} onChange={(event) => setCalendarMode(event.target.value as typeof calendarMode)} aria-label="Phạm vi lịch">
+        <option value="all">Tất cả cuộc họp</option>
+        <option value="history">Lịch tôi tham gia</option>
+      </select>
       <input type="email" value={filterEmail} onChange={(event) => setFilterEmail(event.target.value)} placeholder="member@ictu.edu.vn" />
       <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as typeof filterStatus)}>
         <option value="all">Tất cả trạng thái</option>
@@ -72,6 +128,8 @@ export default function App() {
       </select>
       <input type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} aria-label="Từ ngày" />
       <input type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} aria-label="Đến ngày" />
+      {calendarMode === "history" && !filterEmail && <span className="subtle">Nhập email để xem các cuộc họp bạn được phép xem.</span>}
+      {historyLoading && <span className="subtle">Đang tải lịch...</span>}
     </div>
   );
 
@@ -109,8 +167,7 @@ export default function App() {
       <nav className="main-navigation" aria-label="Điều hướng chính">
         <button className={page === "overview" ? "active" : ""} onClick={() => goTo("overview")}><span>⌂</span>Tổng quan</button>
         <button className={page === "create" ? "active" : ""} onClick={() => goTo("create")}><span>＋</span>Tạo lịch họp</button>
-        <button className={page === "meetings" ? "active" : ""} onClick={() => goTo("meetings")}><span>▣</span>Cuộc họp</button>
-        <button className={page === "history" ? "active" : ""} onClick={() => goTo("history")}><span>◷</span>Lịch sử</button>
+        <button className={page === "calendar" ? "active" : ""} onClick={() => goTo("calendar")}><span>▣</span>Lịch họp</button>
         <button className={page === "rooms" ? "active" : ""} onClick={() => goTo("rooms")}><span>⌗</span>Phòng họp</button>
       </nav>
       <main>
@@ -123,9 +180,9 @@ export default function App() {
           </div>
           <div className="stats">
             <div><strong>{meetings.length}</strong><span>Tổng lịch</span></div>
-            <div><strong>{scheduled}</strong><span>Đang hoạt động</span></div>
+            <div><strong>{scheduled}</strong><span>Sắp tới</span></div>
             <div><strong>{booked}</strong><span>Đã có phòng</span></div>
-            <div><strong>{cancelledRooms}</strong><span>Phòng đã hủy</span></div>
+            <div><strong>{withoutRoom}</strong><span>Chưa có phòng</span></div>
           </div>
         </section>
         )}
@@ -144,16 +201,33 @@ export default function App() {
 
         {page === "overview" && (
           <section className="overview-grid">
-            <div className="overview-card"><span>Cuộc họp sắp tới</span><strong>{scheduled}</strong><button onClick={() => goTo("meetings")}>Xem danh sách →</button></div>
+            <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
             <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
+            <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={() => goTo("calendar")}>Xem lời mời →</button></div>
             <div className="overview-card"><span>Thao tác nhanh</span><strong>＋</strong><button onClick={() => goTo("create")}>Tạo lịch họp mới →</button></div>
           </section>
         )}
+        {page === "overview" && (
+          <section className="card recent-meetings" aria-labelledby="recent-meetings-title">
+            <div className="section-heading">
+              <div><span className="eyebrow">Lịch gần nhất</span><h2 id="recent-meetings-title">Cuộc họp sắp diễn ra</h2></div>
+              <button className="button secondary" onClick={() => goTo("calendar")}>Xem tất cả</button>
+            </div>
+            <div className="recent-list">
+              {recentMeetings.length === 0 && <p className="empty">Chưa có cuộc họp nào.</p>}
+              {recentMeetings.map((meeting) => (
+                <div className="recent-item" key={meeting.id}>
+                  <strong>{meeting.title}</strong>
+                  <span>{new Date(meeting.start_time).toLocaleString("vi-VN")} · {meeting.booking?.room.name ?? "Chưa đặt phòng"}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <div className="page-layout">
-          {page === "create" && <MeetingForm onCreated={loadMeetings} />}
-          {page === "meetings" && renderMeetings(meetings)}
-          {page === "rooms" && <RoomDirectory meetings={meetings} />}
-          {page === "history" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
+          {page === "create" && <MeetingForm onCreated={loadMeetings} onRoomsRequested={(search) => { setRoomSearch(search); goTo("rooms"); }} />}
+          {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
+          {page === "rooms" && <RoomDirectory meetings={meetings} initialSearch={roomSearch} />}
         </div>
       </main>
 
