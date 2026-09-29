@@ -97,6 +97,20 @@ describe("MeetingForm room-aware creation", () => {
     expect(screen.getByLabelText("Người tổ chức")).toHaveValue("minhanh@ictu.edu.vn");
   });
 
+  it("invites all ICTU employees except the organizer", async () => {
+    vi.mocked(api.listEmployees).mockResolvedValue([
+      { id: 1, full_name: "Người tổ chức", email: "leader@ictu.edu.vn", department: "Nhóm dự án ICTU", is_active: true },
+      { id: 2, full_name: "Trần Minh Anh", email: "minhanh@ictu.edu.vn", department: "Khoa Công nghệ thông tin", is_active: true },
+      { id: 3, full_name: "Lê Hoàng Nam", email: "hoangnam@ictu.edu.vn", department: "Phòng Đào tạo", is_active: true },
+    ]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả nhân viên" }));
+    expect(screen.getByText("minhanh@ictu.edu.vn")).toBeInTheDocument();
+    expect(screen.getByText("hoangnam@ictu.edu.vn")).toBeInTheDocument();
+    expect(screen.queryByText("leader@ictu.edu.vn", { selector: ".participant-chip" })).not.toBeInTheDocument();
+  });
+
   it("clears the chosen room when the meeting time changes", async () => {
     render(<MeetingForm onCreated={vi.fn()} />);
     fillRequiredFields();

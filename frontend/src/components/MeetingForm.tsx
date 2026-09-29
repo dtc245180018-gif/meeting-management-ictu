@@ -116,6 +116,30 @@ export function MeetingForm({ onCreated }: Props) {
     return true;
   };
 
+  const inviteAllEmployees = () => {
+    const organizer = form.organizer_email.trim().toLowerCase();
+    if (!emailPattern.test(organizer)) {
+      setMessage("Hãy chọn hoặc nhập email người tổ chức trước khi mời tất cả nhân viên.");
+      return;
+    }
+    const pending = participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
+    const invalid = pending.find((email) => !emailPattern.test(email));
+    if (invalid) {
+      setParticipantError(`Email không hợp lệ: ${invalid}`);
+      return;
+    }
+    const invitees = [...new Set([
+      ...selectedParticipants,
+      ...pending,
+      ...employees.map((employee) => employee.email.toLowerCase()),
+    ])].filter((email) => email !== organizer);
+    clearRoomSelection();
+    setSelectedParticipants(invitees);
+    setParticipantInput("");
+    setParticipantError("");
+    setMessage(`Đã thêm ${invitees.length} người tham dự, không bao gồm người tổ chức.`);
+  };
+
   const submittedParticipants = () => {
     const pending = participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
     return [...new Set([...selectedParticipants, ...pending])]
@@ -261,8 +285,13 @@ export function MeetingForm({ onCreated }: Props) {
           )}
           <small className="field-hint">Nhân viên ICTU có thể đứng tên tổ chức cuộc họp.</small>
         </label>
-        <label>Người tham dự
+        <div className="participant-field">
+          <div className="participant-label-row">
+            <span>Người tham dự</span>
+            <button className="invite-all-button" type="button" onClick={inviteAllEmployees}>Mời tất cả nhân viên</button>
+          </div>
           <input
+            aria-label="Người tham dự"
             value={participantInput}
             onChange={(event) => {
               if (/[;,\n]/.test(event.target.value)) {
@@ -304,7 +333,7 @@ export function MeetingForm({ onCreated }: Props) {
             </div>
           )}
           {participantError && <small className="field-error">{participantError}</small>}
-        </label>
+        </div>
         <label>Bắt đầu
           <input required type="datetime-local" value={form.start_time} onChange={(e) => updateForm({ start_time: e.target.value }, true)} />
         </label>
