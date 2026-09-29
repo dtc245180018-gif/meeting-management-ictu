@@ -243,7 +243,14 @@ def test_room_directory_and_employee_fixture(client):
 
     employees = client.get("/api/employees")
     assert employees.status_code == 200
-    assert any(employee["email"] == ORGANIZER for employee in employees.json())
+    assert len(employees.json()) == 10
+    assert {employee["email"] for employee in employees.json()} >= {
+        ORGANIZER,
+        "trangnt@ictu.edu.vn",
+        "longbd@ictu.edu.vn",
+        "phuonghl@ictu.edu.vn",
+        "viettq@ictu.edu.vn",
+    }
 
 
 def test_expected_attendees_is_persisted_and_controls_booking_capacity(client):

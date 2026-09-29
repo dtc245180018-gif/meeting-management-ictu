@@ -33,19 +33,23 @@ def seed_rooms() -> None:
 
 def seed_employees() -> None:
     with SessionLocal() as db:
-        if db.scalar(select(models.Employee.id).limit(1)):
-            return
-        db.add_all(
-            [
-                models.Employee(full_name="Nguyễn Ngọc Thắng", email="leader@ictu.edu.vn", department="Nhóm dự án ICTU"),
-                models.Employee(full_name="Trần Minh Anh", email="minhanh@ictu.edu.vn", department="Khoa Công nghệ thông tin"),
-                models.Employee(full_name="Lê Hoàng Nam", email="hoangnam@ictu.edu.vn", department="Phòng Đào tạo"),
-                models.Employee(full_name="Phạm Thu Hà", email="thuha@ictu.edu.vn", department="Phòng Hành chính"),
-                models.Employee(full_name="Đỗ Quang Huy", email="quanghuy@ictu.edu.vn", department="Trung tâm CNTT"),
-                models.Employee(full_name="Vũ Mai Linh", email="mailinh@ictu.edu.vn", department="Khoa Hệ thống thông tin"),
-            ]
-        )
-        db.commit()
+        employees = [
+            models.Employee(full_name="Nguyễn Ngọc Thắng", email="leader@ictu.edu.vn", department="Nhóm dự án ICTU"),
+            models.Employee(full_name="Trần Minh Anh", email="minhanh@ictu.edu.vn", department="Khoa Công nghệ thông tin"),
+            models.Employee(full_name="Lê Hoàng Nam", email="hoangnam@ictu.edu.vn", department="Phòng Đào tạo"),
+            models.Employee(full_name="Phạm Thu Hà", email="thuha@ictu.edu.vn", department="Phòng Hành chính"),
+            models.Employee(full_name="Đỗ Quang Huy", email="quanghuy@ictu.edu.vn", department="Trung tâm CNTT"),
+            models.Employee(full_name="Vũ Mai Linh", email="mailinh@ictu.edu.vn", department="Khoa Hệ thống thông tin"),
+            models.Employee(full_name="Nguyễn Thu Trang", email="trangnt@ictu.edu.vn", department="Khoa Truyền thông đa phương tiện"),
+            models.Employee(full_name="Bùi Đức Long", email="longbd@ictu.edu.vn", department="Khoa Kỹ thuật và Công nghệ"),
+            models.Employee(full_name="Hoàng Lan Phương", email="phuonghl@ictu.edu.vn", department="Phòng Khoa học Công nghệ"),
+            models.Employee(full_name="Trịnh Quốc Việt", email="viettq@ictu.edu.vn", department="Phòng Khảo thí và Đảm bảo chất lượng"),
+        ]
+        existing_emails = set(db.scalars(select(models.Employee.email)).all())
+        new_employees = [employee for employee in employees if employee.email not in existing_emails]
+        if new_employees:
+            db.add_all(new_employees)
+            db.commit()
 
 
 def apply_schema_migrations() -> None:

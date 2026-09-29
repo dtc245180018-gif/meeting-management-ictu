@@ -22,8 +22,23 @@ Mở `http://localhost:5173`, sau đó refresh trang một lần.
 Kết quả sau khi reset:
 
 - Chưa có cuộc họp, lời mời hoặc đặt phòng nào.
-- Danh mục phòng và danh sách nhân viên ICTU vẫn có sẵn để chọn.
+- Có 10 phòng và 10 nhân viên ICTU sẵn để chọn.
 - Các lần chạy lại reset đều đưa hệ thống về cùng trạng thái sạch.
+
+Danh sách email dùng khi demo:
+
+| Nhân viên | Email | Đơn vị |
+| --- | --- | --- |
+| Nguyễn Ngọc Thắng | `leader@ictu.edu.vn` | Nhóm dự án ICTU |
+| Trần Minh Anh | `minhanh@ictu.edu.vn` | Khoa Công nghệ thông tin |
+| Lê Hoàng Nam | `hoangnam@ictu.edu.vn` | Phòng Đào tạo |
+| Phạm Thu Hà | `thuha@ictu.edu.vn` | Phòng Hành chính |
+| Đỗ Quang Huy | `quanghuy@ictu.edu.vn` | Trung tâm CNTT |
+| Vũ Mai Linh | `mailinh@ictu.edu.vn` | Khoa Hệ thống thông tin |
+| Nguyễn Thu Trang | `trangnt@ictu.edu.vn` | Khoa Truyền thông đa phương tiện |
+| Bùi Đức Long | `longbd@ictu.edu.vn` | Khoa Kỹ thuật và Công nghệ |
+| Hoàng Lan Phương | `phuonghl@ictu.edu.vn` | Phòng Khoa học Công nghệ |
+| Trịnh Quốc Việt | `viettq@ictu.edu.vn` | Phòng Khảo thí và Đảm bảo chất lượng |
 
 ## 2. Thông điệp mở đầu (30 giây)
 
@@ -51,9 +66,9 @@ Kết quả sau khi reset:
    - Mô tả: `Thống nhất tiến độ và phân công công việc.`
 3. Tại **Người tổ chức**, chọn `leader@ictu.edu.vn`.
 4. Bấm **Mời tất cả mọi người**.
-5. Cho mentor thấy người tổ chức không xuất hiện trong các chip người tham dự.
+5. Cho mentor thấy có 9 người được mời và người tổ chức không xuất hiện trong các chip người tham dự.
 6. Xóa một người khỏi chip để minh họa việc chỉnh sửa danh sách.
-7. Có thể gõ một phần tên/email để chọn gợi ý nhân viên.
+7. Gõ `trang` hoặc `phuong` để minh họa gợi ý nhân viên, sau đó chọn email tương ứng.
 
 Điểm cần nói:
 
@@ -130,7 +145,7 @@ Kết quả sau khi reset:
 4. Bấm **Tìm**.
 5. Đổi trạng thái hoặc khoảng ngày nếu cần, sau đó bấm **Xóa** để bỏ bộ lọc.
 
-6. Để demo phân trang, tạo một lịch lặp hằng tuần 6 lần với `minhanh@ictu.edu.vn` là người tham dự, hoặc dùng một bộ dữ liệu có ít nhất 6 kết quả.
+6. Để demo phân trang, tạo một lịch lặp hằng tuần 6 lần với `minhanh@ictu.edu.vn` là người tham dự. Sáu lần lặp sẽ tạo đủ dữ liệu cho hai trang, mỗi trang 5 lịch.
 7. Tìm lại email đó và kiểm tra nút **Trước/Sau**, số trang và việc chuyển trang không làm mất bộ lọc.
 
 Điểm cần nói:
