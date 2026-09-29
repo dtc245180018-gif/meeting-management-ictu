@@ -90,6 +90,15 @@ python scripts/seed_demo_data.py
 
 Script có tính idempotent: không xóa dữ liệu hiện có và bỏ qua nhóm dữ liệu demo đã được nạp. Kịch bản trình diễn đầy đủ nằm tại [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md).
 
+Để xóa toàn bộ cuộc họp, lời mời và đặt phòng trước khi demo thủ công, đồng thời khôi phục danh mục phòng/nhân viên mẫu:
+
+```powershell
+cd backend
+python scripts/reset_demo_data.py
+```
+
+Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
+
 ## Quy ước Git
 
 - Mỗi User Story hoặc task được phát triển trên nhánh riêng.
