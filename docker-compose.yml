@@ -20,6 +20,15 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://meeting_user:meeting_password@db:5432/meeting_management}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-leader@ictu.edu.vn}
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-console}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      REMINDER_MAX_ATTEMPTS: ${REMINDER_MAX_ATTEMPTS:-3}
     ports:
       - "8000:8000"
     depends_on:
@@ -31,6 +40,7 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
+        VITE_CURRENT_USER_EMAIL: ${VITE_CURRENT_USER_EMAIL:-leader@ictu.edu.vn}
     ports:
       - "5173:80"
     depends_on:

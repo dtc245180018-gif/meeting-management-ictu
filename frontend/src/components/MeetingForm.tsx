@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Employee, MeetingInput, Room, SuggestedTime } from "../types";
+import type { Employee, Equipment, MeetingInput, Room, SuggestedTime } from "../types";
 import { api } from "../services/api";
 
 const initialForm: MeetingInput = {
@@ -12,6 +12,8 @@ const initialForm: MeetingInput = {
   expected_attendees: 1,
   recurrence: null,
   recurrence_count: 1,
+  equipment_ids: [],
+  reminder_minutes: null,
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -49,14 +51,23 @@ export function MeetingForm({ onCreated }: Props) {
   const [roomOptions, setRoomOptions] = useState<Room[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [roomLoading, setRoomLoading] = useState(false);
+  const [equipmentOptions, setEquipmentOptions] = useState<Equipment[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment[]>([]);
+  const [equipmentLoading, setEquipmentLoading] = useState(false);
 
   const clearRoomSelection = () => {
     setSelectedRoom(null);
     setRoomOptions([]);
   };
 
-  const updateForm = (changes: Partial<MeetingInput>, invalidateRoom = false) => {
-    if (invalidateRoom) clearRoomSelection();
+  const clearResourceSelection = () => {
+    clearRoomSelection();
+    setSelectedEquipment([]);
+    setEquipmentOptions([]);
+  };
+
+  const updateForm = (changes: Partial<MeetingInput>, invalidateResources = false) => {
+    if (invalidateResources) clearResourceSelection();
     setForm((current) => ({ ...current, ...changes }));
   };
 
@@ -96,7 +107,7 @@ export function MeetingForm({ onCreated }: Props) {
       return;
     }
     setParticipantError("");
-    clearRoomSelection();
+    clearResourceSelection();
     setSelectedParticipants((current) => [...new Set([...current, ...emails])]);
     setParticipantInput("");
   };
@@ -109,7 +120,7 @@ export function MeetingForm({ onCreated }: Props) {
       setParticipantError(`Email không hợp lệ: ${invalid}`);
       return false;
     }
-    clearRoomSelection();
+    clearResourceSelection();
     setSelectedParticipants((current) => [...new Set([...current, ...emails])]);
     setParticipantInput("");
     setParticipantError("");
@@ -133,7 +144,7 @@ export function MeetingForm({ onCreated }: Props) {
       ...pending,
       ...employees.map((employee) => employee.email.toLowerCase()),
     ])].filter((email) => email !== organizer);
-    clearRoomSelection();
+    clearResourceSelection();
     setSelectedParticipants(invitees);
     setParticipantInput("");
     setParticipantError("");
@@ -158,7 +169,7 @@ export function MeetingForm({ onCreated }: Props) {
         return;
       }
       if (participantInput.trim()) {
-        clearRoomSelection();
+        clearResourceSelection();
         setSelectedParticipants((current) => [...new Set([...current, ...participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean)])]);
         setParticipantInput("");
       }
@@ -175,15 +186,14 @@ export function MeetingForm({ onCreated }: Props) {
         participant_emails: currentParticipants,
         expected_attendees: currentParticipants.length + 1,
         room_id: selectedRoom?.id ?? null,
+        equipment_ids: selectedEquipment.map((item) => item.id),
       });
-      setMessage(selectedRoom
-        ? `Đã tạo ${created.length} lịch họp, ghi nhận ${currentParticipants.length} lời mời và đặt ${selectedRoom.name} cho toàn bộ lần lặp thành công.`
-        : `Đã tạo ${created.length} lịch họp thành công và ghi nhận ${currentParticipants.length} lời mời người tham dự.`);
+      setMessage(`Đã tạo ${created.length} lịch họp, ghi nhận ${currentParticipants.length} lời mời${selectedRoom ? `, đặt ${selectedRoom.name}` : ""}${selectedEquipment.length ? ` và ${selectedEquipment.length} thiết bị` : ""} thành công.`);
       setForm(initialForm);
       setParticipantInput("");
       setSelectedParticipants([]);
       setParticipantError("");
-      clearRoomSelection();
+      clearResourceSelection();
       setSuggestions([]);
       onCreated();
     } catch (error) {
@@ -255,14 +265,39 @@ export function MeetingForm({ onCreated }: Props) {
       .finally(() => setRoomLoading(false));
   };
 
+  const openEquipmentFinder = () => {
+    const start = new Date(form.start_time);
+    const end = new Date(form.end_time);
+    if (!form.start_time || !form.end_time || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+      setMessage("Hãy chọn thời gian hợp lệ trước khi tìm thiết bị.");
+      return;
+    }
+    setEquipmentLoading(true);
+    setMessage("");
+    void api.availableEquipment(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time))
+      .then((items) => {
+        setEquipmentOptions(items);
+        setSelectedEquipment([]);
+        setMessage(items.length ? `Đã tìm thấy ${items.length} thiết bị có thể đặt.` : "Không có thiết bị phù hợp trong khung giờ này.");
+      })
+      .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Không thể tìm thiết bị"))
+      .finally(() => setEquipmentLoading(false));
+  };
+
+  const toggleEquipment = (equipment: Equipment) => {
+    setSelectedEquipment((current) => current.some((item) => item.id === equipment.id)
+      ? current.filter((item) => item.id !== equipment.id)
+      : [...current, equipment]);
+  };
+
   return (
     <section className="card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">US01 · US03 · US04 · US05</span>
+          <span className="eyebrow">US01 · US03 · US04 · US05 · US12 · US16</span>
           <h2>Tạo lịch họp</h2>
         </div>
-        <span className="badge">Sprint 1</span>
+        <span className="badge">Sprint 2</span>
       </div>
       <form onSubmit={submit} className="form-grid">
         <label className="full">Tên cuộc họp
@@ -297,7 +332,7 @@ export function MeetingForm({ onCreated }: Props) {
               if (/[;,\n]/.test(event.target.value)) {
                 addParticipants(event.target.value);
               } else {
-                clearRoomSelection();
+                clearResourceSelection();
                 setParticipantInput(event.target.value);
                 setParticipantError("");
               }
@@ -327,7 +362,7 @@ export function MeetingForm({ onCreated }: Props) {
               {participants.map((email) => (
                 <span className="participant-chip" key={email}>
                   {email}
-                  <button type="button" aria-label={`Xóa ${email}`} onClick={() => { clearRoomSelection(); setSelectedParticipants((current) => current.filter((item) => item !== email)); }}>×</button>
+                  <button type="button" aria-label={`Xóa ${email}`} onClick={() => { clearResourceSelection(); setSelectedParticipants((current) => current.filter((item) => item !== email)); }}>×</button>
                 </span>
               ))}
             </div>
@@ -350,9 +385,23 @@ export function MeetingForm({ onCreated }: Props) {
         <label>Số lần
           <input type="number" min={1} max={24} disabled={!form.recurrence} value={form.recurrence_count} onChange={(e) => updateForm({ recurrence_count: Number(e.target.value) }, true)} />
         </label>
+        <label>Nhắc lịch
+          <select aria-label="Thời gian nhắc" value={form.reminder_minutes ?? ""} onChange={(event) => updateForm({ reminder_minutes: event.target.value ? Number(event.target.value) as 15 | 30 | 60 | 1440 : null })}>
+            <option value="">Không nhắc</option>
+            <option value="15">Trước 15 phút</option>
+            <option value="30">Trước 30 phút</option>
+            <option value="60">Trước 60 phút</option>
+            <option value="1440">Trước 1 ngày</option>
+          </select>
+        </label>
+        <div className="resource-summary">
+          <span>Thiết bị đã chọn</span>
+          <strong>{selectedEquipment.length} thiết bị</strong>
+        </div>
         <div className="full action-row">
           <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading}>Gợi ý giờ trống</button>
           <button className="button secondary" type="button" onClick={openRoomFinder} disabled={roomLoading}>{roomLoading ? "Đang tìm phòng..." : "Tìm phòng phù hợp"}</button>
+          <button className="button secondary" type="button" onClick={openEquipmentFinder} disabled={equipmentLoading}>{equipmentLoading ? "Đang tìm thiết bị..." : "Tìm thiết bị"}</button>
           <button className="button primary" type="submit" disabled={loading}>{loading ? "Đang xử lý..." : "Tạo lịch họp"}</button>
         </div>
       </form>
@@ -365,6 +414,20 @@ export function MeetingForm({ onCreated }: Props) {
               <span>{room.capacity} chỗ · {room.location} · {room.room_type}</span>
             </button>
           ))}
+        </div>
+      )}
+      {equipmentOptions.length > 0 && (
+        <div className="equipment-options" aria-label="Thiết bị phù hợp cho cuộc họp">
+          <strong>Chọn nhiều thiết bị để đặt cùng lúc tạo lịch</strong>
+          <div className="equipment-option-grid">
+            {equipmentOptions.map((equipment) => {
+              const selected = selectedEquipment.some((item) => item.id === equipment.id);
+              return <button className={selected ? "selected" : ""} key={equipment.id} type="button" onClick={() => toggleEquipment(equipment)}>
+                <strong>{equipment.code} · {equipment.name}{selected ? " · Đã chọn" : ""}</strong>
+                <span>{equipment.category} · {equipment.location}</span>
+              </button>;
+            })}
+          </div>
         </div>
       )}
       <p className="subtle">Quy mô phòng tự tính: {participants.length + 1} người, gồm người tổ chức và danh sách được mời.</p>

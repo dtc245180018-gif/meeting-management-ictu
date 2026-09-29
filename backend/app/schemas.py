@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from .models import BookingStatus, InvitationStatus, MeetingStatus
+from .models import BookingStatus, EquipmentStatus, InvitationStatus, MeetingStatus, NotificationStatus
 
 
 class ParticipantOut(BaseModel):
@@ -28,6 +28,102 @@ class RoomOut(BaseModel):
     display: bool
     microphone: bool
     video_conferencing: bool
+    is_active: bool
+
+
+class RoomAdminCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requester_email: EmailStr
+    name: str = Field(min_length=2, max_length=120)
+    capacity: int = Field(gt=0, le=10000)
+    location: str = Field(min_length=2, max_length=255)
+    building: str = Field(default="", max_length=120)
+    floor: int = Field(default=1, ge=0, le=200)
+    room_type: str = Field(default="Phòng họp", min_length=2, max_length=80)
+    projector: bool = False
+    display: bool = False
+    microphone: bool = False
+    video_conferencing: bool = False
+
+    @field_validator("name", "location", "building", "room_type", mode="before")
+    @classmethod
+    def strip_room_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+
+class RoomAdminUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requester_email: EmailStr
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    capacity: int | None = Field(default=None, gt=0, le=10000)
+    location: str | None = Field(default=None, min_length=2, max_length=255)
+    building: str | None = Field(default=None, max_length=120)
+    floor: int | None = Field(default=None, ge=0, le=200)
+    room_type: str | None = Field(default=None, min_length=2, max_length=80)
+    projector: bool | None = None
+    display: bool | None = None
+    microphone: bool | None = None
+    video_conferencing: bool | None = None
+    is_active: bool | None = None
+
+
+class EquipmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    category: str
+    location: str
+    status: Literal["available", "booked", "maintenance", "inactive"]
+    is_active: bool
+
+
+class EquipmentBookingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    equipment_id: int
+    meeting_id: int
+    start_time: datetime
+    end_time: datetime
+    status: BookingStatus
+    equipment: EquipmentOut
+
+
+class EquipmentAdminCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requester_email: EmailStr
+    code: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=2, max_length=160)
+    category: str = Field(min_length=2, max_length=80)
+    location: str = Field(min_length=2, max_length=255)
+    status: EquipmentStatus = EquipmentStatus.AVAILABLE
+
+    @field_validator("code", "name", "category", "location", mode="before")
+    @classmethod
+    def normalize_equipment_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("code")
+    @classmethod
+    def uppercase_code(cls, value: str) -> str:
+        return value.upper()
+
+
+class EquipmentAdminUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requester_email: EmailStr
+    code: str | None = Field(default=None, min_length=2, max_length=80)
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    category: str | None = Field(default=None, min_length=2, max_length=80)
+    location: str | None = Field(default=None, min_length=2, max_length=255)
+    status: EquipmentStatus | None = None
+    is_active: bool | None = None
 
 
 class EmployeeOut(BaseModel):
@@ -105,6 +201,17 @@ class MeetingCreate(MeetingBase):
     recurrence: Literal["weekly", "monthly"] | None = None
     recurrence_count: int = Field(default=1, ge=1, le=24)
     room_id: int | None = Field(default=None, ge=1)
+    equipment_ids: list[int] = Field(default_factory=list, max_length=30)
+    reminder_minutes: Literal[15, 30, 60, 1440] | None = None
+
+    @field_validator("equipment_ids")
+    @classmethod
+    def equipment_must_be_unique(cls, value: list[int]) -> list[int]:
+        if any(item < 1 for item in value):
+            raise ValueError("Mã thiết bị không hợp lệ")
+        if len(value) != len(set(value)):
+            raise ValueError("Không được chọn trùng thiết bị")
+        return value
 
 
 class MeetingUpdate(BaseModel):
@@ -117,6 +224,8 @@ class MeetingUpdate(BaseModel):
     end_time: datetime | None = None
     participant_emails: list[EmailStr] | None = Field(default=None, max_length=50)
     expected_attendees: int | None = Field(default=None, ge=1, le=10000)
+    equipment_ids: list[int] | None = Field(default=None, max_length=30)
+    reminder_minutes: Literal[15, 30, 60, 1440] | None = None
 
     @field_validator("title", mode="before")
     @classmethod
@@ -128,6 +237,13 @@ class MeetingUpdate(BaseModel):
         value = value.strip()
         if len(value) < 3:
             raise ValueError("Tiêu đề phải có ít nhất 3 ký tự sau khi bỏ khoảng trắng")
+        return value
+
+    @field_validator("equipment_ids")
+    @classmethod
+    def update_equipment_must_be_unique(cls, value: list[int] | None) -> list[int] | None:
+        if value is not None and (any(item < 1 for item in value) or len(value) != len(set(value))):
+            raise ValueError("Danh sách thiết bị không hợp lệ hoặc bị trùng")
         return value
 
 
@@ -146,6 +262,7 @@ class MeetingOut(BaseModel):
     status: MeetingStatus
     participants: list[ParticipantOut]
     booking: BookingOut | None = None
+    equipment_bookings: list[EquipmentBookingOut] = Field(default_factory=list)
 
 
 class CancelRequest(BaseModel):
@@ -189,3 +306,31 @@ class BookingCreate(BaseModel):
 
 class MessageOut(BaseModel):
     message: str
+
+
+class CalendarLinksOut(BaseModel):
+    google_url: str
+    outlook_ics_url: str
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    meeting_id: int
+    recipient_email: EmailStr
+    channel: str
+    remind_at: datetime
+    status: NotificationStatus
+    attempts: int
+    error_message: str | None
+    is_read: bool
+    created_at: datetime
+    sent_at: datetime | None
+    meeting_title: str | None = None
+
+
+class NotificationReadRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr

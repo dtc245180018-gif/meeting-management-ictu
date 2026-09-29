@@ -70,7 +70,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
     if (!window.confirm(`Bạn có chắc muốn hủy cuộc họp "${meeting.title}"?`)) return;
     try {
       await api.cancelMeeting(meeting.id, meeting.organizer_email);
-      setMessage(`Đã hủy cuộc họp #${meeting.id}.`);
+      setMessage(`Đã hủy cuộc họp #${meeting.id}; phòng, thiết bị và nhắc lịch liên quan đã được giải phóng.`);
       onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể hủy cuộc họp");
@@ -94,6 +94,15 @@ export function MeetingList({ meetings, onChanged }: Props) {
       onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể đặt phòng");
+    }
+  };
+
+  const addToGoogleCalendar = async (meeting: Meeting) => {
+    try {
+      const links = await api.calendarLinks(meeting.id);
+      window.open(links.google_url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể mở Google Calendar");
     }
   };
 
@@ -135,10 +144,13 @@ export function MeetingList({ meetings, onChanged }: Props) {
                 <span>Chủ trì: {meeting.organizer_email}</span>
                 <span>Tổng quy mô: {meeting.expected_attendees ?? meeting.participants.length + 1} người · {meeting.participants.length} người được mời</span>
                 <span>{meeting.booking ? meeting.booking.room.name : "Chưa đặt phòng"}</span>
+                <span>{meeting.equipment_bookings?.filter((item) => item.status === "active").length ?? 0} thiết bị</span>
                 {meeting.recurrence && <span>Lặp {meeting.recurrence === "weekly" ? "hằng tuần" : "hằng tháng"}</span>}
               </div>
               <div className="item-actions">
                 <button onClick={() => setDetails(meeting)}>Xem chi tiết</button>
+                <button onClick={() => void addToGoogleCalendar(meeting)}>Thêm vào Google Calendar</button>
+                <a className="calendar-download" href={api.calendarFileUrl(meeting.id)} download={`meeting-${meeting.id}.ics`}>Tải lịch Outlook/ICS</a>
               </div>
               {meeting.participants.length > 0 && (
                 <div className="participants">
@@ -203,6 +215,11 @@ export function MeetingList({ meetings, onChanged }: Props) {
               <span>Kết thúc: <strong>{new Date(details.end_time).toLocaleString("vi-VN")}</strong></span>
               <span>Quy mô dự kiến: <strong>{details.expected_attendees ?? details.participants.length + 1} người</strong></span>
               <span>Phòng: <strong>{details.booking?.room.name ?? "Chưa đặt phòng"}</strong></span>
+            </div>
+            <div className="participants">
+              <strong>Thiết bị ({details.equipment_bookings?.filter((item) => item.status === "active").length ?? 0})</strong>
+              {!details.equipment_bookings?.some((item) => item.status === "active") && <span>Không đặt kèm thiết bị.</span>}
+              {details.equipment_bookings?.filter((item) => item.status === "active").map((item) => <span className="participant" key={item.id}>{item.equipment.code} · {item.equipment.name}</span>)}
             </div>
             <div className="participants">
               <strong>Người tham dự ({details.participants.length})</strong>

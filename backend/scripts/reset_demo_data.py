@@ -1,7 +1,7 @@
 """Reset the local database to a clean state for a manual demo.
 
-This removes meetings, invitations and room bookings, then restores the
-canonical ICTU room and employee directory. It intentionally does not add
+This removes meetings, invitations, reminders and resource bookings, then
+restores the canonical ICTU room, equipment and employee directory. It does not add
 sample meetings; the presenter creates them during the demo.
 
 Run from the backend directory:
@@ -19,7 +19,7 @@ from sqlalchemy import delete
 
 from app import models
 from app.database import Base, SessionLocal, engine
-from app.main import apply_schema_migrations, seed_employees, seed_rooms
+from app.main import apply_schema_migrations, seed_employees, seed_equipment, seed_rooms
 
 
 def main() -> None:
@@ -27,16 +27,20 @@ def main() -> None:
     apply_schema_migrations()
 
     with SessionLocal() as db:
+        db.execute(delete(models.Reminder))
+        db.execute(delete(models.EquipmentBooking))
         db.execute(delete(models.RoomBooking))
         db.execute(delete(models.Participant))
         db.execute(delete(models.Meeting))
         db.execute(delete(models.Room))
+        db.execute(delete(models.Equipment))
         db.execute(delete(models.Employee))
         db.commit()
 
     seed_rooms()
     seed_employees()
-    print("Demo database reset: meetings, invitations and bookings cleared; rooms and employees restored.")
+    seed_equipment()
+    print("Demo database reset: meetings, reminders and bookings cleared; rooms, equipment and employees restored.")
 
 
 if __name__ == "__main__":

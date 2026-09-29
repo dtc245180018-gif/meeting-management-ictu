@@ -1,6 +1,7 @@
 # Meeting Management ICTU
 
-Hệ thống quản lý lịch họp được xây dựng cho Sprint 1 theo Agile Scrum.
+Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Nhánh
+`sprint-2` mở rộng luồng Sprint 1 mà không thay đổi các chức năng cốt lõi đã ổn định.
 
 ## Phạm vi Sprint 1
 
@@ -12,6 +13,20 @@ Hệ thống quản lý lịch họp được xây dựng cho Sprint 1 theo Agil
 - US06: Xem lịch sử cuộc họp.
 - US07: Xem danh sách phòng đang trống.
 - US08: Đặt phòng theo khung giờ và chống đặt trùng.
+
+## Phạm vi Sprint 2
+
+- US09: Hủy cuộc họp và giải phóng phòng, thiết bị, reminder trong cùng giao dịch.
+- US10: Xem và lọc phòng theo sức chứa.
+- US11: Quản trị danh sách phòng, kiểm tra trùng tên và ngừng sử dụng bằng xóa mềm.
+- US12: Đặt nhiều thiết bị cùng cuộc họp/lịch lặp với kiểm tra xung đột và rollback.
+- US13: Xem trạng thái thiết bị theo loại, trạng thái và khung thời gian.
+- US14: Quản trị thiết bị, bảo trì, kích hoạt và khóa bằng xóa mềm.
+- US15: Xuất ICS và liên kết Google Calendar một chiều.
+- US16: Nhắc lịch trong ứng dụng và gửi email nền qua console hoặc SMTP.
+
+Không thuộc Sprint 2: đăng nhập, quản lý tài khoản, phân quyền đầy đủ, báo cáo,
+mobile, chatbot, QR check-in và tích hợp HRM/ERP.
 
 ## Công nghệ
 
@@ -39,6 +54,7 @@ không cần trỏ trình duyệt trực tiếp tới hostname `backend`. Có th
 
 ```bash
 cd backend
+cp .env.example .env
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -59,6 +75,7 @@ bằng cả `http://localhost:5173` và `http://127.0.0.1:5173`.
 
 ```bash
 cd frontend
+cp .env.example .env
 npm install
 npm run dev
 ```
@@ -79,9 +96,38 @@ npm run test
 npm run build
 ```
 
+## Cấu hình Sprint 2
+
+- `ADMIN_EMAILS`: danh sách email quản trị tạm thời, phân tách bằng dấu phẩy.
+  API quản trị nhận email người thao tác và đối chiếu cấu hình này. Đây chỉ là
+  cơ chế tạm thời trước Sprint 3, chưa thay thế xác thực/phân quyền.
+- `VITE_CURRENT_USER_EMAIL`: email người dùng demo mà giao diện gửi tới API quản trị/thông báo.
+- `EMAIL_BACKEND=console`: chế độ demo, ghi email nhắc lịch vào log và đánh dấu đã gửi.
+- `EMAIL_BACKEND=smtp`: gửi SMTP bằng `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+  `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` và `SMTP_USE_TLS`.
+- Không đưa mật khẩu, token hoặc OAuth Client Secret thật vào Git.
+
+US15 hiện là đồng bộ một chiều: Backend sinh file ICS chuẩn và liên kết tạo sự
+kiện Google Calendar. Hệ thống chưa có OAuth nên không đọc thay đổi từ Google
+Calendar/Outlook và không tự đồng bộ hai chiều.
+
+## API Sprint 2
+
+| Nhóm | API |
+| --- | --- |
+| Phòng quản trị | `GET/POST /api/admin/rooms`, `PATCH/DELETE /api/admin/rooms/{id}` |
+| Thiết bị | `GET /api/equipment`, `GET /api/equipment/available` |
+| Thiết bị quản trị | `GET/POST /api/admin/equipment`, `PATCH/DELETE /api/admin/equipment/{id}` |
+| Lịch ngoài | `GET /api/meetings/{id}/calendar.ics`, `GET /api/meetings/{id}/calendar-links` |
+| Thông báo | `GET /api/notifications?email=...`, `POST /api/notifications/{id}/read` |
+
+Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
+`reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,
+đặt thiết bị và tạo reminder dùng chung một transaction.
+
 ## Nạp dữ liệu demo và kịch bản trình diễn
 
-Để thêm các cuộc họp, lời mời và đặt phòng mẫu vào cơ sở dữ liệu phát triển:
+Để thêm các cuộc họp, lời mời, phòng, thiết bị và reminder mẫu vào cơ sở dữ liệu phát triển:
 
 ```powershell
 cd backend
@@ -98,6 +144,7 @@ python scripts/reset_demo_data.py
 ```
 
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
+Kịch bản nghiệm thu đầy đủ US09–US16 nằm tại [docs/DEMO_SPRINT2.md](docs/DEMO_SPRINT2.md).
 
 ## Quy ước Git
 

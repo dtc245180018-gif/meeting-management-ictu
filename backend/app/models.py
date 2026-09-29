@@ -25,6 +25,19 @@ class BookingStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class EquipmentStatus(StrEnum):
+    AVAILABLE = "available"
+    MAINTENANCE = "maintenance"
+    INACTIVE = "inactive"
+
+
+class NotificationStatus(StrEnum):
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class Meeting(Base):
     __tablename__ = "meetings"
 
@@ -50,6 +63,10 @@ class Meeting(Base):
 
     participants: Mapped[list[Participant]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
     booking: Mapped[RoomBooking | None] = relationship(back_populates="meeting", uselist=False)
+    equipment_bookings: Mapped[list[EquipmentBooking]] = relationship(
+        back_populates="meeting", cascade="all, delete-orphan"
+    )
+    reminders: Mapped[list[Reminder]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
 
 
 class Participant(Base):
@@ -109,3 +126,73 @@ class RoomBooking(Base):
 
     room: Mapped[Room] = relationship(back_populates="bookings")
     meeting: Mapped[Meeting] = relationship(back_populates="booking")
+
+
+class Equipment(Base):
+    __tablename__ = "equipment"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    category: Mapped[str] = mapped_column(String(80), index=True, nullable=False)
+    location: Mapped[str] = mapped_column(String(255), nullable=False)
+    status: Mapped[EquipmentStatus] = mapped_column(
+        Enum(EquipmentStatus), default=EquipmentStatus.AVAILABLE, nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    bookings: Mapped[list[EquipmentBooking]] = relationship(back_populates="equipment")
+
+
+class EquipmentBooking(Base):
+    __tablename__ = "equipment_bookings"
+    __table_args__ = (
+        UniqueConstraint("equipment_id", "meeting_id", name="uq_equipment_meeting_booking"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), index=True, nullable=False)
+    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True, nullable=False)
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    status: Mapped[BookingStatus] = mapped_column(Enum(BookingStatus), default=BookingStatus.ACTIVE, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    equipment: Mapped[Equipment] = relationship(back_populates="bookings")
+    meeting: Mapped[Meeting] = relationship(back_populates="equipment_bookings")
+
+
+class Reminder(Base):
+    __tablename__ = "reminders"
+    __table_args__ = (
+        UniqueConstraint("meeting_id", "recipient_email", "remind_at", name="uq_meeting_recipient_reminder"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True, nullable=False)
+    recipient_email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    channel: Mapped[str] = mapped_column(String(20), default="email", nullable=False)
+    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    status: Mapped[NotificationStatus] = mapped_column(
+        Enum(NotificationStatus), default=NotificationStatus.PENDING, nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    meeting: Mapped[Meeting] = relationship(back_populates="reminders")
