@@ -12,17 +12,23 @@ from .database import Base, SessionLocal, engine
 
 def seed_rooms() -> None:
     with SessionLocal() as db:
-        if db.scalar(select(models.Room.id).limit(1)):
-            return
-        db.add_all(
-            [
-                models.Room(name="Phòng A101", capacity=6, location="Tầng 1 - Khu A", building="Khu A", floor=1, room_type="Phòng họp nhỏ", display=True, microphone=True),
-                models.Room(name="Phòng A203", capacity=12, location="Tầng 2 - Khu A", building="Khu A", floor=2, room_type="Phòng họp", projector=True, display=True, microphone=True, video_conferencing=True),
-                models.Room(name="Phòng B301", capacity=20, location="Tầng 3 - Khu B", building="Khu B", floor=3, room_type="Phòng họp lớn", projector=True, display=True, microphone=True, video_conferencing=True),
-                models.Room(name="Hội trường C", capacity=80, location="Tầng 1 - Khu C", building="Khu C", floor=1, room_type="Hội trường", projector=True, display=True, microphone=True, video_conferencing=True),
-            ]
-        )
-        db.commit()
+        rooms = [
+            models.Room(name="Phòng A101", capacity=6, location="Tầng 1 - Khu A", building="Khu A", floor=1, room_type="Phòng họp nhỏ", display=True, microphone=True),
+            models.Room(name="Phòng A203", capacity=12, location="Tầng 2 - Khu A", building="Khu A", floor=2, room_type="Phòng họp", projector=True, display=True, microphone=True, video_conferencing=True),
+            models.Room(name="Phòng A205", capacity=8, location="Tầng 2 - Khu A", building="Khu A", floor=2, room_type="Phòng họp nhóm", display=True, microphone=True),
+            models.Room(name="Phòng A302", capacity=16, location="Tầng 3 - Khu A", building="Khu A", floor=3, room_type="Phòng họp", projector=True, display=True, microphone=True),
+            models.Room(name="Phòng B201", capacity=10, location="Tầng 2 - Khu B", building="Khu B", floor=2, room_type="Phòng họp nhóm", display=True, microphone=True),
+            models.Room(name="Phòng B301", capacity=20, location="Tầng 3 - Khu B", building="Khu B", floor=3, room_type="Phòng họp lớn", projector=True, display=True, microphone=True, video_conferencing=True),
+            models.Room(name="Phòng B305", capacity=30, location="Tầng 3 - Khu B", building="Khu B", floor=3, room_type="Phòng họp lớn", projector=True, display=True, microphone=True, video_conferencing=True),
+            models.Room(name="Hội trường C", capacity=80, location="Tầng 1 - Khu C", building="Khu C", floor=1, room_type="Hội trường", projector=True, display=True, microphone=True, video_conferencing=True),
+            models.Room(name="Phòng D201", capacity=24, location="Tầng 2 - Khu D", building="Khu D", floor=2, room_type="Phòng họp lớn", projector=True, display=True, microphone=True, video_conferencing=True),
+            models.Room(name="Phòng D303", capacity=40, location="Tầng 3 - Khu D", building="Khu D", floor=3, room_type="Phòng họp lớn", projector=True, display=True, microphone=True, video_conferencing=True),
+        ]
+        existing_names = set(db.scalars(select(models.Room.name)).all())
+        new_rooms = [room for room in rooms if room.name not in existing_names]
+        if new_rooms:
+            db.add_all(new_rooms)
+            db.commit()
 
 
 def seed_employees() -> None:

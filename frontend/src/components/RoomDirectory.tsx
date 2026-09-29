@@ -24,6 +24,7 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
   const [endTime, setEndTime] = useState("");
   const [capacity, setCapacity] = useState(String(initialSearch?.minCapacity ?? 1));
   const [message, setMessage] = useState("");
+  const [showCatalog, setShowCatalog] = useState(false);
 
   useEffect(() => {
     if (!initialSearch) return;
@@ -31,6 +32,7 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
     setEndTime(initialSearch.endTime);
     setCapacity(String(initialSearch.minCapacity));
     setAvailableRooms(null);
+    setShowCatalog(true);
   }, [initialSearch]);
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
     }
     try {
       setAvailableRooms(await api.availableRooms(toIso(startTime), toIso(endTime), Number(capacity)));
+      setShowCatalog(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể tra cứu phòng trống.");
     }
@@ -75,6 +78,22 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
   const buildings = [...new Set(rooms.map((room) => room.building).filter(Boolean))];
   const roomTypes = [...new Set(rooms.map((room) => room.room_type).filter((item): item is string => Boolean(item)))];
   const floors = [...new Set(rooms.map((room) => room.floor).filter((item): item is number => item !== undefined))].sort((a, b) => a - b);
+  const hasCatalogCriteria = Boolean(building || floor || roomType || equipment || roomFilter !== "all");
+  const shouldShowCatalog = showCatalog || hasCatalogCriteria || Boolean(availableRooms);
+
+  const resetFilters = () => {
+    setBuilding("");
+    setFloor("");
+    setRoomType("");
+    setEquipment("");
+    setRoomFilter("all");
+    setStartTime("");
+    setEndTime("");
+    setCapacity("1");
+    setAvailableRooms(null);
+    setMessage("");
+    setShowCatalog(false);
+  };
 
   return (
     <section className="card wide-card room-directory">
@@ -88,26 +107,30 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
       <p className="subtle">Chọn bộ lọc để xem danh sách phòng. Muốn tra cứu chính xác theo khung giờ, hãy nhập thời gian và sức chứa bên dưới.</p>
       <div className="room-filter">
         <label>Danh sách phòng
-          <select value={roomFilter} disabled={!hasSearchWindow || Boolean(availableRooms)} onChange={(event) => setRoomFilter(event.target.value as typeof roomFilter)}>
+          <select value={roomFilter} disabled={Boolean(availableRooms)} onChange={(event) => { setRoomFilter(event.target.value as typeof roomFilter); setShowCatalog(true); }}>
             <option value="all">Tất cả phòng</option>
             {!availableRooms && hasSearchWindow && <option value="booked">Phòng đã có lịch</option>}
             {!availableRooms && hasSearchWindow && <option value="free">Phòng chưa có lịch</option>}
           </select>
         </label>
-        <span>{availableRooms ? "Trạng thái được tính theo đúng khung giờ đã chọn" : `${filteredRooms.length} phòng thuộc bộ lọc đã chọn`}</span>
+        <span>{availableRooms ? "Trạng thái được tính theo đúng khung giờ đã chọn" : hasSearchWindow ? `${filteredRooms.length} phòng thuộc bộ lọc đã chọn` : "Chọn thời gian để lọc theo trạng thái phòng"}</span>
+        <div className="room-filter-actions">
+          <button className="button secondary" type="button" onClick={() => setShowCatalog((visible) => !visible)}>{showCatalog ? "Ẩn danh sách phòng" : "Xem danh sách phòng"}</button>
+          <button className="button secondary" type="button" onClick={resetFilters}>Xóa bộ lọc</button>
+        </div>
       </div>
       <div className="room-filter room-criteria">
         <label>Tòa nhà/khu vực
-          <select value={building} onChange={(event) => setBuilding(event.target.value)}><option value="">Tất cả</option>{buildings.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={building} onChange={(event) => { setBuilding(event.target.value); setShowCatalog(true); }}><option value="">Tất cả</option>{buildings.map((item) => <option key={item} value={item}>{item}</option>)}</select>
         </label>
         <label>Tầng
-          <select value={floor} onChange={(event) => setFloor(event.target.value)}><option value="">Tất cả</option>{floors.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={floor} onChange={(event) => { setFloor(event.target.value); setShowCatalog(true); }}><option value="">Tất cả</option>{floors.map((item) => <option key={item} value={item}>{item}</option>)}</select>
         </label>
         <label>Loại phòng
-          <select value={roomType} onChange={(event) => setRoomType(event.target.value)}><option value="">Tất cả</option>{roomTypes.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+          <select value={roomType} onChange={(event) => { setRoomType(event.target.value); setShowCatalog(true); }}><option value="">Tất cả</option>{roomTypes.map((item) => <option key={item} value={item}>{item}</option>)}</select>
         </label>
         <label>Thiết bị
-          <select value={equipment} onChange={(event) => setEquipment(event.target.value)}><option value="">Tất cả</option><option value="projector">Máy chiếu</option><option value="display">Màn hình</option><option value="microphone">Micro</option><option value="video_conferencing">Họp trực tuyến</option></select>
+          <select value={equipment} onChange={(event) => { setEquipment(event.target.value); setShowCatalog(true); }}><option value="">Tất cả</option><option value="projector">Máy chiếu</option><option value="display">Màn hình</option><option value="microphone">Micro</option><option value="video_conferencing">Họp trực tuyến</option></select>
         </label>
       </div>
       <form className="room-search" onSubmit={search}>
@@ -123,20 +146,20 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
           {availableRooms.map((room) => <div className="room-result" key={room.id}><strong>{room.name}</strong><span>{room.capacity} chỗ · {room.location} · {room.room_type}</span></div>)}
         </div>
       )}
-      <div className="room-catalog">
-          {filteredRooms.length === 0 && <p className="empty">Không có phòng thuộc trạng thái này.</p>}
-          {filteredRooms.map((room) => {
-            const isBooked = bookedRoomIds.has(room.id);
-            return <article className={`room-card ${isBooked ? "booked" : "free"}`} key={room.id}>
-              <strong>{room.name}</strong>
-              <span>{room.capacity} chỗ ngồi</span>
-              <small>{room.location}</small>
-              <small>Tòa nhà {room.building || "Chưa khai báo"} · Tầng {room.floor ?? "-"} · {room.room_type || "Phòng họp"}</small>
-              <small>Thiết bị: {[room.projector && "máy chiếu", room.display && "màn hình", room.microphone && "micro", room.video_conferencing && "họp trực tuyến"].filter(Boolean).join(", ") || "Chưa khai báo"}</small>
-              <b>{!hasSearchWindow ? "Chọn thời gian để biết trạng thái" : isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ"}</b>
-            </article>;
-          })}
-      </div>
+      {shouldShowCatalog ? <div className="room-catalog">
+        {filteredRooms.length === 0 && <p className="empty">Không có phòng thuộc trạng thái này.</p>}
+        {filteredRooms.map((room) => {
+          const isBooked = bookedRoomIds.has(room.id);
+          return <article className={`room-card ${isBooked ? "booked" : "free"}`} key={room.id}>
+            <strong>{room.name}</strong>
+            <span>{room.capacity} chỗ ngồi</span>
+            <small>{room.location}</small>
+            <small>Tòa nhà {room.building || "Chưa khai báo"} · Tầng {room.floor ?? "-"} · {room.room_type || "Phòng họp"}</small>
+            <small>Thiết bị: {[room.projector && "máy chiếu", room.display && "màn hình", room.microphone && "micro", room.video_conferencing && "họp trực tuyến"].filter(Boolean).join(", ") || "Chưa khai báo"}</small>
+            <b>{!hasSearchWindow ? "Chọn thời gian để biết trạng thái" : isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ"}</b>
+          </article>;
+        })}
+      </div> : <p className="empty room-directory-empty">Danh sách phòng đang được ẩn. Hãy chọn bộ lọc hoặc bấm “Xem danh sách phòng”.</p>}
       <p className="subtle">Hiện có {meetings.length} lịch họp trong hệ thống để kiểm thử đặt phòng và chống trùng lịch.</p>
     </section>
   );
