@@ -61,8 +61,6 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
   const catalogRooms = availableRooms
     ? rooms.filter((room) => availableRooms.some((availableRoom) => availableRoom.id === room.id))
     : rooms;
-  // A time-window search is already the source of truth for availability.
-  // Do not apply the catalog's booked/free filter to that narrowed result.
   const criteriaRooms = catalogRooms.filter((room) => {
     const matchesEquipment = !equipment
       || (equipment === "projector" && room.projector)
@@ -74,7 +72,9 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
       && (!roomType || room.room_type === roomType)
       && matchesEquipment;
   });
-  const filteredRooms = filterRooms(criteriaRooms, bookedRoomIds, availableRooms || !hasSearchWindow ? "all" : roomFilter);
+  // The basic booked/free catalog filter works from the active bookings already
+  // loaded. A time-window search narrows that same list to exact availability.
+  const filteredRooms = filterRooms(criteriaRooms, bookedRoomIds, roomFilter);
   const buildings = [...new Set(rooms.map((room) => room.building).filter(Boolean))];
   const roomTypes = [...new Set(rooms.map((room) => room.room_type).filter((item): item is string => Boolean(item)))];
   const floors = [...new Set(rooms.map((room) => room.floor).filter((item): item is number => item !== undefined))].sort((a, b) => a - b);
@@ -107,13 +107,13 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
       <p className="subtle">Chọn bộ lọc để xem danh sách phòng. Muốn tra cứu chính xác theo khung giờ, hãy nhập thời gian và sức chứa bên dưới.</p>
       <div className="room-filter">
         <label>Danh sách phòng
-          <select value={roomFilter} disabled={Boolean(availableRooms)} onChange={(event) => { setRoomFilter(event.target.value as typeof roomFilter); setShowCatalog(true); }}>
+          <select value={roomFilter} onChange={(event) => { setRoomFilter(event.target.value as typeof roomFilter); setShowCatalog(true); }}>
             <option value="all">Tất cả phòng</option>
-            {!availableRooms && hasSearchWindow && <option value="booked">Phòng đã có lịch</option>}
-            {!availableRooms && hasSearchWindow && <option value="free">Phòng chưa có lịch</option>}
+            <option value="free">Phòng đang trống</option>
+            <option value="booked">Phòng đã đặt</option>
           </select>
         </label>
-        <span>{availableRooms ? "Trạng thái được tính theo đúng khung giờ đã chọn" : hasSearchWindow ? `${filteredRooms.length} phòng thuộc bộ lọc đã chọn` : "Chọn thời gian để lọc theo trạng thái phòng"}</span>
+        <span>{availableRooms ? "Trạng thái được tính theo đúng khung giờ đã chọn" : `${filteredRooms.length} phòng thuộc bộ lọc đã chọn`}</span>
         <div className="room-filter-actions">
           <button className="button secondary" type="button" onClick={() => setShowCatalog((visible) => !visible)}>{showCatalog ? "Ẩn danh sách phòng" : "Xem danh sách phòng"}</button>
           <button className="button secondary" type="button" onClick={resetFilters}>Xóa bộ lọc</button>
@@ -156,7 +156,7 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
             <small>{room.location}</small>
             <small>Tòa nhà {room.building || "Chưa khai báo"} · Tầng {room.floor ?? "-"} · {room.room_type || "Phòng họp"}</small>
             <small>Thiết bị: {[room.projector && "máy chiếu", room.display && "màn hình", room.microphone && "micro", room.video_conferencing && "họp trực tuyến"].filter(Boolean).join(", ") || "Chưa khai báo"}</small>
-            <b>{!hasSearchWindow ? "Chọn thời gian để biết trạng thái" : isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ"}</b>
+            <b>{hasSearchWindow ? (isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ") : (isBooked ? "Đã đặt theo lịch hiện có" : "Đang trống theo lịch hiện có")}</b>
           </article>;
         })}
       </div> : <p className="empty room-directory-empty">Danh sách phòng đang được ẩn. Hãy chọn bộ lọc hoặc bấm “Xem danh sách phòng”.</p>}
