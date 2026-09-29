@@ -1,4 +1,4 @@
-# Kịch bản demo thủ công cho mentor
+# Kịch bản demo thủ công đầy đủ Sprint 1
 
 ## 1. Chuẩn bị trước khi trình diễn
 
@@ -29,7 +29,13 @@ Kết quả sau khi reset:
 
 > Đây là hệ thống quản lý lịch họp nội bộ ICTU. Sprint 1 tập trung vào tạo cuộc họp, mời người tham dự, gợi ý thời gian, tìm/đặt phòng và quản lý lịch lặp. Hiện hệ thống chưa có đăng nhập nên người tổ chức được chọn từ danh sách nhân viên ICTU.
 
-## 3. Demo luồng chính (khoảng 8 phút)
+## 3. Demo giao diện và điều hướng (1 phút)
+
+1. Từ sidebar, lần lượt mở **Tổng quan**, **Tạo lịch họp**, **Lịch họp** và **Phòng họp**.
+2. Bấm nút thu gọn sidebar để chỉ còn icon, sau đó bấm mở rộng lại.
+3. Bấm **Đăng xuất** ở góc phải và ở cuối sidebar. Cả hai nơi đều hiển thị thông báo chức năng đang được cập nhật.
+
+## 4. Demo luồng chính (khoảng 14 phút)
 
 ### Bước 1 — Tổng quan (30 giây)
 
@@ -54,7 +60,20 @@ Kết quả sau khi reset:
 - Người tổ chức chắc chắn tham dự nên không bị thêm lại vào danh sách mời.
 - Số người dự kiến được hệ thống tự tính bằng người tổ chức cộng người tham dự.
 
-### Bước 3 — Tìm phòng và tạo lịch (2 phút)
+### Bước 3 — Gợi ý thời gian (1 phút)
+
+1. Trên form tạo lịch, nhập người tổ chức `leader@ictu.edu.vn`.
+2. Nhập một người tham dự, ví dụ `minhanh@ictu.edu.vn`.
+3. Chọn khoảng thời gian rộng trong tương lai, ví dụ từ 08:00 đến 17:00.
+4. Bấm **Gợi ý giờ trống**.
+5. Chọn một khung giờ được đề xuất; form tự điền lại thời gian bắt đầu và kết thúc.
+
+Điểm cần nói:
+
+- Backend tính thời gian chung mọi người cùng rảnh.
+- Nếu không có khung giờ phù hợp, hệ thống hiển thị thông báo thay vì tạo lịch sai.
+
+### Bước 4 — Tìm phòng và tạo lịch (2 phút)
 
 1. Chọn thời gian trong tương lai, ví dụ một giờ họp vào ngày mai.
 2. Bấm **Tìm phòng phù hợp**.
@@ -68,7 +87,23 @@ Kết quả sau khi reset:
 - Tạo cuộc họp và đặt phòng được gửi trong cùng một yêu cầu.
 - Nếu đặt phòng thất bại, form không bị xóa để người dùng không phải nhập lại.
 
-### Bước 4 — Lọc phòng cơ bản và tra cứu nâng cao (1 phút)
+### Bước 5 — Xem chi tiết, chỉnh sửa và hủy lịch (2 phút)
+
+1. Tại trang **Lịch họp**, bấm **Xem chi tiết** trên cuộc họp vừa tạo.
+2. Kiểm tra tiêu đề, thời gian, quy mô, phòng và danh sách người tham dự.
+3. Đóng cửa sổ chi tiết.
+4. Bấm menu `⋯` của cuộc họp, chọn **Chỉnh sửa**.
+5. Đổi mô tả hoặc thêm một người tham dự, sau đó bấm **Lưu thay đổi**.
+6. Mở lại **Xem chi tiết** để xác nhận dữ liệu đã cập nhật.
+7. Với một cuộc họp riêng không cần giữ lại, mở menu `⋯`, chọn **Hủy lịch** và xác nhận.
+8. Cuộc họp chuyển sang trạng thái **Đã hủy**, không bị xóa khỏi lịch sử.
+
+Điểm cần nói:
+
+- Chỉ người tổ chức mới được sửa hoặc hủy cuộc họp.
+- Cuộc họp đã hủy vẫn được lưu để tra cứu lịch sử.
+
+### Bước 6 — Lọc phòng cơ bản và tra cứu nâng cao (1 phút)
 
 1. Chọn **Phòng họp**.
 2. Bấm **Xem danh sách phòng**.
@@ -79,7 +114,15 @@ Kết quả sau khi reset:
 4. Lọc tiếp theo tòa/khu vực và tầng 2 hoặc tầng 3.
 5. Nhập thời gian + sức chứa rồi bấm **Xem phòng đang trống** để minh họa tra cứu chính xác theo khung giờ.
 
-### Bước 5 — Tìm lịch bằng email (1 phút)
+### Bước 7 — Đặt phòng cho cuộc họp chưa có phòng (1 phút)
+
+1. Tạo thêm một cuộc họp nhưng không chọn phòng.
+2. Tại danh sách **Lịch họp**, mở menu `⋯` của cuộc họp đó.
+3. Chọn **Tìm phòng trống**.
+4. Chọn một phòng trong danh sách kết quả.
+5. Xác nhận phòng được hiển thị trên thẻ cuộc họp và số phòng đã đặt trên Tổng quan được cập nhật.
+
+### Bước 8 — Tìm lịch bằng email và phân trang (2 phút)
 
 1. Quay lại **Lịch họp**.
 2. Gõ `minhanh` vào ô email người tham gia.
@@ -87,12 +130,15 @@ Kết quả sau khi reset:
 4. Bấm **Tìm**.
 5. Đổi trạng thái hoặc khoảng ngày nếu cần, sau đó bấm **Xóa** để bỏ bộ lọc.
 
+6. Để demo phân trang, tạo một lịch lặp hằng tuần 6 lần với `minhanh@ictu.edu.vn` là người tham dự, hoặc dùng một bộ dữ liệu có ít nhất 6 kết quả.
+7. Tìm lại email đó và kiểm tra nút **Trước/Sau**, số trang và việc chuyển trang không làm mất bộ lọc.
+
 Điểm cần nói:
 
 - Hệ thống chỉ thực hiện tìm khi bấm nút **Tìm**, không gọi API liên tục trong lúc gõ.
 - Lịch sử có phân trang khi số kết quả nhiều.
 
-## 4. Demo lịch lặp và chống trùng (2–3 phút, tùy chọn)
+## 9. Demo lịch lặp và chống trùng (2–3 phút)
 
 1. Vào **Tạo lịch họp**.
 2. Tạo lịch với:
@@ -108,17 +154,30 @@ Kết quả sau khi reset:
 - Backend kiểm tra tất cả lần lặp trước khi ghi dữ liệu.
 - Tạo lịch và đặt phòng nằm trong cùng transaction, nên không xảy ra trạng thái đặt được một phần.
 
-## 5. Demo trạng thái đăng xuất (15 giây)
+## 10. Demo trạng thái đăng xuất (15 giây)
 
 1. Bấm **Đăng xuất** ở góc phải hoặc cuối sidebar.
 2. Hiển thị thông báo: `Chức năng đăng xuất đang được cập nhật.`
 3. Giải thích đăng nhập và phân quyền sẽ được bổ sung ở giai đoạn sau.
 
-## 6. Kết luận (30 giây)
+## 11. Đối chiếu User Story Sprint 1
 
-> Sprint 1 đã hoàn thiện luồng cốt lõi: tạo và chỉnh sửa lịch, mời người tham dự, tìm thời gian/phòng phù hợp, đặt phòng theo lịch lặp và ngăn dữ liệu trùng. Các phần chưa thuộc Sprint 1 gồm đăng nhập, phân quyền và gửi email lời mời thực tế.
+| User Story | Cách demo |
+| --- | --- |
+| US01 — Tạo lịch họp | Bước 2 và Bước 4 |
+| US02 — Chỉnh sửa/hủy lịch | Bước 5 |
+| US03 — Lịch lặp tuần/tháng | Bước 2 hoặc Bước 5, sau đó Bước 9 |
+| US04 — Mời người tham dự | Bước 2, gồm gợi ý email và mời tất cả |
+| US05 — Gợi ý giờ chung | Bước 3 |
+| US06 — Xem lịch sử | Bước 8 |
+| US07 — Xem phòng trống | Bước 6 và Bước 7 |
+| US08 — Đặt phòng/chống trùng | Bước 4, Bước 7 và Bước 9 |
 
-## 7. Nếu mentor hỏi về dữ liệu
+## 12. Kết luận (30 giây)
+
+> Sprint 1 đã hoàn thiện luồng cốt lõi: tạo, xem, chỉnh sửa và hủy lịch; mời người tham dự; gợi ý thời gian; tìm và đặt phòng; lịch lặp; lịch sử/phân trang; và ngăn dữ liệu trùng. Các phần chưa thuộc Sprint 1 gồm đăng nhập, phân quyền và gửi email lời mời thực tế.
+
+## 13. Nếu mentor hỏi về dữ liệu
 
 - Muốn làm sạch lại trước khi demo: chạy `python scripts/reset_demo_data.py`.
 - Muốn nạp sẵn dữ liệu mẫu để trình diễn nhanh: chạy `python scripts/seed_demo_data.py`.
