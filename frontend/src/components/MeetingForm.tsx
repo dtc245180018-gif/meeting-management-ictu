@@ -288,7 +288,7 @@ export function MeetingForm({ onCreated }: Props) {
         <div className="participant-field">
           <div className="participant-label-row">
             <span>Người tham dự</span>
-            <button className="invite-all-button" type="button" onClick={inviteAllEmployees}>Mời tất cả nhân viên</button>
+            <button className="invite-all-button" type="button" onClick={inviteAllEmployees}>Mời tất cả mọi người</button>
           </div>
           <input
             aria-label="Người tham dự"

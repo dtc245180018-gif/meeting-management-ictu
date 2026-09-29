@@ -105,7 +105,7 @@ describe("MeetingForm room-aware creation", () => {
     ]);
     render(<MeetingForm onCreated={vi.fn()} />);
     fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
-    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả nhân viên" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
     expect(screen.getByText("minhanh@ictu.edu.vn")).toBeInTheDocument();
     expect(screen.getByText("hoangnam@ictu.edu.vn")).toBeInTheDocument();
     expect(screen.queryByText("leader@ictu.edu.vn", { selector: ".participant-chip" })).not.toBeInTheDocument();
