@@ -24,6 +24,7 @@ export default function App() {
   const [filterTo, setFilterTo] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
   const [error, setError] = useState("");
+  const [logoutMessage, setLogoutMessage] = useState("");
   const pageSize = 5;
 
   const loadMeetings = useCallback(async () => {
@@ -132,6 +133,10 @@ export default function App() {
     setPage(nextPage);
   };
 
+  const showLogoutMessage = () => {
+    setLogoutMessage("Chức năng đăng xuất đang được cập nhật.");
+  };
+
   const searchCalendar = (event?: FormEvent) => {
     event?.preventDefault();
     setFilterEmail(calendarEmailInput.trim());
@@ -201,9 +206,12 @@ export default function App() {
           <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon">▣</span><span className="nav-label">Lịch họp</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
         </nav>
-        <button className="sidebar-toggle" type="button" aria-label={sidebarCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
-          <span className="nav-icon">{sidebarCollapsed ? "›" : "‹"}</span><span className="sidebar-toggle-label">{sidebarCollapsed ? "Mở rộng" : "Thu gọn"}</span>
-        </button>
+        <div className="sidebar-footer-actions">
+          <button className="sidebar-logout" type="button" onClick={showLogoutMessage} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
+          <button className="sidebar-toggle" type="button" aria-label={sidebarCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
+            <span className="nav-icon">{sidebarCollapsed ? "›" : "‹"}</span><span className="sidebar-toggle-label">{sidebarCollapsed ? "Mở rộng" : "Thu gọn"}</span>
+          </button>
+        </div>
       </aside>
       <div className="app-content">
       <header className="ictu-header">
@@ -216,13 +224,14 @@ export default function App() {
         </div>
         <div className="header-user">
           <button className="sidebar-reopen" type="button" aria-label="Mở thanh điều hướng" onClick={() => setSidebarCollapsed(false)}>☰</button>
-          <div><strong>Meeting Management</strong><span>ICTU · Sprint 1</span></div>
-          <button onClick={() => goTo("create")}>＋ Tạo lịch</button>
+          <div><strong>Người dùng ICTU</strong><span>leader@ictu.edu.vn</span></div>
+          <button className="logout-button" type="button" onClick={showLogoutMessage}>Đăng xuất</button>
         </div>
       </header>
       <div className="welcome-bar" aria-label="Thông báo chào mừng">
         <div className="welcome-marquee">Chào mừng đến với hệ thống quản lý lịch họp ICTU</div>
       </div>
+      {logoutMessage && <div className="logout-notice" role="status">{logoutMessage}</div>}
       <main>
         {page === "overview" && (
         <section className="hero">
