@@ -196,7 +196,7 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
         else [participant.email for participant in meeting.participants]
     )
     minimum_attendees = len(participant_emails) + 1
-    expected_attendees = payload.expected_attendees if payload.expected_attendees is not None else max(meeting.expected_attendees, minimum_attendees)
+    expected_attendees = payload.expected_attendees if payload.expected_attendees is not None else minimum_attendees
     if payload.expected_attendees is not None and expected_attendees < minimum_attendees:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

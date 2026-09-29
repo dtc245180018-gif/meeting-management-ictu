@@ -24,7 +24,6 @@ function validateForm(form: MeetingInput, participants: string[]) {
   if (!form.title.trim() || form.title.trim().length < 3) return "Tên cuộc họp phải có ít nhất 3 ký tự.";
   if (!emailPattern.test(form.organizer_email.trim())) return "Email người tổ chức không hợp lệ.";
   if (participants.some((email) => !emailPattern.test(email))) return "Email người tham dự không hợp lệ.";
-  if (form.expected_attendees < participants.length + 1) return "Số người dự kiến phải ít nhất bằng số người được mời và người tổ chức.";
   if (!form.start_time || !form.end_time) return "Hãy chọn thời gian bắt đầu và kết thúc.";
 
   const start = new Date(form.start_time);
@@ -142,6 +141,7 @@ export function MeetingForm({ onCreated }: Props) {
         start_time: toIsoDateTime(form.start_time),
         end_time: toIsoDateTime(form.end_time),
         participant_emails: currentParticipants,
+        expected_attendees: currentParticipants.length + 1,
         room_id: selectedRoom?.id ?? null,
       });
       setMessage(selectedRoom
@@ -213,7 +213,7 @@ export function MeetingForm({ onCreated }: Props) {
     }
     setRoomLoading(true);
     setMessage("");
-    void api.availableRooms(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time), Math.max(form.expected_attendees, currentParticipants.length + 1, 1))
+    void api.availableRooms(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time), Math.max(currentParticipants.length + 1, 1))
       .then((rooms) => {
         setRoomOptions(rooms);
         setSelectedRoom(null);
@@ -292,9 +292,6 @@ export function MeetingForm({ onCreated }: Props) {
         <label>Kết thúc
           <input required type="datetime-local" value={form.end_time} onChange={(e) => updateForm({ end_time: e.target.value }, true)} />
         </label>
-        <label>Số người dự kiến
-            <input min={participants.length + 1} type="number" value={form.expected_attendees} onChange={(event) => updateForm({ expected_attendees: Number(event.target.value) }, true)} />
-        </label>
         <label>Lặp lại
           <select value={form.recurrence ?? ""} onChange={(e) => updateForm({ recurrence: (e.target.value || null) as MeetingInput["recurrence"] }, true)}>
             <option value="">Không lặp</option>
@@ -322,7 +319,7 @@ export function MeetingForm({ onCreated }: Props) {
           ))}
         </div>
       )}
-      {participants.length > 0 && <p className="subtle">{participants.length} người sẽ nhận lời mời.</p>}
+      <p className="subtle">Quy mô phòng tự tính: {participants.length + 1} người, gồm người tổ chức và danh sách được mời.</p>
       {suggestions.length > 0 && (
         <div className="suggestions">
           <strong>Khung giờ đề xuất</strong>

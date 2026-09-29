@@ -31,7 +31,6 @@ function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
   fireEvent.change(screen.getByLabelText("Bắt đầu"), { target: { value: "2026-10-01T09:00" } });
   fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-10-01T10:00" } });
-  fireEvent.change(screen.getByLabelText("Số người dự kiến"), { target: { value: "3" } });
 }
 
 describe("MeetingForm room-aware creation", () => {
@@ -62,6 +61,7 @@ describe("MeetingForm room-aware creation", () => {
 
     await waitFor(() => expect(api.createMeeting).toHaveBeenCalledWith(expect.objectContaining({
       room_id: 7,
+      expected_attendees: 3,
       participant_emails: ["one@ictu.edu.vn", "two@ictu.edu.vn"],
     })));
     expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 3);
