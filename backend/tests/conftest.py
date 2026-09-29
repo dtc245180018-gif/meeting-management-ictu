@@ -1,6 +1,8 @@
 import os
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_meeting_management.db"
+os.environ["ADMIN_EMAILS"] = "leader@ictu.edu.vn"
+os.environ["EMAIL_BACKEND"] = "console"
 
 import pytest
 from fastapi.testclient import TestClient

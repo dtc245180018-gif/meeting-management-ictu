@@ -1,10 +1,13 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Literal
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import models, schemas, services
+from . import models, reminders, schemas, services
+from .calendar_integration import calendar_provider
 from .database import get_db
 
 
@@ -17,8 +20,10 @@ def health():
 
 
 @router.post("/meetings", response_model=list[schemas.MeetingOut], status_code=status.HTTP_201_CREATED)
-def create_meeting(payload: schemas.MeetingCreate, db: Session = Depends(get_db)):
-    return services.create_meetings(db, payload)
+def create_meeting(payload: schemas.MeetingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    result = services.create_meetings(db, payload)
+    background_tasks.add_task(reminders.process_due_reminders_task)
+    return result
 
 
 @router.get("/meetings", response_model=list[schemas.MeetingOut])
@@ -53,8 +58,15 @@ def meeting_detail(meeting_id: int, db: Session = Depends(get_db)):
 
 
 @router.patch("/meetings/{meeting_id}", response_model=schemas.MeetingOut)
-def edit_meeting(meeting_id: int, payload: schemas.MeetingUpdate, db: Session = Depends(get_db)):
-    return services.update_meeting(db, meeting_id, payload)
+def edit_meeting(
+    meeting_id: int,
+    payload: schemas.MeetingUpdate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    result = services.update_meeting(db, meeting_id, payload)
+    background_tasks.add_task(reminders.process_due_reminders_task)
+    return result
 
 
 @router.post("/meetings/{meeting_id}/cancel", response_model=schemas.MeetingOut)
@@ -91,3 +103,102 @@ def list_available_rooms(
 @router.post("/rooms/bookings", response_model=schemas.BookingOut, status_code=status.HTTP_201_CREATED)
 def book_room(payload: schemas.BookingCreate, db: Session = Depends(get_db)):
     return services.create_booking(db, payload)
+
+
+@router.get("/admin/rooms", response_model=list[schemas.RoomOut])
+def admin_list_rooms(requester_email: str, db: Session = Depends(get_db)):
+    return services.list_admin_rooms(db, requester_email)
+
+
+@router.post("/admin/rooms", response_model=schemas.RoomOut, status_code=status.HTTP_201_CREATED)
+def admin_create_room(payload: schemas.RoomAdminCreate, db: Session = Depends(get_db)):
+    return services.create_admin_room(db, payload)
+
+
+@router.patch("/admin/rooms/{room_id}", response_model=schemas.RoomOut)
+def admin_update_room(room_id: int, payload: schemas.RoomAdminUpdate, db: Session = Depends(get_db)):
+    return services.update_admin_room(db, room_id, payload)
+
+
+@router.delete("/admin/rooms/{room_id}", response_model=schemas.RoomOut)
+def admin_deactivate_room(room_id: int, requester_email: str, db: Session = Depends(get_db)):
+    return services.deactivate_admin_room(db, room_id, requester_email)
+
+
+@router.get("/equipment", response_model=list[schemas.EquipmentOut])
+def equipment_directory(
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
+    category: str | None = None,
+    status_filter: Literal["available", "booked", "maintenance", "inactive"] | None = Query(default=None, alias="status"),
+    db: Session = Depends(get_db),
+):
+    return services.list_equipment(db, start_time, end_time, category, status_filter)
+
+
+@router.get("/equipment/available", response_model=list[schemas.EquipmentOut])
+def available_equipment(
+    start_time: datetime,
+    end_time: datetime,
+    category: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return services.list_equipment(db, start_time, end_time, category, "available", include_inactive=False)
+
+
+@router.get("/admin/equipment", response_model=list[schemas.EquipmentOut])
+def admin_list_equipment(requester_email: str, db: Session = Depends(get_db)):
+    services.require_admin(requester_email)
+    return services.list_equipment(db)
+
+
+@router.post("/admin/equipment", response_model=schemas.EquipmentOut, status_code=status.HTTP_201_CREATED)
+def admin_create_equipment(payload: schemas.EquipmentAdminCreate, db: Session = Depends(get_db)):
+    return services.create_admin_equipment(db, payload)
+
+
+@router.patch("/admin/equipment/{equipment_id}", response_model=schemas.EquipmentOut)
+def admin_update_equipment(
+    equipment_id: int,
+    payload: schemas.EquipmentAdminUpdate,
+    db: Session = Depends(get_db),
+):
+    return services.update_admin_equipment(db, equipment_id, payload)
+
+
+@router.delete("/admin/equipment/{equipment_id}", response_model=schemas.EquipmentOut)
+def admin_deactivate_equipment(equipment_id: int, requester_email: str, db: Session = Depends(get_db)):
+    return services.deactivate_admin_equipment(db, equipment_id, requester_email)
+
+
+@router.get("/meetings/{meeting_id}/calendar.ics")
+def meeting_calendar_file(meeting_id: int, db: Session = Depends(get_db)):
+    meeting = services.get_meeting_or_404(db, meeting_id)
+    return Response(
+        content=calendar_provider.ics(meeting),
+        media_type="text/calendar; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="meeting-{meeting.id}.ics"'},
+    )
+
+
+@router.get("/meetings/{meeting_id}/calendar-links", response_model=schemas.CalendarLinksOut)
+def meeting_calendar_links(meeting_id: int, db: Session = Depends(get_db)):
+    meeting = services.get_meeting_or_404(db, meeting_id)
+    return schemas.CalendarLinksOut(
+        google_url=calendar_provider.google_url(meeting),
+        outlook_ics_url=f"/api/meetings/{meeting.id}/calendar.ics",
+    )
+
+
+@router.get("/notifications", response_model=list[schemas.NotificationOut])
+def notifications(email: str = Query(min_length=3), db: Session = Depends(get_db)):
+    return services.list_notifications(db, email)
+
+
+@router.post("/notifications/{notification_id}/read", response_model=schemas.NotificationOut)
+def read_notification(
+    notification_id: int,
+    payload: schemas.NotificationReadRequest,
+    db: Session = Depends(get_db),
+):
+    return services.mark_notification_read(db, notification_id, str(payload.email))

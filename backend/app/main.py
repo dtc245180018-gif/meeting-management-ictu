@@ -1,10 +1,11 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, select, text
 
-from . import models
+from . import models, reminders
 from .api import router
 from .config import get_settings
 from .database import Base, SessionLocal, engine
@@ -52,6 +53,35 @@ def seed_employees() -> None:
             db.commit()
 
 
+def seed_equipment() -> None:
+    with SessionLocal() as db:
+        equipment_items = [
+            models.Equipment(code="TB-MC-01", name="Máy chiếu Epson 01", category="projector", location="Phòng thiết bị"),
+            models.Equipment(code="TB-MC-02", name="Máy chiếu Epson 02", category="projector", location="Phòng thiết bị"),
+            models.Equipment(code="TB-TV-01", name="Màn hình Samsung 65 inch", category="display", location="Phòng thiết bị"),
+            models.Equipment(code="TB-BT-01", name="Bảng trắng di động", category="whiteboard", location="Phòng thiết bị"),
+            models.Equipment(code="TB-MIC-01", name="Bộ micro không dây", category="microphone", location="Phòng thiết bị"),
+            models.Equipment(
+                code="TB-VC-01",
+                name="Bộ họp trực tuyến",
+                category="video_conference",
+                location="Phòng thiết bị",
+                status=models.EquipmentStatus.MAINTENANCE,
+            ),
+        ]
+        existing_codes = set(db.scalars(select(models.Equipment.code)).all())
+        additions = [item for item in equipment_items if item.code not in existing_codes]
+        if additions:
+            db.add_all(additions)
+            db.commit()
+
+
+async def reminder_worker() -> None:
+    while True:
+        await asyncio.to_thread(reminders.process_due_reminders_task)
+        await asyncio.sleep(30)
+
+
 def apply_schema_migrations() -> None:
     """Apply the forward-only schema changes used by the Sprint 1 app."""
     inspector = inspect(engine)
@@ -82,7 +112,14 @@ async def lifespan(_: FastAPI):
     apply_schema_migrations()
     seed_rooms()
     seed_employees()
-    yield
+    seed_equipment()
+    worker = asyncio.create_task(reminder_worker())
+    try:
+        yield
+    finally:
+        worker.cancel()
+        with suppress(asyncio.CancelledError):
+            await worker
 
 
 settings = get_settings()
