@@ -13,9 +13,17 @@ import { loadAllHistory } from "./utils/historyPagination";
 type Page = "overview" | "create" | "calendar" | "rooms" | "equipment" | "admin";
 
 const CURRENT_USER_EMAIL = import.meta.env.VITE_CURRENT_USER_EMAIL ?? "";
+type DemoRole = "employee" | "admin";
+const DEMO_USERS: Record<DemoRole, { email: string; label: string }> = {
+  employee: { email: "minhanh@ictu.edu.vn", label: "Nhân viên" },
+  admin: { email: CURRENT_USER_EMAIL || "leader@ictu.edu.vn", label: "Quản trị viên" },
+};
 
 export default function App() {
   const [page, setPage] = useState<Page>("overview");
+  const [demoRole, setDemoRole] = useState<DemoRole>(
+    CURRENT_USER_EMAIL.toLowerCase() === DEMO_USERS.admin.email.toLowerCase() ? "admin" : "employee",
+  );
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -31,6 +39,15 @@ export default function App() {
   const [error, setError] = useState("");
   const [logoutMessage, setLogoutMessage] = useState("");
   const pageSize = 5;
+  const activeUser = DEMO_USERS[demoRole];
+
+  const switchDemoRole = (role: DemoRole) => {
+    setDemoRole(role);
+    setPage("overview");
+    setFilterEmail("");
+    setCalendarEmailInput("");
+    setLogoutMessage("");
+  };
 
   const loadMeetings = useCallback(async () => {
     try {
@@ -211,7 +228,7 @@ export default function App() {
           <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon">▣</span><span className="nav-label">Lịch họp</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
           <button className={page === "equipment" ? "active" : ""} title="Thiết bị" aria-current={page === "equipment" ? "page" : undefined} onClick={() => goTo("equipment")}><span className="nav-icon">⚙</span><span className="nav-label">Thiết bị</span></button>
-          <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>
+          {demoRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
         </nav>
         <div className="sidebar-footer-actions">
           <button className="sidebar-logout" type="button" onClick={showLogoutMessage} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
@@ -231,13 +248,19 @@ export default function App() {
         </div>
         <div className="header-user">
           <button className="sidebar-reopen" type="button" aria-label="Mở thanh điều hướng" onClick={() => setSidebarCollapsed(false)}>☰</button>
-          <div><strong>Người dùng ICTU</strong><span>{CURRENT_USER_EMAIL || "Chưa cấu hình email"}</span></div>
+          <div><strong>{activeUser.label}</strong><span>{activeUser.email}</span></div>
           <button className="logout-button" type="button" onClick={showLogoutMessage}>Đăng xuất</button>
         </div>
       </header>
       <div className="welcome-bar" aria-label="Thông báo chào mừng">
         <div className="welcome-marquee">Chào mừng đến với hệ thống quản lý lịch họp ICTU</div>
       </div>
+      <section className="demo-role-switch" aria-label="Chuyển vai trò demo">
+        <div><span className="eyebrow">Chế độ trình diễn</span><strong>Đang xem với vai trò: {activeUser.label}</strong><small>Đây là bộ chọn demo, chưa phải xác thực tài khoản.</small></div>
+        <div className="role-switch-buttons">
+          {(Object.keys(DEMO_USERS) as DemoRole[]).map((role) => <button key={role} className={demoRole === role ? "active" : ""} type="button" onClick={() => switchDemoRole(role)}>{DEMO_USERS[role].label}</button>)}
+        </div>
+      </section>
       {logoutMessage && <div className="logout-notice" role="status">{logoutMessage}</div>}
       <main>
         {page === "overview" && (
@@ -270,7 +293,7 @@ export default function App() {
 
         {page === "overview" && (
           <section className="overview-grid" aria-label="Thống kê toàn hệ thống">
-            <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>Thống kê toàn hệ thống · chỉ tính các cuộc họp sắp tới, vì Sprint 1 chưa có đăng nhập cá nhân.</p>
+            <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>{demoRole === "admin" ? "Góc nhìn quản trị · tổng hợp cuộc họp và tài nguyên toàn hệ thống." : "Góc nhìn nhân viên · thông báo và lịch liên quan đến tài khoản demo."}</p>
             <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
             <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
             <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={() => goTo("calendar")}>Xem lời mời →</button></div>
@@ -294,13 +317,13 @@ export default function App() {
             </div>
           </section>
         )}
-        {page === "overview" && <div className="page-layout"><NotificationCenter email={CURRENT_USER_EMAIL} /></div>}
+        {page === "overview" && <div className="page-layout"><NotificationCenter email={activeUser.email} /></div>}
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
           {page === "equipment" && <EquipmentDirectory />}
-          {page === "admin" && <AdminPanel adminEmail={CURRENT_USER_EMAIL} />}
+          {page === "admin" && demoRole === "admin" && <AdminPanel adminEmail={activeUser.email} />}
         </div>
       </main>
 

@@ -293,6 +293,8 @@ input:disabled { background: #eef2f6; }
 .equipment-status.maintenance { color: #8b5a11; background: #fff0cf; }
 .equipment-status.inactive { color: #536170; background: #e9eef2; }
 .inline-error { margin: 10px 0; }
+.notification-actions { display: flex; align-items: center; gap: 8px; }
+.notification-help { margin: 0 0 13px; padding: 10px 12px; border: 1px solid #d6e5ef; border-radius: 4px; color: var(--muted); background: #f7fbfe; font-size: .76rem; line-height: 1.5; }
 .admin-tabs { display: flex; gap: 6px; margin: 16px 0; border-bottom: 1px solid var(--line); }
 .admin-tabs button { padding: 10px 14px; border: 0; border-bottom: 3px solid transparent; color: var(--muted); background: transparent; font-weight: 800; }
 .admin-tabs button.active { border-bottom-color: var(--ictu-orange); color: var(--ictu-blue); }
@@ -345,6 +347,13 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .welcome-marquee { display: inline-block; min-width: max-content; padding-left: 100%; animation: welcome-marquee 18s linear infinite; }
 @keyframes welcome-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 @media (prefers-reduced-motion: reduce) { .welcome-marquee { padding-left: 0; animation: none; } }
+.demo-role-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 5vw 0; padding: 12px 16px; border: 1px solid #b9d6e9; border-left: 4px solid var(--ictu-orange); border-radius: 4px; background: #fffaf1; }
+.demo-role-switch > div:first-child { display: grid; gap: 3px; }
+.demo-role-switch strong { color: var(--ictu-navy); font-size: .88rem; }
+.demo-role-switch small { color: var(--muted); font-size: .7rem; }
+.role-switch-buttons { display: flex; gap: 6px; }
+.role-switch-buttons button { padding: 8px 12px; border: 1px solid #bfd3e3; border-radius: 4px; color: var(--ictu-navy); background: #fff; font-size: .76rem; font-weight: 800; }
+.role-switch-buttons button:hover, .role-switch-buttons button.active { border-color: var(--ictu-blue); color: #fff; background: var(--ictu-blue); }
 .main-navigation { display: flex; align-items: stretch; gap: 0; padding: 0 clamp(8px, 3vw, 32px); overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.22); background: #004a99; scrollbar-width: thin; }
 .main-navigation button { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 7px; min-height: 48px; padding: 0 18px; border: 0; border-bottom: 3px solid transparent; color: rgba(255,255,255,.9); background: transparent; font-size: .82rem; font-weight: 750; white-space: nowrap; }
 .main-navigation button:hover { background: rgba(255,255,255,.1); color: #fff; }
@@ -392,6 +401,8 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .ictu-brand span:not(.brand-mark) { font-size: .68rem; }
   .header-user { width: 100%; justify-content: space-between; padding-left: 0; }
   .header-user > div { text-align: left; }
+  .demo-role-switch { align-items: stretch; flex-direction: column; margin-right: 16px; margin-left: 16px; }
+  .role-switch-buttons button { flex: 1; }
   .sidebar { width: 0; padding: 20px 0; overflow: hidden; }
   .app-shell:not(.sidebar-collapsed) .sidebar { width: 248px; padding: 20px 14px; box-shadow: 8px 0 24px rgba(0, 31, 61, .2); }
   .sidebar-collapsed .sidebar { width: 0; }
