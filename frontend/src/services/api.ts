@@ -1,4 +1,17 @@
-import type { Booking, Employee, Meeting, MeetingInput, Room, SuggestedTime } from "../types";
+import type {
+  Booking,
+  CalendarLinks,
+  Employee,
+  Equipment,
+  EquipmentAdminInput,
+  EquipmentStatus,
+  Meeting,
+  MeetingInput,
+  Notification,
+  Room,
+  RoomAdminInput,
+  SuggestedTime,
+} from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
@@ -78,4 +91,46 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ room_id: roomId, meeting_id: meetingId, requester_email: requesterEmail }),
     }),
+
+  listEquipment: (options: { startTime?: string; endTime?: string; category?: string; status?: EquipmentStatus } = {}) => {
+    const params = new URLSearchParams();
+    if (options.startTime) params.set("start_time", options.startTime);
+    if (options.endTime) params.set("end_time", options.endTime);
+    if (options.category) params.set("category", options.category);
+    if (options.status) params.set("status", options.status);
+    const query = params.toString();
+    return request<Equipment[]>(`/equipment${query ? `?${query}` : ""}`);
+  },
+
+  availableEquipment: (startTime: string, endTime: string, category?: string) => {
+    const params = new URLSearchParams({ start_time: startTime, end_time: endTime });
+    if (category) params.set("category", category);
+    return request<Equipment[]>(`/equipment/available?${params.toString()}`);
+  },
+
+  adminRooms: (requesterEmail: string) =>
+    request<Room[]>(`/admin/rooms?${new URLSearchParams({ requester_email: requesterEmail })}`),
+  createRoom: (payload: RoomAdminInput) =>
+    request<Room>("/admin/rooms", { method: "POST", body: JSON.stringify(payload) }),
+  updateRoom: (id: number, payload: Partial<RoomAdminInput> & { requester_email: string }) =>
+    request<Room>(`/admin/rooms/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deactivateRoom: (id: number, requesterEmail: string) =>
+    request<Room>(`/admin/rooms/${id}?${new URLSearchParams({ requester_email: requesterEmail })}`, { method: "DELETE" }),
+
+  adminEquipment: (requesterEmail: string) =>
+    request<Equipment[]>(`/admin/equipment?${new URLSearchParams({ requester_email: requesterEmail })}`),
+  createEquipment: (payload: EquipmentAdminInput) =>
+    request<Equipment>("/admin/equipment", { method: "POST", body: JSON.stringify(payload) }),
+  updateEquipment: (id: number, payload: Partial<EquipmentAdminInput> & { requester_email: string }) =>
+    request<Equipment>(`/admin/equipment/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  deactivateEquipment: (id: number, requesterEmail: string) =>
+    request<Equipment>(`/admin/equipment/${id}?${new URLSearchParams({ requester_email: requesterEmail })}`, { method: "DELETE" }),
+
+  calendarLinks: (meetingId: number) => request<CalendarLinks>(`/meetings/${meetingId}/calendar-links`),
+  calendarFileUrl: (meetingId: number) => `${API_URL}/meetings/${meetingId}/calendar.ics`,
+
+  notifications: (email: string) =>
+    request<Notification[]>(`/notifications?${new URLSearchParams({ email })}`),
+  markNotificationRead: (id: number, email: string) =>
+    request<Notification>(`/notifications/${id}/read`, { method: "POST", body: JSON.stringify({ email }) }),
 };

@@ -18,6 +18,29 @@ export interface Room {
   display?: boolean;
   microphone?: boolean;
   video_conferencing?: boolean;
+  is_active?: boolean;
+}
+
+export type EquipmentStatus = "available" | "booked" | "maintenance" | "inactive";
+
+export interface Equipment {
+  id: number;
+  code: string;
+  name: string;
+  category: string;
+  location: string;
+  status: EquipmentStatus;
+  is_active: boolean;
+}
+
+export interface EquipmentBooking {
+  id: number;
+  equipment_id: number;
+  meeting_id: number;
+  start_time: string;
+  end_time: string;
+  status: "active" | "cancelled";
+  equipment: Equipment;
 }
 
 export interface Employee {
@@ -51,6 +74,7 @@ export interface Meeting {
   status: MeetingStatus;
   participants: Participant[];
   booking?: Booking;
+  equipment_bookings?: EquipmentBooking[];
 }
 
 export interface MeetingInput {
@@ -62,6 +86,8 @@ export interface MeetingInput {
   participant_emails: string[];
   expected_attendees: number;
   room_id?: number | null;
+  equipment_ids?: number[];
+  reminder_minutes?: 15 | 30 | 60 | 1440 | null;
   recurrence: "weekly" | "monthly" | null;
   recurrence_count: number;
 }
@@ -69,4 +95,49 @@ export interface MeetingInput {
 export interface SuggestedTime {
   start_time: string;
   end_time: string;
+}
+
+export interface CalendarLinks {
+  google_url: string;
+  outlook_ics_url: string;
+}
+
+export interface Notification {
+  id: number;
+  meeting_id: number;
+  recipient_email: string;
+  channel: string;
+  remind_at: string;
+  status: "pending" | "sent" | "failed" | "cancelled";
+  attempts: number;
+  error_message?: string;
+  is_read: boolean;
+  created_at: string;
+  sent_at?: string;
+  meeting_title?: string;
+}
+
+export interface RoomAdminInput {
+  requester_email: string;
+  name: string;
+  capacity: number;
+  location: string;
+  building: string;
+  floor: number;
+  room_type: string;
+  projector?: boolean;
+  display?: boolean;
+  microphone?: boolean;
+  video_conferencing?: boolean;
+  is_active?: boolean;
+}
+
+export interface EquipmentAdminInput {
+  requester_email: string;
+  code: string;
+  name: string;
+  category: string;
+  location: string;
+  status?: "available" | "maintenance" | "inactive";
+  is_active?: boolean;
 }

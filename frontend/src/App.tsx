@@ -2,12 +2,17 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { MeetingForm } from "./components/MeetingForm";
 import { MeetingList } from "./components/MeetingList";
 import { RoomDirectory } from "./components/RoomDirectory";
+import { EquipmentDirectory } from "./components/EquipmentDirectory";
+import { AdminPanel } from "./components/AdminPanel";
+import { NotificationCenter } from "./components/NotificationCenter";
 import { api } from "./services/api";
 import type { Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
 import { loadAllHistory } from "./utils/historyPagination";
 
-type Page = "overview" | "create" | "calendar" | "rooms";
+type Page = "overview" | "create" | "calendar" | "rooms" | "equipment" | "admin";
+
+const CURRENT_USER_EMAIL = import.meta.env.VITE_CURRENT_USER_EMAIL ?? "";
 
 export default function App() {
   const [page, setPage] = useState<Page>("overview");
@@ -205,6 +210,8 @@ export default function App() {
           <button className={page === "create" ? "active" : ""} title="Tạo lịch họp" aria-current={page === "create" ? "page" : undefined} onClick={() => goTo("create")}><span className="nav-icon">＋</span><span className="nav-label">Tạo lịch họp</span></button>
           <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon">▣</span><span className="nav-label">Lịch họp</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
+          <button className={page === "equipment" ? "active" : ""} title="Thiết bị" aria-current={page === "equipment" ? "page" : undefined} onClick={() => goTo("equipment")}><span className="nav-icon">⚙</span><span className="nav-label">Thiết bị</span></button>
+          <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>
         </nav>
         <div className="sidebar-footer-actions">
           <button className="sidebar-logout" type="button" onClick={showLogoutMessage} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
@@ -224,7 +231,7 @@ export default function App() {
         </div>
         <div className="header-user">
           <button className="sidebar-reopen" type="button" aria-label="Mở thanh điều hướng" onClick={() => setSidebarCollapsed(false)}>☰</button>
-          <div><strong>Người dùng ICTU</strong><span>leader@ictu.edu.vn</span></div>
+          <div><strong>Người dùng ICTU</strong><span>{CURRENT_USER_EMAIL || "Chưa cấu hình email"}</span></div>
           <button className="logout-button" type="button" onClick={showLogoutMessage}>Đăng xuất</button>
         </div>
       </header>
@@ -236,7 +243,7 @@ export default function App() {
         {page === "overview" && (
         <section className="hero">
           <div>
-            <span className="eyebrow light">ICTU MEETING · SPRINT 1</span>
+            <span className="eyebrow light">ICTU MEETING · SPRINT 2</span>
             <h1>Lịch họp rõ ràng,<br />phối hợp hiệu quả.</h1>
             <p>Quản lý lịch, thành viên và phòng họp trong một không gian thống nhất dành cho ICTU.</p>
           </div>
@@ -287,14 +294,17 @@ export default function App() {
             </div>
           </section>
         )}
+        {page === "overview" && <div className="page-layout"><NotificationCenter email={CURRENT_USER_EMAIL} /></div>}
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
+          {page === "equipment" && <EquipmentDirectory />}
+          {page === "admin" && <AdminPanel adminEmail={CURRENT_USER_EMAIL} />}
         </div>
       </main>
 
-      <footer>Meeting Management ICTU · Sprint 1 · Nhóm 4</footer>
+      <footer>Meeting Management ICTU · Sprint 2 · Nhóm 4</footer>
       </div>
     </div>
   );

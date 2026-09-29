@@ -40,6 +40,7 @@ describe("RoomDirectory filters", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.listRooms).mockResolvedValue(rooms);
+    vi.mocked(api.availableRooms).mockResolvedValue([rooms[1]]);
   });
 
   it("filters the catalog by equipment", async () => {
@@ -83,5 +84,16 @@ describe("RoomDirectory filters", () => {
     fireEvent.change(screen.getByLabelText("Danh sách phòng"), { target: { value: "free" } });
     expect(screen.queryByText("A101")).not.toBeInTheDocument();
     expect(screen.getByText("B301")).toBeInTheDocument();
+  });
+
+  it("filters rooms by minimum capacity through the availability API", async () => {
+    render(<RoomDirectory meetings={[]} />);
+    fireEvent.change(screen.getByLabelText("Từ lúc"), { target: { value: "2026-10-01T09:00" } });
+    fireEvent.change(screen.getByLabelText("Đến lúc"), { target: { value: "2026-10-01T10:00" } });
+    fireEvent.change(screen.getByLabelText("Sức chứa tối thiểu"), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Xem phòng đang trống" }));
+    await waitFor(() => expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 20));
+    expect(await screen.findByText(/Có 1 phòng phù hợp/)).toBeInTheDocument();
+    expect(screen.getAllByText("B301").length).toBeGreaterThan(0);
   });
 });

@@ -7,6 +7,7 @@ vi.mock("../services/api", () => ({
   api: {
     listEmployees: vi.fn(),
     availableRooms: vi.fn(),
+    availableEquipment: vi.fn(),
     createMeeting: vi.fn(),
     suggestTimes: vi.fn(),
   },
@@ -26,6 +27,11 @@ const room = {
   video_conferencing: false,
 };
 
+const equipment = [
+  { id: 11, code: "TB-MC-01", name: "Máy chiếu", category: "projector", location: "Kho", status: "available" as const, is_active: true },
+  { id: 12, code: "TB-MIC-01", name: "Micro", category: "microphone", location: "Kho", status: "available" as const, is_active: true },
+];
+
 function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText("Tên cuộc họp"), { target: { value: "Họp kiểm thử" } });
   fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
@@ -38,6 +44,7 @@ describe("MeetingForm room-aware creation", () => {
     vi.clearAllMocks();
     vi.mocked(api.listEmployees).mockResolvedValue([]);
     vi.mocked(api.availableRooms).mockResolvedValue([room]);
+    vi.mocked(api.availableEquipment).mockResolvedValue(equipment);
     vi.mocked(api.createMeeting).mockResolvedValue([{
       id: 42,
       title: "Họp kiểm thử",
@@ -130,5 +137,21 @@ describe("MeetingForm room-aware creation", () => {
     await screen.findByText("Phòng đã được đặt ở một lần lặp");
     expect(screen.getByLabelText("Tên cuộc họp")).toHaveValue("Họp kiểm thử");
     expect(screen.getByLabelText("Người tổ chức")).toHaveValue("leader@ictu.edu.vn");
+  });
+
+  it("selects multiple equipment and a reminder in the atomic create request", async () => {
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText("Thời gian nhắc"), { target: { value: "30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm thiết bị" }));
+    await screen.findByText(/Đã tìm thấy 2 thiết bị/);
+    fireEvent.click(screen.getByRole("button", { name: /TB-MC-01/ }));
+    fireEvent.click(screen.getByRole("button", { name: /TB-MIC-01/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lịch họp" }));
+
+    await waitFor(() => expect(api.createMeeting).toHaveBeenCalledWith(expect.objectContaining({
+      equipment_ids: [11, 12],
+      reminder_minutes: 30,
+    })));
   });
 });
