@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { MeetingForm } from "./components/MeetingForm";
 import { MeetingList } from "./components/MeetingList";
 import { RoomDirectory } from "./components/RoomDirectory";
 import { api } from "./services/api";
-import type { Meeting } from "./types";
+import type { Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
 import { loadAllHistory } from "./utils/historyPagination";
 
@@ -11,11 +11,14 @@ type Page = "overview" | "create" | "calendar" | "rooms";
 
 export default function App() {
   const [page, setPage] = useState<Page>("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [historyMeetings, setHistoryMeetings] = useState<Meeting[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [calendarMode, setCalendarMode] = useState<"all" | "history">("all");
   const [filterEmail, setFilterEmail] = useState("");
+  const [calendarEmailInput, setCalendarEmailInput] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | Meeting["status"]>("all");
   const [filterFrom, setFilterFrom] = useState("");
   const [filterTo, setFilterTo] = useState("");
@@ -34,6 +37,7 @@ export default function App() {
 
   useEffect(() => {
     void loadMeetings();
+    void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, [loadMeetings]);
 
   useEffect(() => {
@@ -102,7 +106,9 @@ export default function App() {
     day: "2-digit",
   }).format(value);
   const today = businessDate(now);
-  const upcomingMeetings = meetings.filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time) >= now);
+  const upcomingMeetings = meetings
+    .filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time).getTime() >= now.getTime())
+    .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime());
   const scheduled = upcomingMeetings.length;
   const todayMeetings = meetings.filter((meeting) => {
     const start = new Date(meeting.start_time);
@@ -114,17 +120,26 @@ export default function App() {
     (count, meeting) => count + meeting.participants.filter((participant) => participant.status === "invited").length,
     0,
   );
-  const recentMeetings = meetings
-    .filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time) >= now)
-    .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime())
-    .slice(0, 5);
+  const recentMeetings = upcomingMeetings.slice(0, 5);
+  const calendarEmployeeSuggestions = employees
+    .filter((employee) => {
+      const query = calendarEmailInput.trim().toLowerCase();
+      return Boolean(query) && `${employee.full_name} ${employee.email} ${employee.department}`.toLowerCase().includes(query);
+    })
+    .slice(0, 6);
 
   const goTo = (nextPage: Page) => {
     setPage(nextPage);
   };
 
+  const searchCalendar = (event?: FormEvent) => {
+    event?.preventDefault();
+    setFilterEmail(calendarEmailInput.trim());
+    setHistoryPage(1);
+  };
+
   const renderHistoryFilters = () => (
-    <div className="filter-card">
+    <form className="filter-card" onSubmit={searchCalendar}>
       <div>
         <span className="eyebrow">US06 · Lịch họp</span>
         <strong>Lọc cuộc họp</strong>
@@ -133,7 +148,19 @@ export default function App() {
         <option value="all">Tất cả cuộc họp</option>
         <option value="history">Lịch tôi tham gia</option>
       </select>
-      <input type="email" value={filterEmail} onChange={(event) => setFilterEmail(event.target.value)} placeholder="member@ictu.edu.vn" />
+      <label className="calendar-email-filter">Email người tham gia
+        <input type="email" value={calendarEmailInput} onChange={(event) => setCalendarEmailInput(event.target.value)} placeholder="member@ictu.edu.vn" />
+        {calendarEmployeeSuggestions.length > 0 && (
+          <div className="employee-suggestions calendar-suggestions" role="listbox" aria-label="Gợi ý email nhân viên">
+            {calendarEmployeeSuggestions.map((employee) => (
+              <button type="button" key={employee.email} onClick={() => setCalendarEmailInput(employee.email)}>
+                <strong>{employee.full_name}</strong>
+                <span>{employee.email} · {employee.department}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </label>
       <select value={filterStatus} onChange={(event) => setFilterStatus(event.target.value as typeof filterStatus)}>
         <option value="all">Tất cả trạng thái</option>
         <option value="scheduled">Đã lên lịch</option>
@@ -141,9 +168,11 @@ export default function App() {
       </select>
       <input type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} aria-label="Từ ngày" />
       <input type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} aria-label="Đến ngày" />
+      <button className="button primary calendar-search-button" type="submit">Tìm</button>
+      <button className="button secondary" type="button" onClick={() => { setCalendarEmailInput(""); setFilterEmail(""); setFilterStatus("all"); setFilterFrom(""); setFilterTo(""); }}>Xóa</button>
       {calendarMode === "history" && !filterEmail && <span className="subtle">Nhập email để xem các cuộc họp bạn được phép xem.</span>}
       {historyLoading && <span className="subtle">Đang tải lịch...</span>}
-    </div>
+    </form>
   );
 
   const renderMeetings = (items: Meeting[], showPagination = false) => (
@@ -160,7 +189,23 @@ export default function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <aside className="sidebar" aria-label="Điều hướng chính">
+        <div className="sidebar-brand">
+          <img className="sidebar-logo" src="/assets/ICTU.png" alt="ICTU" />
+          <div><strong>Meeting Management</strong><small>Hệ thống lịch họp</small></div>
+        </div>
+        <nav className="side-nav">
+          <button className={page === "overview" ? "active" : ""} title="Tổng quan" aria-current={page === "overview" ? "page" : undefined} onClick={() => goTo("overview")}><span className="nav-icon">⌂</span><span className="nav-label">Tổng quan</span></button>
+          <button className={page === "create" ? "active" : ""} title="Tạo lịch họp" aria-current={page === "create" ? "page" : undefined} onClick={() => goTo("create")}><span className="nav-icon">＋</span><span className="nav-label">Tạo lịch họp</span></button>
+          <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon">▣</span><span className="nav-label">Lịch họp</span></button>
+          <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
+        </nav>
+        <button className="sidebar-toggle" type="button" aria-label={sidebarCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
+          <span className="nav-icon">{sidebarCollapsed ? "›" : "‹"}</span><span className="sidebar-toggle-label">{sidebarCollapsed ? "Mở rộng" : "Thu gọn"}</span>
+        </button>
+      </aside>
+      <div className="app-content">
       <header className="ictu-header">
         <div className="ictu-brand">
           <img className="ictu-logo" src="/assets/ICTU.png" alt="Logo Trường Đại học Công nghệ Thông tin và Truyền thông" />
@@ -170,6 +215,7 @@ export default function App() {
           </div>
         </div>
         <div className="header-user">
+          <button className="sidebar-reopen" type="button" aria-label="Mở thanh điều hướng" onClick={() => setSidebarCollapsed(false)}>☰</button>
           <div><strong>Meeting Management</strong><span>ICTU · Sprint 1</span></div>
           <button onClick={() => goTo("create")}>＋ Tạo lịch</button>
         </div>
@@ -177,12 +223,6 @@ export default function App() {
       <div className="welcome-bar" aria-label="Thông báo chào mừng">
         <div className="welcome-marquee">Chào mừng đến với hệ thống quản lý lịch họp ICTU</div>
       </div>
-      <nav className="main-navigation" aria-label="Điều hướng chính">
-        <button className={page === "overview" ? "active" : ""} onClick={() => goTo("overview")}><span>⌂</span>Tổng quan</button>
-        <button className={page === "create" ? "active" : ""} onClick={() => goTo("create")}><span>＋</span>Tạo lịch họp</button>
-        <button className={page === "calendar" ? "active" : ""} onClick={() => goTo("calendar")}><span>▣</span>Lịch họp</button>
-        <button className={page === "rooms" ? "active" : ""} onClick={() => goTo("rooms")}><span>⌗</span>Phòng họp</button>
-      </nav>
       <main>
         {page === "overview" && (
         <section className="hero">
@@ -246,6 +286,7 @@ export default function App() {
       </main>
 
       <footer>Meeting Management ICTU · Sprint 1 · Nhóm 4</footer>
+      </div>
     </div>
   );
 }

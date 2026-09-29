@@ -79,6 +79,14 @@ export function MeetingForm({ onCreated }: Props) {
       .slice(0, 6);
   }, [employees, form.organizer_email, participantInput, selectedParticipants]);
 
+  const organizerSuggestions = useMemo(() => {
+    const query = form.organizer_email.trim().toLowerCase();
+    if (!query) return [];
+    return employees
+      .filter((employee) => `${employee.full_name} ${employee.email} ${employee.department}`.toLowerCase().includes(query))
+      .slice(0, 6);
+  }, [employees, form.organizer_email]);
+
   const addParticipants = (value: string) => {
     const emails = value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
     if (!emails.length) return;
@@ -240,7 +248,18 @@ export function MeetingForm({ onCreated }: Props) {
           <textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Nội dung và mục tiêu cuộc họp" />
         </label>
         <label>Người tổ chức
-          <input required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => updateForm({ organizer_email: e.target.value }, true)} placeholder="leader@ictu.edu.vn" />
+          <input aria-label="Người tổ chức" required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => updateForm({ organizer_email: e.target.value }, true)} placeholder="Chọn hoặc nhập email nhân viên ICTU" />
+          {organizerSuggestions.length > 0 && (
+            <div className="employee-suggestions" role="listbox" aria-label="Gợi ý người tổ chức">
+              {organizerSuggestions.map((employee) => (
+                <button type="button" key={employee.email} onClick={() => updateForm({ organizer_email: employee.email }, true)}>
+                  <strong>{employee.full_name}</strong>
+                  <span>{employee.email} · {employee.department}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          <small className="field-hint">Nhân viên ICTU có thể đứng tên tổ chức cuộc họp.</small>
         </label>
         <label>Người tham dự
           <input
@@ -320,6 +339,7 @@ export function MeetingForm({ onCreated }: Props) {
         </div>
       )}
       <p className="subtle">Quy mô phòng tự tính: {participants.length + 1} người, gồm người tổ chức và danh sách được mời.</p>
+      <datalist id="ictu-employees">{employees.map((employee) => <option key={employee.email} value={employee.email}>{employee.full_name} · {employee.department}</option>)}</datalist>
       {suggestions.length > 0 && (
         <div className="suggestions">
           <strong>Khung giờ đề xuất</strong>

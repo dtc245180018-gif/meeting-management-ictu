@@ -82,6 +82,21 @@ describe("MeetingForm room-aware creation", () => {
     expect(screen.getByText("minhanh@ictu.edu.vn")).toBeInTheDocument();
   });
 
+  it("offers ICTU employees as meeting organizers", async () => {
+    vi.mocked(api.listEmployees).mockResolvedValue([{
+      id: 2,
+      full_name: "Trần Minh Anh",
+      email: "minhanh@ictu.edu.vn",
+      department: "Khoa Công nghệ thông tin",
+      is_active: true,
+    }]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "minhanh" } });
+    const suggestion = await screen.findByRole("button", { name: /Trần Minh Anh/ });
+    fireEvent.click(suggestion);
+    expect(screen.getByLabelText("Người tổ chức")).toHaveValue("minhanh@ictu.edu.vn");
+  });
+
   it("clears the chosen room when the meeting time changes", async () => {
     render(<MeetingForm onCreated={vi.fn()} />);
     fillRequiredFields();
