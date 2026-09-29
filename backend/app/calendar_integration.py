@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from urllib.parse import urlencode
-from zoneinfo import ZoneInfo
 
 from . import models
 
 
-LOCAL_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
-
-
 def _aware(value: datetime) -> datetime:
-    return value.replace(tzinfo=LOCAL_TIMEZONE) if value.tzinfo is None else value
+    # PostgreSQL preserves offsets. SQLite drops tzinfo while retaining the UTC
+    # clock value sent by the web client, so naive development values are UTC.
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
 def _utc_stamp(value: datetime) -> str:

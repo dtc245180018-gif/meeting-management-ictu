@@ -103,12 +103,16 @@ def test_us11_room_admin_crud_soft_lock_duplicate_and_permission(client):
     assert locked.status_code == 200 and locked.json()["is_active"] is False
     assert room["id"] not in {item["id"] for item in client.get("/api/rooms").json()}
     assert room["id"] in {item["id"] for item in client.get("/api/admin/rooms", params={"requester_email": ADMIN}).json()}
+    assert client.post("/api/meetings", json=meeting_payload(
+        title="Không đặt phòng khóa", start_time=future_time(days=40), room_id=room["id"], participant_emails=[], expected_attendees=1,
+    )).status_code == 404
 
 
 def test_us12_multiple_equipment_conflict_and_atomic_rollback(client):
     start = future_time(days=23)
     first = equipment_by_code(client, "TB-MC-01")
     second = equipment_by_code(client, "TB-TV-01")
+    rollback_candidate = equipment_by_code(client, "TB-BT-01")
     created = client.post("/api/meetings", json=meeting_payload(
         start_time=start, equipment_ids=[first["id"], second["id"]],
     ))
@@ -121,10 +125,13 @@ def test_us12_multiple_equipment_conflict_and_atomic_rollback(client):
 
     conflict = client.post("/api/meetings", json=meeting_payload(
         title="Phải rollback", organizer_email="other@ictu.edu.vn", participant_emails=[], expected_attendees=1,
-        start_time=start, equipment_ids=[first["id"]],
+        start_time=start, equipment_ids=[rollback_candidate["id"], first["id"]],
     ))
     assert conflict.status_code == 409
     assert "Phải rollback" not in {item["title"] for item in client.get("/api/meetings").json()}
+    assert rollback_candidate["id"] in {item["id"] for item in client.get("/api/equipment/available", params={
+        "start_time": start.isoformat(), "end_time": (start + timedelta(hours=1)).isoformat(),
+    }).json()}
 
 
 def test_us12_recurring_equipment_checks_every_occurrence(client):
@@ -184,6 +191,9 @@ def test_us14_equipment_admin_crud_maintenance_inactive_and_permission(client):
     assert reactivated.status_code == 200 and reactivated.json()["is_active"] is True
     locked = client.delete(f"/api/admin/equipment/{item['id']}", params={"requester_email": ADMIN})
     assert locked.status_code == 200 and locked.json()["status"] == "inactive"
+    assert client.post("/api/meetings", json=meeting_payload(
+        title="Không đặt thiết bị khóa", start_time=future_time(days=41), equipment_ids=[item["id"]],
+    )).status_code == 409
 
 
 def test_us14_cannot_maintain_equipment_in_use_now(client):
