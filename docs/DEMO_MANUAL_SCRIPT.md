@@ -46,9 +46,23 @@ Danh sách email dùng khi demo:
 
 ## 3. Demo giao diện và điều hướng (1 phút)
 
-1. Từ sidebar, lần lượt mở **Tổng quan**, **Tạo lịch họp**, **Lịch họp** và **Phòng họp**.
-2. Bấm nút thu gọn sidebar để chỉ còn icon, sau đó bấm mở rộng lại.
-3. Bấm **Đăng xuất** ở góc phải và ở cuối sidebar. Cả hai nơi đều hiển thị thông báo chức năng đang được cập nhật.
+1. Trên thanh **Chế độ trình diễn**, chọn **Nhân viên** để bắt đầu. Giao diện
+   hiển thị email `minhanh@ictu.edu.vn`, chỉ có các luồng nhân viên và không có
+   menu Quản trị. Chọn **Quản trị viên** bất kỳ lúc nào để chuyển sang
+   `leader@ictu.edu.vn`; menu Quản trị xuất hiện và mở được US11/US14.
+2. Từ sidebar, lần lượt mở **Tổng quan**, **Tạo lịch họp**, **Lịch họp** và **Phòng họp**.
+3. Bấm nút thu gọn sidebar để chỉ còn icon, sau đó bấm mở rộng lại.
+4. Bấm **Đăng xuất** ở góc phải và ở cuối sidebar. Cả hai nơi đều hiển thị thông báo chức năng đang được cập nhật.
+
+### Kiểm chứng reminder và thông báo (US16)
+
+1. Tạo một cuộc họp có `Nhắc lịch` (15 phút hoặc 1 ngày) và email
+   `minhanh@ictu.edu.vn` trong danh sách tham dự.
+2. Quay về **Tổng quan** ở vai trò Nhân viên. Thẻ **Thông báo của bạn** hiển thị
+   reminder theo đúng email, số lượng chưa đọc và trạng thái `Đang chờ gửi`.
+3. Bấm **Làm mới** để gọi lại API; worker nền sẽ chuyển reminder đến hạn sang
+   `Đã gửi` (email demo ghi ra console). Bấm dòng thông báo để chuyển số chưa đọc
+   về 0.
 
 ## 4. Demo luồng chính (khoảng 14 phút)
 

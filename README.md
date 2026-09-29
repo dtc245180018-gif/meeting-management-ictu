@@ -102,10 +102,19 @@ npm run build
   API quản trị nhận email người thao tác và đối chiếu cấu hình này. Đây chỉ là
   cơ chế tạm thời trước Sprint 3, chưa thay thế xác thực/phân quyền.
 - `VITE_CURRENT_USER_EMAIL`: email người dùng demo mà giao diện gửi tới API quản trị/thông báo.
+- Trên giao diện có bộ chọn **Chế độ trình diễn** giữa `Nhân viên` (`minhanh@ictu.edu.vn`)
+  và `Quản trị viên` (email đầu tiên trong `ADMIN_EMAILS`). Đây là role switch phía
+  frontend để trình diễn, không phải xác thực; vai trò nhân viên không hiển thị
+  menu Quản trị và vai trò quản trị mới mở được màn hình quản trị.
 - `EMAIL_BACKEND=console`: chế độ demo, ghi email nhắc lịch vào log và đánh dấu đã gửi.
 - `EMAIL_BACKEND=smtp`: gửi SMTP bằng `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
   `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` và `SMTP_USE_TLS`.
 - Không đưa mật khẩu, token hoặc OAuth Client Secret thật vào Git.
+
+Ở trang Tổng quan, thẻ **Thông báo của bạn** hiển thị reminder của vai trò đang
+chọn. Nút `Làm mới` gọi lại API, trạng thái `Đang chờ gửi`/`Đã gửi` cho thấy
+worker reminder và chế độ email demo (`EMAIL_BACKEND=console`) đang hoạt động;
+bấm từng dòng để đánh dấu đã đọc.
 
 US15 hiện là đồng bộ một chiều: Backend sinh file ICS chuẩn và liên kết tạo sự
 kiện Google Calendar. Hệ thống chưa có OAuth nên không đọc thay đổi từ Google
