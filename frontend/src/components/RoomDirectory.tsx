@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import type { Meeting, Room } from "../types";
 import { api } from "../services/api";
 import { filterRooms, getBookedRoomIds } from "../utils/meetingFilters";
+import { ictuInputToIso } from "../utils/dateTime";
 
 interface Props {
   meetings: Meeting[];
@@ -9,7 +10,7 @@ interface Props {
 }
 
 function toIso(value: string) {
-  return new Date(value).toISOString();
+  return ictuInputToIso(value);
 }
 
 export function RoomDirectory({ meetings, initialSearch }: Props) {
@@ -57,10 +58,13 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
   };
 
   const hasSearchWindow = Boolean(startTime && endTime && new Date(endTime) > new Date(startTime));
-  const bookedRoomIds = getBookedRoomIds(meetings, hasSearchWindow ? toIso(startTime) : undefined, hasSearchWindow ? toIso(endTime) : undefined);
+  const availableRoomIds = new Set((availableRooms ?? []).map((room) => room.id));
   const catalogRooms = availableRooms
-    ? rooms.filter((room) => availableRooms.some((availableRoom) => availableRoom.id === room.id))
+    ? rooms.filter((room) => room.capacity >= Number(capacity || 1))
     : rooms;
+  const bookedRoomIds = availableRooms
+    ? new Set(catalogRooms.filter((room) => !availableRoomIds.has(room.id)).map((room) => room.id))
+    : getBookedRoomIds(meetings);
   const criteriaRooms = catalogRooms.filter((room) => {
     const matchesEquipment = !equipment
       || (equipment === "projector" && room.projector)
@@ -109,8 +113,8 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
         <label>Danh sách phòng
           <select value={roomFilter} onChange={(event) => { setRoomFilter(event.target.value as typeof roomFilter); setShowCatalog(true); }}>
             <option value="all">Tất cả phòng</option>
-            <option value="free">Phòng đang trống</option>
-            <option value="booked">Phòng đã đặt</option>
+            <option value="free">{availableRooms ? "Trống trong khung giờ" : "Chưa có lịch đặt"}</option>
+            <option value="booked">{availableRooms ? "Đã đặt trong khung giờ" : "Có lịch đặt"}</option>
           </select>
         </label>
         <span>{availableRooms ? "Trạng thái được tính theo đúng khung giờ đã chọn" : `${filteredRooms.length} phòng thuộc bộ lọc đã chọn`}</span>
@@ -156,7 +160,7 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
             <small>{room.location}</small>
             <small>Tòa nhà {room.building || "Chưa khai báo"} · Tầng {room.floor ?? "-"} · {room.room_type || "Phòng họp"}</small>
             <small>Thiết bị: {[room.projector && "máy chiếu", room.display && "màn hình", room.microphone && "micro", room.video_conferencing && "họp trực tuyến"].filter(Boolean).join(", ") || "Chưa khai báo"}</small>
-            <b>{hasSearchWindow ? (isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ") : (isBooked ? "Đã đặt theo lịch hiện có" : "Đang trống theo lịch hiện có")}</b>
+            <b>{hasSearchWindow && availableRooms ? (isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ") : (isBooked ? "Có lịch đặt" : "Chưa có lịch đặt")}</b>
           </article>;
         })}
       </div> : <p className="empty room-directory-empty">Danh sách phòng đang được ẩn. Hãy chọn bộ lọc hoặc bấm “Xem danh sách phòng”.</p>}

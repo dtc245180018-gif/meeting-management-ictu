@@ -19,12 +19,13 @@ from sqlalchemy import delete
 
 from app import models
 from app.database import Base, SessionLocal, engine
-from app.main import apply_schema_migrations, seed_employees, seed_equipment, seed_rooms
+from app.main import apply_schema_migrations, migrate_employee_emails, seed_employees, seed_equipment, seed_rooms
 
 
 def main() -> None:
     Base.metadata.create_all(bind=engine)
     apply_schema_migrations()
+    migrate_employee_emails()
 
     with SessionLocal() as db:
         db.execute(delete(models.Reminder))

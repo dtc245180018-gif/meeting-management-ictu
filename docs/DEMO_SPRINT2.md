@@ -73,9 +73,10 @@ sẵn trạng thái bảo trì để demo US13.
 ## 7. US12 và US16 — Tạo lịch với nhiều thiết bị và reminder (3 phút)
 
 1. Mở **Tạo lịch họp**.
-2. Nhập tên `Demo Sprint 2 - Tài nguyên`, người tổ chức `leader@ictu.edu.vn`.
-3. Mời `minhanh@ictu.edu.vn` và `hoangnam@ictu.edu.vn`.
-4. Chọn một giờ trong tương lai, chọn **Nhắc trước 30 phút**.
+2. Nhập tên `Demo Sprint 2 - Tài nguyên`, người tổ chức `leader@example.com`.
+3. Mời `employee.one@example.com` và `employee.two@example.com`.
+4. Nhập **Số người dự kiến** lớn hơn hoặc bằng 3, chọn một giờ trong tương lai
+   theo giờ Việt Nam và chọn **Nhắc trước 30 phút**.
 5. Bấm **Tìm phòng phù hợp**, chọn `Phòng A203`.
 6. Bấm **Tìm thiết bị**, chọn `TB-MC-01` và `TB-MIC-01`.
 7. Bấm **Tạo lịch họp**. Xác nhận thông báo tạo lịch, phòng và 2 thiết bị thành công.
@@ -103,6 +104,8 @@ pytest -q tests/test_sprint2.py
 ## 9. US15 — Google Calendar và Outlook/ICS (1 phút)
 
 1. Tại thẻ cuộc họp, bấm **Thêm vào Google Calendar** để mở form tạo sự kiện Google.
+   Kiểm tra người tham dự xuất hiện trong danh sách khách mời và thời gian trùng
+   với giờ hiển thị trên hệ thống.
 2. Bấm **Tải lịch Outlook/ICS** để tải file `.ics`.
 3. Mở file bằng trình soạn thảo hoặc Outlook; kiểm tra tiêu đề, mô tả, thời gian,
    phòng, người tổ chức và người tham dự.
@@ -116,6 +119,7 @@ pytest -q tests/test_sprint2.py
 3. Giao diện thông báo phòng, thiết bị và reminder đã được giải phóng.
 4. Tìm lại đúng phòng/thiết bị trong cùng khung giờ; chúng phải xuất hiện là sẵn sàng.
 5. Tải lại ICS của cuộc họp đã hủy; file có `METHOD:CANCEL` và `STATUS:CANCELLED`.
+   Giao diện không còn nút tạo mới sự kiện Google cho cuộc họp đã hủy.
 6. Hủy lại qua API không gây lỗi 500; người khác hủy thay nhận HTTP 403.
 
 ## 11. Kiểm tra hồi quy Sprint 1 (2 phút)

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "../services/api";
 import type { Notification } from "../types";
+import { formatIctuDateTime } from "../utils/dateTime";
 
 
 interface Props {
@@ -47,12 +48,12 @@ export function NotificationCenter({ email }: Props) {
 
   return <section className="card notification-center" aria-labelledby="notification-title">
     <div className="section-heading"><div><span className="eyebrow">US16 · Nhắc lịch</span><h2 id="notification-title">Thông báo của bạn</h2></div><div className="notification-actions"><span className="counter">{items.filter((item) => !item.is_read).length} chưa đọc</span><button className="button secondary" type="button" onClick={() => void load()}>Làm mới</button></div></div>
-    <p className="notification-help">Reminder được tạo khi lập cuộc họp; trạng thái <strong>Đang chờ gửi</strong> sẽ chuyển thành <strong>Đã gửi</strong> khi worker nền xử lý đến hạn. Bấm một thông báo để đánh dấu đã đọc.</p>
+    <p className="notification-help">Reminder được tạo khi lập cuộc họp; trạng thái <strong>Đang chờ gửi</strong> sẽ chuyển thành <strong>Đã gửi</strong> khi worker nền xử lý đến hạn. EMAIL_BACKEND=console chỉ ghi email vào log phát triển; cấu hình SMTP mới gửi tới hộp thư thật. Bấm một thông báo để đánh dấu đã đọc.</p>
     {loading && <p className="empty">Đang tải thông báo...</p>}
     {error && <p className="error-banner inline-error">{error}</p>}
     {!loading && !error && items.length === 0 && <p className="empty">Chưa có thông báo nhắc lịch.</p>}
     <div className="notification-list">{items.map((item) => <button className={item.is_read ? "read" : "unread"} key={item.id} onClick={() => void read(item)}>
-      <span><strong>{item.meeting_title ?? `Cuộc họp #${item.meeting_id}`}</strong><small>{new Date(item.remind_at).toLocaleString("vi-VN")}</small></span>
+      <span><strong>{item.meeting_title ?? `Cuộc họp #${item.meeting_id}`}</strong><small>{formatIctuDateTime(item.remind_at)}</small></span>
       <b className={`notification-status ${item.status}`}>{labels[item.status]}</b>
     </button>)}</div>
   </section>;

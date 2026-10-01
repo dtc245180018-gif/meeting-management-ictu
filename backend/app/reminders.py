@@ -14,6 +14,7 @@ from .database import SessionLocal
 
 
 logger = logging.getLogger(__name__)
+ICTU_TIMEZONE = timezone(timedelta(hours=7), name="Asia/Ho_Chi_Minh")
 
 
 def add_meeting_reminders(
@@ -51,19 +52,36 @@ def sync_pending_reminders(
         return
 
     remind_at = meeting.start_time - timedelta(minutes=reminder_minutes)
-    existing_by_email = {item.recipient_email: item for item in pending}
+    # Cancel obsolete pending rows first. Updating one in place can collide
+    # with a previous cancelled reminder at the new target time.
     for item in pending:
-        if item.recipient_email not in desired:
+        if item.recipient_email not in desired or item.remind_at != remind_at:
             item.status = models.NotificationStatus.CANCELLED
-        else:
-            item.remind_at = remind_at
-            item.error_message = None
-            item.attempts = 0
 
-    for email in sorted(desired - set(existing_by_email)):
-        meeting.reminders.append(
-            models.Reminder(recipient_email=email, channel="email", remind_at=remind_at)
+    for email in sorted(desired):
+        matching = [
+            item for item in meeting.reminders
+            if item.recipient_email == email and item.remind_at == remind_at
+        ]
+        active = next((item for item in matching if item.status == models.NotificationStatus.PENDING), None)
+        reusable = next(
+            (
+                item for item in matching
+                if item.status in {models.NotificationStatus.CANCELLED, models.NotificationStatus.FAILED}
+            ),
+            None,
         )
+        if active is None and not any(item.status == models.NotificationStatus.SENT for item in matching):
+            active = reusable
+            if active is None:
+                active = models.Reminder(recipient_email=email, channel="email", remind_at=remind_at)
+                meeting.reminders.append(active)
+            active.status = models.NotificationStatus.PENDING
+        if active is not None:
+            active.attempts = 0
+            active.error_message = None
+            active.sent_at = None
+            active.is_read = False
 
 
 def cancel_pending_reminders(meeting: models.Meeting) -> None:
@@ -76,9 +94,12 @@ def _send_email(reminder: models.Reminder) -> None:
     settings = get_settings()
     meeting = reminder.meeting
     subject = f"Nhắc lịch họp: {meeting.title}"
+    start_local = meeting.start_time.astimezone(ICTU_TIMEZONE)
+    end_local = meeting.end_time.astimezone(ICTU_TIMEZONE)
     body = (
-        f"Cuộc họp '{meeting.title}' sẽ bắt đầu lúc {meeting.start_time.isoformat()}.\n"
-        f"Kết thúc: {meeting.end_time.isoformat()}.\n"
+        f"Cuộc họp '{meeting.title}' sẽ bắt đầu lúc {start_local:%H:%M ngày %d/%m/%Y} "
+        "(Asia/Ho_Chi_Minh).\n"
+        f"Kết thúc: {end_local:%H:%M ngày %d/%m/%Y} (Asia/Ho_Chi_Minh).\n"
         f"Người tổ chức: {meeting.organizer_email}."
     )
     if settings.email_backend.lower() == "console":
@@ -113,6 +134,7 @@ def process_due_reminders(db: Session, now: datetime | None = None) -> int:
                 models.Reminder.remind_at <= current,
             )
             .order_by(models.Reminder.remind_at)
+            .with_for_update(skip_locked=True)
         ).all()
     )
     processed = 0

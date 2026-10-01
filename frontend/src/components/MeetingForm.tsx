@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { Employee, Equipment, MeetingInput, Room, SuggestedTime } from "../types";
 import { api } from "../services/api";
+import { formatIctuDateTime, formatIctuTime, ictuInputToIso, toIctuDateTimeInput } from "../utils/dateTime";
 
 const initialForm: MeetingInput = {
   title: "",
@@ -19,13 +20,16 @@ const initialForm: MeetingInput = {
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function toIsoDateTime(value: string) {
-  return new Date(value).toISOString();
+  return ictuInputToIso(value);
 }
 
 function validateForm(form: MeetingInput, participants: string[]) {
   if (!form.title.trim() || form.title.trim().length < 3) return "Tên cuộc họp phải có ít nhất 3 ký tự.";
   if (!emailPattern.test(form.organizer_email.trim())) return "Email người tổ chức không hợp lệ.";
   if (participants.some((email) => !emailPattern.test(email))) return "Email người tham dự không hợp lệ.";
+  if (!Number.isInteger(form.expected_attendees) || form.expected_attendees < participants.length + 1) {
+    return "Số người dự kiến phải ít nhất bằng người tổ chức và số người được mời.";
+  }
   if (!form.start_time || !form.end_time) return "Hãy chọn thời gian bắt đầu và kết thúc.";
 
   const start = new Date(form.start_time);
@@ -79,6 +83,13 @@ export function MeetingForm({ onCreated }: Props) {
     () => selectedParticipants.filter((email) => email !== form.organizer_email.trim().toLowerCase()),
     [selectedParticipants, form.organizer_email],
   );
+
+  useEffect(() => {
+    const minimum = participants.length + 1;
+    setForm((current) => current.expected_attendees < minimum
+      ? { ...current, expected_attendees: minimum }
+      : current);
+  }, [participants.length]);
 
   const employeeSuggestions = useMemo(() => {
     const query = participantInput.trim().toLowerCase();
@@ -173,18 +184,23 @@ export function MeetingForm({ onCreated }: Props) {
         setSelectedParticipants((current) => [...new Set([...current, ...participantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean)])]);
         setParticipantInput("");
       }
-      const validationError = validateForm(form, currentParticipants);
+      const expectedAttendees = Math.max(form.expected_attendees, currentParticipants.length + 1);
+      if (expectedAttendees !== form.expected_attendees) {
+        setForm((current) => ({ ...current, expected_attendees: expectedAttendees }));
+      }
+      const submissionForm = { ...form, expected_attendees: expectedAttendees };
+      const validationError = validateForm(submissionForm, currentParticipants);
       if (validationError) {
         setMessage(validationError);
         return;
       }
       const created = await api.createMeeting({
-        ...form,
+        ...submissionForm,
         organizer_email: form.organizer_email.trim(),
         start_time: toIsoDateTime(form.start_time),
         end_time: toIsoDateTime(form.end_time),
         participant_emails: currentParticipants,
-        expected_attendees: currentParticipants.length + 1,
+        expected_attendees: expectedAttendees,
         room_id: selectedRoom?.id ?? null,
         equipment_ids: selectedEquipment.map((item) => item.id),
       });
@@ -218,8 +234,8 @@ export function MeetingForm({ onCreated }: Props) {
     try {
       const result = await api.suggestTimes(
         [form.organizer_email, ...participants].filter(Boolean),
-        new Date(form.start_time).toISOString(),
-        new Date(form.end_time).toISOString(),
+        toIsoDateTime(form.start_time),
+        toIsoDateTime(form.end_time),
       );
       setSuggestions(result);
       if (!result.length) setMessage("Không tìm thấy khung giờ chung phù hợp.");
@@ -231,12 +247,7 @@ export function MeetingForm({ onCreated }: Props) {
   };
 
   const chooseSuggestion = (suggestion: SuggestedTime) => {
-    const toLocal = (value: string) => {
-      const date = new Date(value);
-      const offset = date.getTimezoneOffset();
-      return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
-    };
-    updateForm({ start_time: toLocal(suggestion.start_time), end_time: toLocal(suggestion.end_time) }, true);
+    updateForm({ start_time: toIctuDateTimeInput(suggestion.start_time), end_time: toIctuDateTimeInput(suggestion.end_time) }, true);
     setSuggestions([]);
   };
 
@@ -255,7 +266,11 @@ export function MeetingForm({ onCreated }: Props) {
     }
     setRoomLoading(true);
     setMessage("");
-    void api.availableRooms(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time), Math.max(currentParticipants.length + 1, 1))
+    void api.availableRooms(
+      toIsoDateTime(form.start_time),
+      toIsoDateTime(form.end_time),
+      Math.max(form.expected_attendees, currentParticipants.length + 1),
+    )
       .then((rooms) => {
         setRoomOptions(rooms);
         setSelectedRoom(null);
@@ -375,6 +390,17 @@ export function MeetingForm({ onCreated }: Props) {
         <label>Kết thúc
           <input required type="datetime-local" value={form.end_time} onChange={(e) => updateForm({ end_time: e.target.value }, true)} />
         </label>
+        <label>Số người dự kiến
+          <input
+            aria-label="Số người dự kiến"
+            required
+            type="number"
+            min={participants.length + 1}
+            value={form.expected_attendees}
+            onChange={(event) => updateForm({ expected_attendees: Number(event.target.value) }, true)}
+          />
+          <small className="field-hint">Tối thiểu {participants.length + 1} người, gồm người tổ chức.</small>
+        </label>
         <label>Lặp lại
           <select value={form.recurrence ?? ""} onChange={(e) => updateForm({ recurrence: (e.target.value || null) as MeetingInput["recurrence"] }, true)}>
             <option value="">Không lặp</option>
@@ -430,14 +456,14 @@ export function MeetingForm({ onCreated }: Props) {
           </div>
         </div>
       )}
-      <p className="subtle">Quy mô phòng tự tính: {participants.length + 1} người, gồm người tổ chức và danh sách được mời.</p>
+      <p className="subtle">Quy mô dự kiến: {form.expected_attendees} người; tối thiểu {participants.length + 1} người theo danh sách hiện tại.</p>
       <datalist id="ictu-employees">{employees.map((employee) => <option key={employee.email} value={employee.email}>{employee.full_name} · {employee.department}</option>)}</datalist>
       {suggestions.length > 0 && (
         <div className="suggestions">
           <strong>Khung giờ đề xuất</strong>
           {suggestions.map((item) => (
             <button key={item.start_time} onClick={() => chooseSuggestion(item)}>
-              {new Date(item.start_time).toLocaleString("vi-VN")} - {new Date(item.end_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+              {formatIctuDateTime(item.start_time)} - {formatIctuTime(item.end_time)}
             </button>
           ))}
         </div>

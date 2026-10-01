@@ -1,10 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "../services/api";
 import type { Equipment, EquipmentStatus } from "../types";
+import { ictuInputToIso } from "../utils/dateTime";
 
 
 function toIso(value: string) {
-  return new Date(value).toISOString();
+  return ictuInputToIso(value);
 }
 
 

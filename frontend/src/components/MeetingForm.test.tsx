@@ -34,7 +34,7 @@ const equipment = [
 
 function fillRequiredFields() {
   fireEvent.change(screen.getByLabelText("Tên cuộc họp"), { target: { value: "Họp kiểm thử" } });
-  fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
+  fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
   fireEvent.change(screen.getByLabelText("Bắt đầu"), { target: { value: "2026-10-01T09:00" } });
   fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-10-01T10:00" } });
 }
@@ -48,7 +48,7 @@ describe("MeetingForm room-aware creation", () => {
     vi.mocked(api.createMeeting).mockResolvedValue([{
       id: 42,
       title: "Họp kiểm thử",
-      organizer_email: "leader@ictu.edu.vn",
+      organizer_email: "leader@example.com",
       expected_attendees: 3,
       start_time: "2026-10-01T02:00:00Z",
       end_time: "2026-10-01T03:00:00Z",
@@ -78,44 +78,44 @@ describe("MeetingForm room-aware creation", () => {
     vi.mocked(api.listEmployees).mockResolvedValue([{
       id: 1,
       full_name: "Trần Minh Anh",
-      email: "minhanh@ictu.edu.vn",
+      email: "employee.one@example.com",
       department: "Khoa Công nghệ thông tin",
       is_active: true,
     }]);
     render(<MeetingForm onCreated={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "minhanh" } });
+    fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "employee.one" } });
     const suggestion = await screen.findByRole("button", { name: /Trần Minh Anh/ });
     fireEvent.click(suggestion);
-    expect(screen.getByText("minhanh@ictu.edu.vn")).toBeInTheDocument();
+    expect(screen.getByText("employee.one@example.com")).toBeInTheDocument();
   });
 
   it("offers ICTU employees as meeting organizers", async () => {
     vi.mocked(api.listEmployees).mockResolvedValue([{
       id: 2,
       full_name: "Trần Minh Anh",
-      email: "minhanh@ictu.edu.vn",
+      email: "employee.one@example.com",
       department: "Khoa Công nghệ thông tin",
       is_active: true,
     }]);
     render(<MeetingForm onCreated={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "minhanh" } });
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "employee.one" } });
     const suggestion = await screen.findByRole("button", { name: /Trần Minh Anh/ });
     fireEvent.click(suggestion);
-    expect(screen.getByLabelText("Người tổ chức")).toHaveValue("minhanh@ictu.edu.vn");
+    expect(screen.getByLabelText("Người tổ chức")).toHaveValue("employee.one@example.com");
   });
 
   it("invites all ICTU employees except the organizer", async () => {
     vi.mocked(api.listEmployees).mockResolvedValue([
-      { id: 1, full_name: "Người tổ chức", email: "leader@ictu.edu.vn", department: "Nhóm dự án ICTU", is_active: true },
-      { id: 2, full_name: "Trần Minh Anh", email: "minhanh@ictu.edu.vn", department: "Khoa Công nghệ thông tin", is_active: true },
-      { id: 3, full_name: "Lê Hoàng Nam", email: "hoangnam@ictu.edu.vn", department: "Phòng Đào tạo", is_active: true },
+      { id: 1, full_name: "Người tổ chức", email: "leader@example.com", department: "Nhóm dự án ICTU", is_active: true },
+      { id: 2, full_name: "Trần Minh Anh", email: "employee.one@example.com", department: "Khoa Công nghệ thông tin", is_active: true },
+      { id: 3, full_name: "Lê Hoàng Nam", email: "employee.two@example.com", department: "Phòng Đào tạo", is_active: true },
     ]);
     render(<MeetingForm onCreated={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
     fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
-    expect(screen.getByText("minhanh@ictu.edu.vn")).toBeInTheDocument();
-    expect(screen.getByText("hoangnam@ictu.edu.vn")).toBeInTheDocument();
-    expect(screen.queryByText("leader@ictu.edu.vn", { selector: ".participant-chip" })).not.toBeInTheDocument();
+    expect(screen.getByText("employee.one@example.com")).toBeInTheDocument();
+    expect(screen.getByText("employee.two@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("leader@example.com", { selector: ".participant-chip" })).not.toBeInTheDocument();
   });
 
   it("clears the chosen room when the meeting time changes", async () => {
@@ -136,7 +136,7 @@ describe("MeetingForm room-aware creation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Tạo lịch họp" }));
     await screen.findByText("Phòng đã được đặt ở một lần lặp");
     expect(screen.getByLabelText("Tên cuộc họp")).toHaveValue("Họp kiểm thử");
-    expect(screen.getByLabelText("Người tổ chức")).toHaveValue("leader@ictu.edu.vn");
+    expect(screen.getByLabelText("Người tổ chức")).toHaveValue("leader@example.com");
   });
 
   it("selects multiple equipment and a reminder in the atomic create request", async () => {
@@ -153,5 +153,28 @@ describe("MeetingForm room-aware creation", () => {
       equipment_ids: [11, 12],
       reminder_minutes: 30,
     })));
+  });
+
+  it("preserves an expected size larger than the named invitation list", async () => {
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "one@ictu.edu.vn;two@ictu.edu.vn" } });
+    fireEvent.change(screen.getByLabelText("Số người dự kiến"), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm phòng phù hợp" }));
+    await waitFor(() => expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 20));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lịch họp" }));
+    await waitFor(() => expect(api.createMeeting).toHaveBeenCalledWith(expect.objectContaining({ expected_attendees: 20 })));
+  });
+
+  it("raises the expected size when inviting all employees", async () => {
+    vi.mocked(api.listEmployees).mockResolvedValue([
+      { id: 1, full_name: "Người tổ chức", email: "leader@example.com", department: "ICTU", is_active: true },
+      { id: 2, full_name: "Nhân viên 1", email: "one@ictu.edu.vn", department: "ICTU", is_active: true },
+      { id: 3, full_name: "Nhân viên 2", email: "two@ictu.edu.vn", department: "ICTU", is_active: true },
+    ]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
+    await waitFor(() => expect(screen.getByLabelText("Số người dự kiến")).toHaveValue(3));
   });
 });

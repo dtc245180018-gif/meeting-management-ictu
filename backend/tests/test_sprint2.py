@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+from urllib.parse import parse_qs, urlparse
 
-from app import models
+from app import models, reminders
 from app.database import SessionLocal
 from app.reminders import process_due_reminders
 
 
-ADMIN = "leader@ictu.edu.vn"
+ADMIN = "leader@example.com"
 
 
 def future_time(days: int = 20, hour: int = 9) -> datetime:
@@ -21,7 +24,7 @@ def meeting_payload(**overrides):
         "organizer_email": ADMIN,
         "start_time": start.isoformat(),
         "end_time": (start + timedelta(hours=1)).isoformat(),
-        "participant_emails": ["minhanh@ictu.edu.vn"],
+        "participant_emails": ["employee.one@example.com"],
         "expected_attendees": 2,
         "recurrence": None,
         "recurrence_count": 1,
@@ -237,6 +240,8 @@ def test_us15_ics_and_calendar_links_include_complete_data_and_cancelled_state(c
     links = client.get(f"/api/meetings/{meeting['id']}/calendar-links")
     assert links.status_code == 200
     assert "calendar.google.com" in links.json()["google_url"]
+    google_params = parse_qs(urlparse(links.json()["google_url"]).query)
+    assert google_params["add"] == ["employee.one@example.com"]
     assert links.json()["outlook_ics_url"].endswith(f"/{meeting['id']}/calendar.ics")
     calendar = client.get(f"/api/meetings/{meeting['id']}/calendar.ics")
     assert calendar.status_code == 200
@@ -244,12 +249,25 @@ def test_us15_ics_and_calendar_links_include_complete_data_and_cancelled_state(c
     assert f"UID:meeting-{meeting['id']}@meeting-management-ictu" in calendar.text
     assert "Họp kế hoạch tiếng Việt" in calendar.text
     assert f"LOCATION:{room['name']}" in calendar.text
-    assert "ORGANIZER:mailto:leader@ictu.edu.vn" in calendar.text
-    assert "ATTENDEE:mailto:minhanh@ictu.edu.vn" in calendar.text
+    assert "ORGANIZER:mailto:leader@example.com" in calendar.text
+    assert "ATTENDEE:mailto:employee.one@example.com" in calendar.text
+    assert "SEQUENCE:" in calendar.text
+    initial_sequence = int(next(line.split(":", 1)[1] for line in calendar.text.splitlines() if line.startswith("SEQUENCE:")))
+
+    updated_calendar = client.patch(f"/api/meetings/{meeting['id']}", json={
+        "requester_email": ADMIN,
+        "title": "Họp kế hoạch tiếng Việt đã cập nhật",
+    })
+    assert updated_calendar.status_code == 200
+    revised = client.get(f"/api/meetings/{meeting['id']}/calendar.ics").text
+    revised_sequence = int(next(line.split(":", 1)[1] for line in revised.splitlines() if line.startswith("SEQUENCE:")))
+    assert f"UID:meeting-{meeting['id']}@meeting-management-ictu" in revised
+    assert revised_sequence > initial_sequence
 
     client.post(f"/api/meetings/{meeting['id']}/cancel", json={"requester_email": ADMIN})
     cancelled = client.get(f"/api/meetings/{meeting['id']}/calendar.ics").text
     assert "METHOD:CANCEL" in cancelled and "STATUS:CANCELLED" in cancelled
+    assert f"UID:meeting-{meeting['id']}@meeting-management-ictu" in cancelled
 
 
 def test_us16_reminders_create_reschedule_cancel_read_and_do_not_send_cancelled(client):
@@ -258,7 +276,7 @@ def test_us16_reminders_create_reschedule_cancel_read_and_do_not_send_cancelled(
         start_time=start, reminder_minutes=60,
     )).json()[0]
     organizer_notifications = client.get("/api/notifications", params={"email": ADMIN}).json()
-    participant_notifications = client.get("/api/notifications", params={"email": "MINHANH@ICTU.EDU.VN"}).json()
+    participant_notifications = client.get("/api/notifications", params={"email": "EMPLOYEE.ONE@EXAMPLE.COM"}).json()
     assert len(organizer_notifications) == 1 and len(participant_notifications) == 1
     original_remind_at = organizer_notifications[0]["remind_at"]
 
@@ -285,3 +303,86 @@ def test_us16_reminders_create_reschedule_cancel_read_and_do_not_send_cancelled(
         db.commit()
         assert process_due_reminders(db) == 0
         assert db.get(models.Reminder, reminder.id).status == models.NotificationStatus.CANCELLED
+
+
+def test_datetime_is_normalized_to_utc_for_sqlite_calendar_and_reminders(client):
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        start_time=datetime(2026, 10, 3, 9, tzinfo=timezone(timedelta(hours=7))),
+        end_time="2026-10-03T10:00:00+07:00",
+        reminder_minutes=60,
+    ))
+    assert meeting.status_code == 201
+    created = meeting.json()[0]
+    assert datetime.fromisoformat(created["start_time"].replace("Z", "+00:00")) == datetime(2026, 10, 3, 2, tzinfo=timezone.utc)
+    notification = client.get("/api/notifications", params={"email": ADMIN}).json()[0]
+    assert datetime.fromisoformat(notification["remind_at"].replace("Z", "+00:00")) == datetime(2026, 10, 3, 1, tzinfo=timezone.utc)
+
+    calendar = client.get(f"/api/meetings/{created['id']}/calendar.ics").text
+    assert "DTSTART:20261003T020000Z" in calendar
+    google = client.get(f"/api/meetings/{created['id']}/calendar-links").json()["google_url"]
+    assert parse_qs(urlparse(google).query)["dates"][0].startswith("20261003T020000Z/")
+
+
+def test_reminder_can_be_disabled_and_reenabled_without_duplicates(client):
+    start = future_time(days=29)
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        start_time=start,
+        reminder_minutes=60,
+    )).json()[0]
+    endpoint = f"/api/meetings/{meeting['id']}"
+    assert client.patch(endpoint, json={"requester_email": ADMIN, "reminder_minutes": None}).status_code == 200
+    assert client.patch(endpoint, json={"requester_email": ADMIN, "reminder_minutes": 60}).status_code == 200
+
+    with SessionLocal() as db:
+        items = list(db.query(models.Reminder).filter(models.Reminder.meeting_id == meeting["id"]).all())
+        keys = {(item.recipient_email, item.remind_at) for item in items}
+        assert len(keys) == len(items)
+        assert all(item.status == models.NotificationStatus.PENDING for item in items)
+        assert all(item.attempts == 0 and item.error_message is None and item.sent_at is None for item in items)
+
+    assert client.patch(endpoint, json={"requester_email": ADMIN, "reminder_minutes": None}).status_code == 200
+    changed = client.patch(endpoint, json={
+        "requester_email": ADMIN,
+        "reminder_minutes": 30,
+        "participant_emails": ["other@ictu.edu.vn"],
+        "start_time": (start + timedelta(hours=2)).isoformat(),
+        "end_time": (start + timedelta(hours=3)).isoformat(),
+    })
+    assert changed.status_code == 200
+    with SessionLocal() as db:
+        items = list(db.query(models.Reminder).filter(models.Reminder.meeting_id == meeting["id"]).all())
+        keys = {(item.recipient_email, item.remind_at) for item in items}
+        assert len(keys) == len(items)
+        pending_recipients = {item.recipient_email for item in items if item.status == models.NotificationStatus.PENDING}
+        assert pending_recipients == {ADMIN, "other@ictu.edu.vn"}
+
+
+def test_smtp_backend_formats_email_in_ictu_timezone(client, monkeypatch):
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        start_time=datetime(2026, 10, 3, 2, tzinfo=timezone.utc),
+        end_time="2026-10-03T03:00:00Z",
+        reminder_minutes=60,
+    )).json()[0]
+    smtp_instance = MagicMock()
+    smtp_instance.__enter__.return_value = smtp_instance
+    smtp_factory = MagicMock(return_value=smtp_instance)
+    monkeypatch.setattr(reminders.smtplib, "SMTP", smtp_factory)
+    monkeypatch.setattr(reminders, "get_settings", lambda: SimpleNamespace(
+        email_backend="smtp",
+        smtp_host="smtp.example.test",
+        smtp_port=587,
+        smtp_from_email="noreply@ictu.edu.vn",
+        smtp_use_tls=True,
+        smtp_username="",
+        smtp_password="",
+    ))
+
+    with SessionLocal() as db:
+        item = db.query(models.Reminder).filter(models.Reminder.meeting_id == meeting["id"]).first()
+        reminders._send_email(item)
+
+    smtp_instance.starttls.assert_called_once()
+    message = smtp_instance.send_message.call_args.args[0]
+    body = message.get_content()
+    assert "09:00 ngày 03/10/2026" in body
+    assert "Asia/Ho_Chi_Minh" in body

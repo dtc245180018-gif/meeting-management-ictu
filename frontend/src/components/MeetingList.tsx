@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import type { Employee, Meeting, Room } from "../types";
 import { api } from "../services/api";
+import { formatIctuDate, formatIctuDateTime, formatIctuTime, ictuInputToIso, toIctuDateTimeInput } from "../utils/dateTime";
 
 interface Props {
   meetings: Meeting[];
   onChanged: () => void;
+  currentUserEmail: string;
 }
 
 function toLocalInput(value: string) {
-  const date = new Date(value);
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 16);
+  return toIctuDateTimeInput(value);
 }
 
-export function MeetingList({ meetings, onChanged }: Props) {
+export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -49,13 +49,17 @@ export function MeetingList({ meetings, onChanged }: Props) {
 
   const saveEdit = async () => {
     if (!editing) return;
+    if (editing.organizer_email !== currentUserEmail.toLowerCase()) {
+      setMessage("Chỉ người tổ chức mới được chỉnh sửa cuộc họp.");
+      return;
+    }
     try {
       await api.updateMeeting(editing.id, {
-        requester_email: editing.organizer_email,
+        requester_email: currentUserEmail,
         title: editTitle,
         description: editDescription,
-        start_time: new Date(editStart).toISOString(),
-        end_time: new Date(editEnd).toISOString(),
+        start_time: ictuInputToIso(editStart),
+        end_time: ictuInputToIso(editEnd),
         participant_emails: [...new Set([...editParticipantList, ...editParticipantInput.split(/[;,\n]/).map((value) => value.trim().toLowerCase()).filter(Boolean)])],
       });
       setMessage(`Đã cập nhật cuộc họp #${editing.id}.`);
@@ -67,9 +71,13 @@ export function MeetingList({ meetings, onChanged }: Props) {
   };
 
   const cancel = async (meeting: Meeting) => {
+    if (meeting.organizer_email !== currentUserEmail.toLowerCase()) {
+      setMessage("Chỉ người tổ chức mới được hủy cuộc họp.");
+      return;
+    }
     if (!window.confirm(`Bạn có chắc muốn hủy cuộc họp "${meeting.title}"?`)) return;
     try {
-      await api.cancelMeeting(meeting.id, meeting.organizer_email);
+      await api.cancelMeeting(meeting.id, currentUserEmail);
       setMessage(`Đã hủy cuộc họp #${meeting.id}; phòng, thiết bị và nhắc lịch liên quan đã được giải phóng.`);
       onChanged();
     } catch (error) {
@@ -87,8 +95,12 @@ export function MeetingList({ meetings, onChanged }: Props) {
   };
 
   const book = async (meeting: Meeting, room: Room) => {
+    if (meeting.organizer_email !== currentUserEmail.toLowerCase()) {
+      setMessage("Chỉ người tổ chức mới được đặt phòng cho cuộc họp.");
+      return;
+    }
     try {
-      await api.bookRoom(room.id, meeting.id, meeting.organizer_email);
+      await api.bookRoom(room.id, meeting.id, currentUserEmail);
       setMessage(`Đã đặt ${room.name} cho cuộc họp #${meeting.id}.`);
       setRooms({ ...rooms, [meeting.id]: [] });
       onChanged();
@@ -98,10 +110,17 @@ export function MeetingList({ meetings, onChanged }: Props) {
   };
 
   const addToGoogleCalendar = async (meeting: Meeting) => {
+    const popup = window.open("about:blank", "_blank");
+    if (!popup) {
+      setMessage("Trình duyệt đã chặn cửa sổ Google Calendar. Hãy cho phép popup rồi thử lại.");
+      return;
+    }
+    popup.opener = null;
     try {
       const links = await api.calendarLinks(meeting.id);
-      window.open(links.google_url, "_blank", "noopener,noreferrer");
+      popup.location.replace(links.google_url);
     } catch (error) {
+      popup.close();
       setMessage(error instanceof Error ? error.message : "Không thể mở Google Calendar");
     }
   };
@@ -121,16 +140,16 @@ export function MeetingList({ meetings, onChanged }: Props) {
         {meetings.map((meeting) => (
           <article className={`meeting-item ${meeting.status}`} key={meeting.id}>
             <div className="meeting-date">
-              <strong>{new Date(meeting.start_time).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" })}</strong>
-              <span>{new Date(meeting.start_time).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
+              <strong>{formatIctuDate(meeting.start_time)}</strong>
+              <span>{formatIctuTime(meeting.start_time)}</span>
             </div>
             <div className="meeting-info">
               <div className="meeting-title-row">
                 <h3>{meeting.title}</h3>
                 <div className="meeting-controls">
                   <span className={`status ${meeting.status}`}>{meeting.status === "scheduled" ? "Đã lên lịch" : "Đã hủy"}</span>
-                  {meeting.status === "scheduled" && <button className="more-button" onClick={() => setOpenMenu(openMenu === meeting.id ? null : meeting.id)} aria-label={`Thao tác cho ${meeting.title}`}>⋯</button>}
-                  {openMenu === meeting.id && meeting.status === "scheduled" && (
+                  {meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && <button className="more-button" onClick={() => setOpenMenu(openMenu === meeting.id ? null : meeting.id)} aria-label={`Thao tác cho ${meeting.title}`}>⋯</button>}
+                  {openMenu === meeting.id && meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && (
                     <div className="more-menu">
                       {meeting.status === "scheduled" && <button onClick={() => { setEditing(meeting); setOpenMenu(null); }}>Chỉnh sửa</button>}
                       {meeting.status === "scheduled" && !meeting.booking && <button onClick={() => { findRooms(meeting); setOpenMenu(null); }}>Tìm phòng trống</button>}
@@ -149,7 +168,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
               </div>
               <div className="item-actions">
                 <button onClick={() => setDetails(meeting)}>Xem chi tiết</button>
-                <button onClick={() => void addToGoogleCalendar(meeting)}>Thêm vào Google Calendar</button>
+                {meeting.status === "scheduled" && <button onClick={() => void addToGoogleCalendar(meeting)}>Thêm vào Google Calendar</button>}
                 <a className="calendar-download" href={api.calendarFileUrl(meeting.id)} download={`meeting-${meeting.id}.ics`}>Tải lịch Outlook/ICS</a>
               </div>
               {meeting.participants.length > 0 && (
@@ -162,7 +181,7 @@ export function MeetingList({ meetings, onChanged }: Props) {
                   ))}
                 </div>
               )}
-              {meeting.status === "scheduled" && (
+              {meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && (
                 <div className="item-actions"><span className="action-hint">Mở ⋯ để thao tác</span></div>
               )}
               {editing?.id === meeting.id && (
@@ -211,8 +230,8 @@ export function MeetingList({ meetings, onChanged }: Props) {
             <p>{details.description || "Không có mô tả"}</p>
             <div className="detail-grid">
               <span>Chủ trì: <strong>{details.organizer_email}</strong></span>
-              <span>Bắt đầu: <strong>{new Date(details.start_time).toLocaleString("vi-VN")}</strong></span>
-              <span>Kết thúc: <strong>{new Date(details.end_time).toLocaleString("vi-VN")}</strong></span>
+               <span>Bắt đầu: <strong>{formatIctuDateTime(details.start_time)}</strong></span>
+               <span>Kết thúc: <strong>{formatIctuDateTime(details.end_time)}</strong></span>
               <span>Quy mô dự kiến: <strong>{details.expected_attendees ?? details.participants.length + 1} người</strong></span>
               <span>Phòng: <strong>{details.booking?.room.name ?? "Chưa đặt phòng"}</strong></span>
             </div>

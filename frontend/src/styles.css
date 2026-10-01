@@ -138,7 +138,7 @@ main { width: min(1400px, 100%); margin: auto; }
 .hero p { max-width: 600px; margin: 0; color: #d9eafb; font-size: 1rem; line-height: 1.7; }
 .eyebrow { display: block; color: var(--ictu-blue); font-size: .7rem; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
 .eyebrow.light { color: #ffc76d; }
-.stats { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.stats { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .stats div { min-height: 108px; padding: 15px 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,.2); border-radius: 3px; background: rgba(255,255,255,.08); }
 .stats strong { font-size: 2rem; }
 .stats span { margin-top: 5px; color: #d9eafb; font-size: .74rem; text-align: center; }
@@ -347,10 +347,10 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .welcome-marquee { display: inline-block; min-width: max-content; padding-left: 100%; animation: welcome-marquee 18s linear infinite; }
 @keyframes welcome-marquee { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 @media (prefers-reduced-motion: reduce) { .welcome-marquee { padding-left: 0; animation: none; } }
-.demo-role-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 5vw 0; padding: 12px 16px; border: 1px solid #b9d6e9; border-left: 4px solid var(--ictu-orange); border-radius: 4px; background: #fffaf1; }
-.demo-role-switch > div:first-child { display: grid; gap: 3px; }
-.demo-role-switch strong { color: var(--ictu-navy); font-size: .88rem; }
-.demo-role-switch small { color: var(--muted); font-size: .7rem; }
+.role-switch { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 5vw 0; padding: 12px 16px; border: 1px solid #b9d6e9; border-left: 4px solid var(--ictu-orange); border-radius: 4px; background: #fffaf1; }
+.role-switch > div:first-child { display: grid; gap: 3px; }
+.role-switch strong { color: var(--ictu-navy); font-size: .88rem; }
+.role-switch small { color: var(--muted); font-size: .7rem; }
 .role-switch-buttons { display: flex; gap: 6px; }
 .role-switch-buttons button { padding: 8px 12px; border: 1px solid #bfd3e3; border-radius: 4px; color: var(--ictu-navy); background: #fff; font-size: .76rem; font-weight: 800; }
 .role-switch-buttons button:hover, .role-switch-buttons button.active { border-color: var(--ictu-blue); color: #fff; background: var(--ictu-blue); }
@@ -384,6 +384,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .filter-card { align-items: stretch; flex-wrap: wrap; }
   .filter-card > label { flex: 1 1 220px; }
   .hero { grid-template-columns: 1fr; gap: 28px; }
+  .stats, .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sprint-brief { grid-template-columns: 1fr; }
   .workspace { grid-template-columns: 1fr; }
   .equipment-filter { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -401,7 +402,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .ictu-brand span:not(.brand-mark) { font-size: .68rem; }
   .header-user { width: 100%; justify-content: space-between; padding-left: 0; }
   .header-user > div { text-align: left; }
-  .demo-role-switch { align-items: stretch; flex-direction: column; margin-right: 16px; margin-left: 16px; }
+  .role-switch { align-items: stretch; flex-direction: column; margin-right: 16px; margin-left: 16px; }
   .role-switch-buttons button { flex: 1; }
   .sidebar { width: 0; padding: 20px 0; overflow: hidden; }
   .app-shell:not(.sidebar-collapsed) .sidebar { width: 248px; padding: 20px 14px; box-shadow: 8px 0 24px rgba(0, 31, 61, .2); }
@@ -431,7 +432,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .room-filter span { padding-bottom: 0; }
   .room-filter-actions { margin-left: 0; }
   .room-result { grid-template-columns: 1fr; }
-  .stats { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .stats div { min-height: 80px; padding: 8px 3px; }
   .stats strong { font-size: 1.45rem; }
   .stats span { font-size: .64rem; }

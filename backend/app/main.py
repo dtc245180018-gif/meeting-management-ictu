@@ -11,6 +11,73 @@ from .config import get_settings
 from .database import Base, SessionLocal, engine
 
 
+LEGACY_EMAILS = (
+    "leader@ictu.edu.vn",
+    "minhanh@ictu.edu.vn",
+    "hoangnam@ictu.edu.vn",
+)
+
+
+def configured_user_emails() -> tuple[str, str, str]:
+    settings = get_settings()
+    return (
+        settings.leader_email.strip().lower(),
+        settings.employee_one_email.strip().lower(),
+        settings.employee_two_email.strip().lower(),
+    )
+
+
+def migrate_employee_emails() -> None:
+    """Replace the old sample addresses in every persisted reference."""
+    replacements = dict(zip(LEGACY_EMAILS, configured_user_emails(), strict=True))
+    with SessionLocal() as db:
+        for old_email, new_email in replacements.items():
+            for meeting in db.scalars(
+                select(models.Meeting).where(models.Meeting.organizer_email == old_email)
+            ).all():
+                meeting.organizer_email = new_email
+
+            for participant in list(
+                db.scalars(select(models.Participant).where(models.Participant.email == old_email)).all()
+            ):
+                duplicate = db.scalar(
+                    select(models.Participant).where(
+                        models.Participant.meeting_id == participant.meeting_id,
+                        models.Participant.email == new_email,
+                    )
+                )
+                if duplicate and duplicate.id != participant.id:
+                    if participant.status == models.InvitationStatus.ACCEPTED:
+                        duplicate.status = participant.status
+                    db.delete(participant)
+                else:
+                    participant.email = new_email
+
+            for reminder in list(
+                db.scalars(select(models.Reminder).where(models.Reminder.recipient_email == old_email)).all()
+            ):
+                duplicate = db.scalar(
+                    select(models.Reminder).where(
+                        models.Reminder.meeting_id == reminder.meeting_id,
+                        models.Reminder.recipient_email == new_email,
+                        models.Reminder.remind_at == reminder.remind_at,
+                    )
+                )
+                if duplicate and duplicate.id != reminder.id:
+                    duplicate.is_read = duplicate.is_read or reminder.is_read
+                    db.delete(reminder)
+                else:
+                    reminder.recipient_email = new_email
+
+            old_employee = db.scalar(select(models.Employee).where(models.Employee.email == old_email))
+            new_employee = db.scalar(select(models.Employee).where(models.Employee.email == new_email))
+            if old_employee and new_employee and old_employee.id != new_employee.id:
+                db.delete(old_employee)
+            elif old_employee:
+                old_employee.email = new_email
+        db.commit()
+
+
 def seed_rooms() -> None:
     with SessionLocal() as db:
         rooms = [
@@ -33,11 +100,12 @@ def seed_rooms() -> None:
 
 
 def seed_employees() -> None:
+    leader_email, employee_one_email, employee_two_email = configured_user_emails()
     with SessionLocal() as db:
         employees = [
-            models.Employee(full_name="Nguyễn Ngọc Thắng", email="leader@ictu.edu.vn", department="Nhóm dự án ICTU"),
-            models.Employee(full_name="Trần Minh Anh", email="minhanh@ictu.edu.vn", department="Khoa Công nghệ thông tin"),
-            models.Employee(full_name="Lê Hoàng Nam", email="hoangnam@ictu.edu.vn", department="Phòng Đào tạo"),
+            models.Employee(full_name="Nguyễn Ngọc Thắng", email=leader_email, department="Nhóm dự án ICTU"),
+            models.Employee(full_name="Trần Minh Anh", email=employee_one_email, department="Khoa Công nghệ thông tin"),
+            models.Employee(full_name="Lê Hoàng Nam", email=employee_two_email, department="Phòng Đào tạo"),
             models.Employee(full_name="Phạm Thu Hà", email="thuha@ictu.edu.vn", department="Phòng Hành chính"),
             models.Employee(full_name="Đỗ Quang Huy", email="quanghuy@ictu.edu.vn", department="Trung tâm CNTT"),
             models.Employee(full_name="Vũ Mai Linh", email="mailinh@ictu.edu.vn", department="Khoa Hệ thống thông tin"),
@@ -110,6 +178,7 @@ def apply_schema_migrations() -> None:
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
     apply_schema_migrations()
+    migrate_employee_emails()
     seed_rooms()
     seed_employees()
     seed_equipment()

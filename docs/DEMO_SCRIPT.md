@@ -42,7 +42,7 @@ Dữ liệu demo có thể nạp nhiều lần. Script không xóa dữ liệu t
 
 ### Bước 2 — Tìm lịch theo email (1 phút)
 
-1. Tại trang **Lịch họp**, chọn email `minhanh@ictu.edu.vn` hoặc gõ `minhanh`.
+1. Tại trang **Lịch họp**, chọn email `employee.one@example.com` hoặc gõ `minhanh`.
 2. Chọn gợi ý email.
 3. Bấm **Tìm** để xem lịch người đó tham gia.
 4. Đổi trạng thái hoặc khoảng ngày để minh họa bộ lọc; dùng **Xóa** để trở về danh sách ban đầu.
@@ -51,7 +51,7 @@ Dữ liệu demo có thể nạp nhiều lần. Script không xóa dữ liệu t
 
 1. Mở **Tạo lịch họp**.
 2. Nhập tiêu đề: `Demo lập kế hoạch truyền thông`.
-3. Tại **Người tổ chức**, chọn `leader@ictu.edu.vn`.
+3. Tại **Người tổ chức**, chọn `leader@example.com`.
 4. Bấm **Mời tất cả mọi người**. Hệ thống thêm toàn bộ nhân viên ICTU nhưng tự loại người tổ chức.
 5. Có thể xóa một người trong chip danh sách để minh họa chỉnh sửa.
 6. Chọn thời gian trong tương lai và chọn lặp lại nếu cần.

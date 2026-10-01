@@ -20,7 +20,10 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://meeting_user:meeting_password@db:5432/meeting_management}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      ADMIN_EMAILS: ${ADMIN_EMAILS:-leader@ictu.edu.vn}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-leader@example.com}
+      LEADER_EMAIL: ${LEADER_EMAIL:-leader@example.com}
+      EMPLOYEE_ONE_EMAIL: ${EMPLOYEE_ONE_EMAIL:-employee.one@example.com}
+      EMPLOYEE_TWO_EMAIL: ${EMPLOYEE_TWO_EMAIL:-employee.two@example.com}
       EMAIL_BACKEND: ${EMAIL_BACKEND:-console}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -40,7 +43,9 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_CURRENT_USER_EMAIL: ${VITE_CURRENT_USER_EMAIL:-leader@ictu.edu.vn}
+        VITE_CURRENT_USER_EMAIL: ${VITE_CURRENT_USER_EMAIL:-leader@example.com}
+        VITE_EMPLOYEE_ONE_EMAIL: ${VITE_EMPLOYEE_ONE_EMAIL:-employee.one@example.com}
+        VITE_EMPLOYEE_TWO_EMAIL: ${VITE_EMPLOYEE_TWO_EMAIL:-employee.two@example.com}
     ports:
       - "5173:80"
     depends_on:
@@ -48,4 +53,3 @@ services:
 
 volumes:
   postgres_data:
-

@@ -20,19 +20,19 @@ describe("AdminPanel forms", () => {
   });
 
   it("submits the room administration form", async () => {
-    render(<AdminPanel adminEmail="leader@ictu.edu.vn" />);
+    render(<AdminPanel adminEmail="leader@example.com" />);
     await screen.findByRole("heading", { name: "Thêm phòng" });
     fireEvent.change(screen.getByLabelText("Tên phòng quản trị"), { target: { value: "E201" } });
     fireEvent.change(screen.getByLabelText("Sức chứa quản trị"), { target: { value: "12" } });
     fireEvent.change(screen.getByLabelText("Vị trí"), { target: { value: "Tầng 2 - Khu E" } });
     fireEvent.click(screen.getByRole("button", { name: "Thêm phòng" }));
     await waitFor(() => expect(api.createRoom).toHaveBeenCalledWith(expect.objectContaining({
-      requester_email: "leader@ictu.edu.vn", name: "E201", capacity: 12,
+      requester_email: "leader@example.com", name: "E201", capacity: 12,
     })));
   });
 
   it("submits the equipment administration form", async () => {
-    render(<AdminPanel adminEmail="leader@ictu.edu.vn" />);
+    render(<AdminPanel adminEmail="leader@example.com" />);
     await screen.findByRole("button", { name: "Quản lý thiết bị" });
     fireEvent.click(screen.getByRole("button", { name: "Quản lý thiết bị" }));
     fireEvent.change(screen.getByLabelText("Mã thiết bị quản trị"), { target: { value: "TB-NEW-01" } });
@@ -41,7 +41,7 @@ describe("AdminPanel forms", () => {
     fireEvent.change(screen.getByLabelText("Vị trí"), { target: { value: "Kho" } });
     fireEvent.click(screen.getByRole("button", { name: "Thêm thiết bị" }));
     await waitFor(() => expect(api.createEquipment).toHaveBeenCalledWith(expect.objectContaining({
-      requester_email: "leader@ictu.edu.vn", code: "TB-NEW-01", name: "Thiết bị mới",
+      requester_email: "leader@example.com", code: "TB-NEW-01", name: "Thiết bị mới",
     })));
   });
 });

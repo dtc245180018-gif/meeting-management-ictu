@@ -7,8 +7,8 @@ from . import models
 
 
 def _aware(value: datetime) -> datetime:
-    # PostgreSQL preserves offsets. SQLite drops tzinfo while retaining the UTC
-    # clock value sent by the web client, so naive development values are UTC.
+    # Legacy SQLite rows may still be naive UTC values. UTCDateTime restores the
+    # marker for new reads, while this fallback keeps old data exportable.
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
 
 
@@ -57,6 +57,9 @@ class CalendarProvider:
             "BEGIN:VEVENT",
             f"UID:{self.uid(meeting)}",
             f"DTSTAMP:{_utc_stamp(meeting.updated_at)}",
+            f"CREATED:{_utc_stamp(meeting.created_at)}",
+            f"LAST-MODIFIED:{_utc_stamp(meeting.updated_at)}",
+            f"SEQUENCE:{int(_aware(meeting.updated_at).timestamp() * 1_000_000)}",
             f"DTSTART:{_utc_stamp(meeting.start_time)}",
             f"DTEND:{_utc_stamp(meeting.end_time)}",
             f"SUMMARY:{_escape(meeting.title)}",
@@ -81,8 +84,9 @@ class CalendarProvider:
             "dates": f"{_utc_stamp(meeting.start_time)}/{_utc_stamp(meeting.end_time)}",
             "details": details,
             "location": room,
+            "add": [item.email for item in meeting.participants],
         }
-        return "https://calendar.google.com/calendar/render?" + urlencode(params)
+        return "https://calendar.google.com/calendar/render?" + urlencode(params, doseq=True)
 
 
 calendar_provider = CalendarProvider()
