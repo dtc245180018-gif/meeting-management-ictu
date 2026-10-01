@@ -1,7 +1,10 @@
 import os
 
 os.environ["DATABASE_URL"] = "sqlite:///./test_meeting_management.db"
-os.environ["ADMIN_EMAILS"] = "leader@ictu.edu.vn"
+os.environ["ADMIN_EMAILS"] = "leader@example.com"
+os.environ["LEADER_EMAIL"] = "leader@example.com"
+os.environ["EMPLOYEE_ONE_EMAIL"] = "employee.one@example.com"
+os.environ["EMPLOYEE_TWO_EMAIL"] = "employee.two@example.com"
 os.environ["EMAIL_BACKEND"] = "console"
 
 import pytest
@@ -17,4 +20,3 @@ def client():
     with TestClient(app) as test_client:
         yield test_client
     Base.metadata.drop_all(bind=engine)
-

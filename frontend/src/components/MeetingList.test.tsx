@@ -11,7 +11,7 @@ vi.mock("../services/api", () => ({
 }));
 
 const meeting = {
-  id: 7, title: "Họp tích hợp lịch", description: "Demo", organizer_email: "leader@ictu.edu.vn",
+  id: 7, title: "Họp tích hợp lịch", description: "Demo", organizer_email: "leader@example.com",
   expected_attendees: 1, start_time: "2026-10-01T02:00:00Z", end_time: "2026-10-01T03:00:00Z",
   status: "scheduled" as const, participants: [], equipment_bookings: [{
     id: 3, equipment_id: 2, meeting_id: 7, start_time: "2026-10-01T02:00:00Z", end_time: "2026-10-01T03:00:00Z",
@@ -38,7 +38,7 @@ describe("MeetingList calendar integration", () => {
   });
 
   it("offers Google Calendar and Outlook ICS and shows booked equipment", async () => {
-    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toHaveAttribute("href", "/api/meetings/7/calendar.ics");
     fireEvent.click(screen.getByRole("button", { name: "Thêm vào Google Calendar" }));
     await waitFor(() => expect(api.calendarLinks).toHaveBeenCalledWith(7));
@@ -49,7 +49,7 @@ describe("MeetingList calendar integration", () => {
   });
 
   it("does not let another demo user manage the organizer's meeting", () => {
-    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="minhanh@ictu.edu.vn" />);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" />);
     expect(screen.queryByRole("button", { name: `Thao tác cho ${meeting.title}` })).not.toBeInTheDocument();
     expect(screen.queryByText("Mở ⋯ để thao tác")).not.toBeInTheDocument();
   });
@@ -57,21 +57,21 @@ describe("MeetingList calendar integration", () => {
   it("uses the active demo user when the organizer cancels", async () => {
     vi.mocked(api.cancelMeeting).mockResolvedValue({ ...meeting, status: "cancelled" });
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     fireEvent.click(screen.getByRole("button", { name: `Thao tác cho ${meeting.title}` }));
     fireEvent.click(screen.getByRole("button", { name: "Hủy lịch" }));
-    await waitFor(() => expect(api.cancelMeeting).toHaveBeenCalledWith(7, "leader@ictu.edu.vn"));
+    await waitFor(() => expect(api.cancelMeeting).toHaveBeenCalledWith(7, "leader@example.com"));
   });
 
   it("does not offer a normal Google Calendar action for a cancelled meeting", () => {
-    render(<MeetingList meetings={[{ ...meeting, status: "cancelled" }]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    render(<MeetingList meetings={[{ ...meeting, status: "cancelled" }]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     expect(screen.queryByRole("button", { name: "Thêm vào Google Calendar" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toBeInTheDocument();
   });
 
   it("closes the pre-opened tab when the calendar API fails", async () => {
     vi.mocked(api.calendarLinks).mockRejectedValue(new Error("Không lấy được liên kết lịch"));
-    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     fireEvent.click(screen.getByRole("button", { name: "Thêm vào Google Calendar" }));
     await screen.findByText("Không lấy được liên kết lịch");
     expect(popup.close).toHaveBeenCalledOnce();

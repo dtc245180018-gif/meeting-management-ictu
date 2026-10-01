@@ -19,7 +19,7 @@ const rooms = [
 const meetingsWithBooking = [{
   id: 10,
   title: "Lịch đã đặt phòng",
-  organizer_email: "leader@ictu.edu.vn",
+  organizer_email: "leader@example.com",
   expected_attendees: 2,
   start_time: "2026-10-01T02:00:00Z",
   end_time: "2026-10-01T03:00:00Z",

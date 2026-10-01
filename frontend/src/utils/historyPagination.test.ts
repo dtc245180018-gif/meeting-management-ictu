@@ -5,7 +5,7 @@ import { loadAllHistory } from "./historyPagination";
 const item = (id: number): Meeting => ({
   id,
   title: `Cuộc họp ${id}`,
-  organizer_email: "leader@ictu.edu.vn",
+  organizer_email: "leader@example.com",
   expected_attendees: 1,
   start_time: "2026-10-01T02:00:00Z",
   end_time: "2026-10-01T03:00:00Z",

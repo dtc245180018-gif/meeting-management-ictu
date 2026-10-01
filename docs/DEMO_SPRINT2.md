@@ -73,8 +73,8 @@ sẵn trạng thái bảo trì để demo US13.
 ## 7. US12 và US16 — Tạo lịch với nhiều thiết bị và reminder (3 phút)
 
 1. Mở **Tạo lịch họp**.
-2. Nhập tên `Demo Sprint 2 - Tài nguyên`, người tổ chức `leader@ictu.edu.vn`.
-3. Mời `minhanh@ictu.edu.vn` và `hoangnam@ictu.edu.vn`.
+2. Nhập tên `Demo Sprint 2 - Tài nguyên`, người tổ chức `leader@example.com`.
+3. Mời `employee.one@example.com` và `employee.two@example.com`.
 4. Nhập **Số người dự kiến** lớn hơn hoặc bằng 3, chọn một giờ trong tương lai
    theo giờ Việt Nam và chọn **Nhắc trước 30 phút**.
 5. Bấm **Tìm phòng phù hợp**, chọn `Phòng A203`.

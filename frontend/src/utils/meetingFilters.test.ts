@@ -6,7 +6,7 @@ const meeting = (overrides: Partial<Meeting> = {}): Meeting => ({
   id: 1,
   title: "Sprint review",
   description: "",
-  organizer_email: "leader@ictu.edu.vn",
+  organizer_email: "leader@example.com",
   start_time: "2026-10-01T09:00:00+07:00",
   end_time: "2026-10-01T10:00:00+07:00",
   recurrence: undefined,

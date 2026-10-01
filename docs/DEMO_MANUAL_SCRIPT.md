@@ -29,9 +29,9 @@ Danh sách email dùng khi demo:
 
 | Nhân viên | Email | Đơn vị |
 | --- | --- | --- |
-| Nguyễn Ngọc Thắng | `leader@ictu.edu.vn` | Nhóm dự án ICTU |
-| Trần Minh Anh | `minhanh@ictu.edu.vn` | Khoa Công nghệ thông tin |
-| Lê Hoàng Nam | `hoangnam@ictu.edu.vn` | Phòng Đào tạo |
+| Nguyễn Ngọc Thắng | `leader@example.com` | Nhóm dự án ICTU |
+| Trần Minh Anh | `employee.one@example.com` | Khoa Công nghệ thông tin |
+| Lê Hoàng Nam | `employee.two@example.com` | Phòng Đào tạo |
 | Phạm Thu Hà | `thuha@ictu.edu.vn` | Phòng Hành chính |
 | Đỗ Quang Huy | `quanghuy@ictu.edu.vn` | Trung tâm CNTT |
 | Vũ Mai Linh | `mailinh@ictu.edu.vn` | Khoa Hệ thống thông tin |
@@ -47,9 +47,9 @@ Danh sách email dùng khi demo:
 ## 3. Demo giao diện và điều hướng (1 phút)
 
 1. Trên thanh **Chế độ trình diễn**, chọn **Nhân viên** để bắt đầu. Giao diện
-   hiển thị email `minhanh@ictu.edu.vn`, chỉ có các luồng nhân viên và không có
+   hiển thị email `employee.one@example.com`, chỉ có các luồng nhân viên và không có
    menu Quản trị. Chọn **Quản trị viên** bất kỳ lúc nào để chuyển sang
-   `leader@ictu.edu.vn`; menu Quản trị xuất hiện và mở được US11/US14.
+   `leader@example.com`; menu Quản trị xuất hiện và mở được US11/US14.
 2. Từ sidebar, lần lượt mở **Tổng quan**, **Tạo lịch họp**, **Lịch họp** và **Phòng họp**.
 3. Bấm nút thu gọn sidebar để chỉ còn icon, sau đó bấm mở rộng lại.
 4. Bấm **Đăng xuất** ở góc phải và ở cuối sidebar. Cả hai nơi đều hiển thị thông báo chức năng đang được cập nhật.
@@ -57,7 +57,7 @@ Danh sách email dùng khi demo:
 ### Kiểm chứng reminder và thông báo (US16)
 
 1. Tạo một cuộc họp có `Nhắc lịch` (15 phút hoặc 1 ngày) và email
-   `minhanh@ictu.edu.vn` trong danh sách tham dự.
+   `employee.one@example.com` trong danh sách tham dự.
 2. Quay về **Tổng quan** ở vai trò Nhân viên. Thẻ **Thông báo của bạn** hiển thị
    reminder theo đúng email, số lượng chưa đọc và trạng thái `Đang chờ gửi`.
 3. Bấm **Làm mới** để gọi lại API; worker nền sẽ chuyển reminder đến hạn sang
@@ -78,7 +78,7 @@ Danh sách email dùng khi demo:
 2. Nhập:
    - Tên: `Họp kế hoạch Sprint 1 - Demo`.
    - Mô tả: `Thống nhất tiến độ và phân công công việc.`
-3. Tại **Người tổ chức**, chọn `leader@ictu.edu.vn`.
+3. Tại **Người tổ chức**, chọn `leader@example.com`.
 4. Bấm **Mời tất cả mọi người**.
 5. Cho mentor thấy có 9 người được mời và người tổ chức không xuất hiện trong các chip người tham dự.
 6. Xóa một người khỏi chip để minh họa việc chỉnh sửa danh sách.
@@ -91,8 +91,8 @@ Danh sách email dùng khi demo:
 
 ### Bước 3 — Gợi ý thời gian (1 phút)
 
-1. Trên form tạo lịch, nhập người tổ chức `leader@ictu.edu.vn`.
-2. Nhập một người tham dự, ví dụ `minhanh@ictu.edu.vn`.
+1. Trên form tạo lịch, nhập người tổ chức `leader@example.com`.
+2. Nhập một người tham dự, ví dụ `employee.one@example.com`.
 3. Chọn khoảng thời gian rộng trong tương lai, ví dụ từ 08:00 đến 17:00.
 4. Bấm **Gợi ý giờ trống**.
 5. Chọn một khung giờ được đề xuất; form tự điền lại thời gian bắt đầu và kết thúc.
@@ -155,11 +155,11 @@ Danh sách email dùng khi demo:
 
 1. Quay lại **Lịch họp**.
 2. Gõ `minhanh` vào ô email người tham gia.
-3. Chọn gợi ý `minhanh@ictu.edu.vn`.
+3. Chọn gợi ý `employee.one@example.com`.
 4. Bấm **Tìm**.
 5. Đổi trạng thái hoặc khoảng ngày nếu cần, sau đó bấm **Xóa** để bỏ bộ lọc.
 
-6. Để demo phân trang, tạo một lịch lặp hằng tuần 6 lần với `minhanh@ictu.edu.vn` là người tham dự. Sáu lần lặp sẽ tạo đủ dữ liệu cho hai trang, mỗi trang 5 lịch.
+6. Để demo phân trang, tạo một lịch lặp hằng tuần 6 lần với `employee.one@example.com` là người tham dự. Sáu lần lặp sẽ tạo đủ dữ liệu cho hai trang, mỗi trang 5 lịch.
 7. Tìm lại email đó và kiểm tra nút **Trước/Sau**, số trang và việc chuyển trang không làm mất bộ lọc.
 
 Điểm cần nói:

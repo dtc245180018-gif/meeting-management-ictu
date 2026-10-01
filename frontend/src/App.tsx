@@ -15,17 +15,26 @@ import { countPendingInvitations, scopeDashboardMeetings } from "./utils/dashboa
 type Page = "overview" | "create" | "calendar" | "rooms" | "equipment" | "admin";
 
 const CURRENT_USER_EMAIL = import.meta.env.VITE_CURRENT_USER_EMAIL ?? "";
-type DemoRole = "employee" | "admin";
-const DEMO_USERS: Record<DemoRole, { email: string; label: string }> = {
-  employee: { email: "minhanh@ictu.edu.vn", label: "Nhân viên" },
-  admin: { email: CURRENT_USER_EMAIL || "leader@ictu.edu.vn", label: "Quản trị viên" },
+const EMPLOYEE_ONE_EMAIL = import.meta.env.VITE_EMPLOYEE_ONE_EMAIL || "employee.one@example.com";
+const EMPLOYEE_TWO_EMAIL = import.meta.env.VITE_EMPLOYEE_TWO_EMAIL || "employee.two@example.com";
+type UserRole = "employeeOne" | "employeeTwo" | "admin";
+const ROLE_USERS: Record<UserRole, { email: string; label: string }> = {
+  employeeOne: { email: EMPLOYEE_ONE_EMAIL, label: "Nhân viên 1" },
+  employeeTwo: { email: EMPLOYEE_TWO_EMAIL, label: "Nhân viên 2" },
+  admin: { email: CURRENT_USER_EMAIL || "leader@example.com", label: "Quản trị viên" },
 };
+
+function initialRole(): UserRole {
+  const configuredEmail = CURRENT_USER_EMAIL.trim().toLowerCase();
+  const matched = (Object.keys(ROLE_USERS) as UserRole[]).find(
+    (role) => ROLE_USERS[role].email.toLowerCase() === configuredEmail,
+  );
+  return matched ?? "admin";
+}
 
 export default function App() {
   const [page, setPage] = useState<Page>("overview");
-  const [demoRole, setDemoRole] = useState<DemoRole>(
-    CURRENT_USER_EMAIL.toLowerCase() === DEMO_USERS.admin.email.toLowerCase() ? "admin" : "employee",
-  );
+  const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -41,10 +50,10 @@ export default function App() {
   const [error, setError] = useState("");
   const [logoutMessage, setLogoutMessage] = useState("");
   const pageSize = 5;
-  const activeUser = DEMO_USERS[demoRole];
+  const activeUser = ROLE_USERS[activeRole];
 
-  const switchDemoRole = (role: DemoRole) => {
-    setDemoRole(role);
+  const switchRole = (role: UserRole) => {
+    setActiveRole(role);
     setPage("overview");
     setFilterEmail("");
     setCalendarEmailInput("");
@@ -131,7 +140,7 @@ export default function App() {
     day: "2-digit",
   }).format(value);
   const today = businessDate(now);
-  const scopedMeetings = scopeDashboardMeetings(meetings, activeUser.email, demoRole === "admin");
+  const scopedMeetings = scopeDashboardMeetings(meetings, activeUser.email, activeRole === "admin");
   const upcomingMeetings = scopedMeetings
     .filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time).getTime() >= now.getTime())
     .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime());
@@ -142,7 +151,7 @@ export default function App() {
   }).length;
   const booked = upcomingMeetings.filter((meeting) => meeting.booking?.status === "active").length;
   const withoutRoom = upcomingMeetings.filter((meeting) => !meeting.booking).length;
-  const pendingInvites = countPendingInvitations(upcomingMeetings, activeUser.email, demoRole === "admin");
+  const pendingInvites = countPendingInvitations(upcomingMeetings, activeUser.email, activeRole === "admin");
   const recentMeetings = upcomingMeetings.slice(0, 5);
   const calendarEmployeeSuggestions = employees
     .filter((employee) => {
@@ -237,7 +246,7 @@ export default function App() {
           <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon">▣</span><span className="nav-label">Lịch họp</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
           <button className={page === "equipment" ? "active" : ""} title="Thiết bị" aria-current={page === "equipment" ? "page" : undefined} onClick={() => goTo("equipment")}><span className="nav-icon">⚙</span><span className="nav-label">Thiết bị</span></button>
-          {demoRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
+          {activeRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
         </nav>
         <div className="sidebar-footer-actions">
           <button className="sidebar-logout" type="button" onClick={showLogoutMessage} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
@@ -264,10 +273,10 @@ export default function App() {
       <div className="welcome-bar" aria-label="Thông báo chào mừng">
         <div className="welcome-marquee">Chào mừng đến với hệ thống quản lý lịch họp ICTU</div>
       </div>
-      <section className="demo-role-switch" aria-label="Chuyển vai trò demo">
-        <div><span className="eyebrow">Chế độ trình diễn</span><strong>Đang xem với vai trò: {activeUser.label}</strong><small>Đây là bộ chọn demo, chưa phải xác thực tài khoản.</small></div>
+      <section className="role-switch" aria-label="Chuyển tài khoản kiểm thử quyền">
+        <div><span className="eyebrow">Kiểm thử phân quyền</span><strong>Tài khoản hiện tại: {activeUser.label}</strong><small>Quyền quản trị được API kiểm tra bằng ADMIN_EMAILS; đăng nhập đầy đủ thuộc Sprint 3.</small></div>
         <div className="role-switch-buttons">
-          {(Object.keys(DEMO_USERS) as DemoRole[]).map((role) => <button key={role} className={demoRole === role ? "active" : ""} type="button" onClick={() => switchDemoRole(role)}>{DEMO_USERS[role].label}</button>)}
+          {(Object.keys(ROLE_USERS) as UserRole[]).map((role) => <button key={role} className={activeRole === role ? "active" : ""} type="button" onClick={() => switchRole(role)}>{ROLE_USERS[role].label}</button>)}
         </div>
       </section>
       {logoutMessage && <div className="logout-notice" role="status">{logoutMessage}</div>}
@@ -302,7 +311,7 @@ export default function App() {
 
         {page === "overview" && (
           <section className="overview-grid" aria-label="Thống kê toàn hệ thống">
-            <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>{demoRole === "admin" ? "Góc nhìn quản trị · tổng hợp cuộc họp và tài nguyên toàn hệ thống." : "Góc nhìn nhân viên · thông báo và lịch liên quan đến tài khoản demo."}</p>
+            <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>{activeRole === "admin" ? "Góc nhìn quản trị · tổng hợp cuộc họp và tài nguyên toàn hệ thống." : "Góc nhìn nhân viên · thông báo và lịch liên quan đến tài khoản hiện tại."}</p>
             <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
             <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
             <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={showMyInvitations}>Xem lời mời →</button></div>
@@ -332,7 +341,7 @@ export default function App() {
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
           {page === "equipment" && <EquipmentDirectory />}
-          {page === "admin" && demoRole === "admin" && <AdminPanel adminEmail={activeUser.email} />}
+          {page === "admin" && activeRole === "admin" && <AdminPanel adminEmail={activeUser.email} />}
         </div>
       </main>
 

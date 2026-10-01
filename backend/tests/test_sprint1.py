@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 
-ORGANIZER = "leader@ictu.edu.vn"
+ORGANIZER = "leader@example.com"
 
 
 def future_time(days=1, hour=9):

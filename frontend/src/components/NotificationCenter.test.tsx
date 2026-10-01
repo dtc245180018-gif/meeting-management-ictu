@@ -6,7 +6,7 @@ import { NotificationCenter } from "./NotificationCenter";
 vi.mock("../services/api", () => ({ api: { notifications: vi.fn(), markNotificationRead: vi.fn() } }));
 
 const notification = {
-  id: 5, meeting_id: 9, recipient_email: "leader@ictu.edu.vn", channel: "email",
+  id: 5, meeting_id: 9, recipient_email: "leader@example.com", channel: "email",
   remind_at: "2026-10-01T01:30:00Z", status: "pending" as const, attempts: 0,
   is_read: false, created_at: "2026-09-29T01:00:00Z", meeting_title: "Họp Sprint 2",
 };
@@ -19,9 +19,9 @@ describe("NotificationCenter", () => {
   });
 
   it("loads notifications and marks one as read", async () => {
-    render(<NotificationCenter email="leader@ictu.edu.vn" />);
+    render(<NotificationCenter email="leader@example.com" />);
     fireEvent.click(await screen.findByRole("button", { name: /Họp Sprint 2/ }));
-    await waitFor(() => expect(api.markNotificationRead).toHaveBeenCalledWith(5, "leader@ictu.edu.vn"));
+    await waitFor(() => expect(api.markNotificationRead).toHaveBeenCalledWith(5, "leader@example.com"));
     expect(screen.getByText("0 chưa đọc")).toBeInTheDocument();
   });
 });

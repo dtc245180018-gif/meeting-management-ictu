@@ -123,10 +123,10 @@ def main() -> None:
             add_demo_meeting(
                 db,
                 title=f"{DEMO_PREFIX} Họp kế hoạch Sprint 1",
-                organizer="leader@ictu.edu.vn",
+                organizer="leader@example.com",
                 participants=[
-                    ("minhanh@ictu.edu.vn", models.InvitationStatus.ACCEPTED),
-                    ("hoangnam@ictu.edu.vn", models.InvitationStatus.INVITED),
+                    ("employee.one@example.com", models.InvitationStatus.ACCEPTED),
+                    ("employee.two@example.com", models.InvitationStatus.INVITED),
                 ],
                 start=first_day,
                 room_name="Phòng A203",
@@ -136,7 +136,7 @@ def main() -> None:
             add_demo_meeting(
                 db,
                 title=f"{DEMO_PREFIX} Nghiệm thu nội bộ",
-                organizer="minhanh@ictu.edu.vn",
+                organizer="employee.one@example.com",
                 participants=[
                     ("thuha@ictu.edu.vn", models.InvitationStatus.ACCEPTED),
                     ("quanghuy@ictu.edu.vn", models.InvitationStatus.DECLINED),
@@ -158,7 +158,7 @@ def main() -> None:
             add_demo_meeting(
                 db,
                 title=f"{DEMO_PREFIX} Lịch họp định kỳ",
-                organizer="leader@ictu.edu.vn",
+                organizer="leader@example.com",
                 participants=[
                     ("quanghuy@ictu.edu.vn", models.InvitationStatus.INVITED),
                     ("mailinh@ictu.edu.vn", models.InvitationStatus.ACCEPTED),
@@ -172,7 +172,7 @@ def main() -> None:
             add_demo_meeting(
                 db,
                 title=f"{DEMO_PREFIX} Cuộc họp đã hủy",
-                organizer="leader@ictu.edu.vn",
+                organizer="leader@example.com",
                 participants=[("thuha@ictu.edu.vn", models.InvitationStatus.INVITED)],
                 start=past_day,
                 status=models.MeetingStatus.CANCELLED,

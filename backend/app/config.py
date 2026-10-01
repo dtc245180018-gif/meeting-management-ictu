@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./meeting_management.db"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     admin_emails: str = ""
+    leader_email: str = "leader@example.com"
+    employee_one_email: str = "employee.one@example.com"
+    employee_two_email: str = "employee.two@example.com"
     email_backend: str = "console"
     smtp_host: str = ""
     smtp_port: int = 587

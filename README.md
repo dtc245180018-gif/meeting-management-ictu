@@ -101,12 +101,13 @@ npm run build
 - `ADMIN_EMAILS`: danh sách email quản trị tạm thời, phân tách bằng dấu phẩy.
   API quản trị nhận email người thao tác và đối chiếu cấu hình này. Đây chỉ là
   cơ chế tạm thời trước Sprint 3, chưa thay thế xác thực/phân quyền.
-- `VITE_CURRENT_USER_EMAIL`: email người dùng demo mà giao diện gửi tới API quản trị/thông báo.
-- Trên giao diện có bộ chọn **Chế độ trình diễn** giữa `Nhân viên` (`minhanh@ictu.edu.vn`)
-  và `Quản trị viên` (email đầu tiên trong `ADMIN_EMAILS`). Đây là role switch phía
-  frontend để trình diễn, không phải xác thực; vai trò nhân viên không hiển thị
-  menu Quản trị và vai trò quản trị mới mở được màn hình quản trị.
-- `EMAIL_BACKEND=console`: chế độ demo, ghi email nhắc lịch vào log và đánh dấu đã gửi.
+- `VITE_CURRENT_USER_EMAIL`: email quản trị viên mà giao diện gửi tới API quản trị/thông báo.
+- Trên giao diện có bộ chọn **Kiểm thử phân quyền** cho `Nhân viên 1`
+  (`employee.one@example.com`), `Nhân viên 2` (`employee.two@example.com`) và
+  `Quản trị viên` (`leader@example.com`). Bộ chọn này phục vụ nghiệm thu
+  Sprint 1–2, không thay thế xác thực; vai trò nhân viên không hiển thị menu
+  Quản trị và API trả `403` khi nhân viên gọi chức năng quản trị.
+- `EMAIL_BACKEND=console`: chế độ phát triển, ghi email nhắc lịch vào log và đánh dấu đã gửi.
 - `EMAIL_BACKEND=smtp`: gửi SMTP bằng `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
   `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` và `SMTP_USE_TLS`.
 - Không đưa mật khẩu, token hoặc OAuth Client Secret thật vào Git.
@@ -117,7 +118,7 @@ kết quả không phụ thuộc múi giờ của máy đang mở trình duyệt
 
 Ở trang Tổng quan, thẻ **Thông báo của bạn** hiển thị reminder của vai trò đang
 chọn. Nút `Làm mới` gọi lại API, trạng thái `Đang chờ gửi`/`Đã gửi` cho thấy
-worker reminder và chế độ email demo (`EMAIL_BACKEND=console`) đang hoạt động;
+worker reminder và chế độ email console (`EMAIL_BACKEND=console`) đang hoạt động;
 bấm từng dòng để đánh dấu đã đọc.
 
 `EMAIL_BACKEND=console` chỉ mô phỏng việc gửi bằng cách ghi nội dung vào log.

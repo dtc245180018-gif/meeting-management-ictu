@@ -8,7 +8,7 @@ from app.database import SessionLocal
 from app.reminders import process_due_reminders
 
 
-ADMIN = "leader@ictu.edu.vn"
+ADMIN = "leader@example.com"
 
 
 def future_time(days: int = 20, hour: int = 9) -> datetime:
@@ -24,7 +24,7 @@ def meeting_payload(**overrides):
         "organizer_email": ADMIN,
         "start_time": start.isoformat(),
         "end_time": (start + timedelta(hours=1)).isoformat(),
-        "participant_emails": ["minhanh@ictu.edu.vn"],
+        "participant_emails": ["employee.one@example.com"],
         "expected_attendees": 2,
         "recurrence": None,
         "recurrence_count": 1,
@@ -241,7 +241,7 @@ def test_us15_ics_and_calendar_links_include_complete_data_and_cancelled_state(c
     assert links.status_code == 200
     assert "calendar.google.com" in links.json()["google_url"]
     google_params = parse_qs(urlparse(links.json()["google_url"]).query)
-    assert google_params["add"] == ["minhanh@ictu.edu.vn"]
+    assert google_params["add"] == ["employee.one@example.com"]
     assert links.json()["outlook_ics_url"].endswith(f"/{meeting['id']}/calendar.ics")
     calendar = client.get(f"/api/meetings/{meeting['id']}/calendar.ics")
     assert calendar.status_code == 200
@@ -249,8 +249,8 @@ def test_us15_ics_and_calendar_links_include_complete_data_and_cancelled_state(c
     assert f"UID:meeting-{meeting['id']}@meeting-management-ictu" in calendar.text
     assert "Họp kế hoạch tiếng Việt" in calendar.text
     assert f"LOCATION:{room['name']}" in calendar.text
-    assert "ORGANIZER:mailto:leader@ictu.edu.vn" in calendar.text
-    assert "ATTENDEE:mailto:minhanh@ictu.edu.vn" in calendar.text
+    assert "ORGANIZER:mailto:leader@example.com" in calendar.text
+    assert "ATTENDEE:mailto:employee.one@example.com" in calendar.text
     assert "SEQUENCE:" in calendar.text
     initial_sequence = int(next(line.split(":", 1)[1] for line in calendar.text.splitlines() if line.startswith("SEQUENCE:")))
 
@@ -276,7 +276,7 @@ def test_us16_reminders_create_reschedule_cancel_read_and_do_not_send_cancelled(
         start_time=start, reminder_minutes=60,
     )).json()[0]
     organizer_notifications = client.get("/api/notifications", params={"email": ADMIN}).json()
-    participant_notifications = client.get("/api/notifications", params={"email": "MINHANH@ICTU.EDU.VN"}).json()
+    participant_notifications = client.get("/api/notifications", params={"email": "EMPLOYEE.ONE@EXAMPLE.COM"}).json()
     assert len(organizer_notifications) == 1 and len(participant_notifications) == 1
     original_remind_at = organizer_notifications[0]["remind_at"]
 
