@@ -79,7 +79,7 @@ describe("RoomDirectory filters", () => {
     fireEvent.change(await screen.findByLabelText("Danh sách phòng"), { target: { value: "booked" } });
     expect(await screen.findByText("A101")).toBeInTheDocument();
     expect(screen.queryByText("B301")).not.toBeInTheDocument();
-    expect(screen.getByText("Đã đặt theo lịch hiện có")).toBeInTheDocument();
+    expect(screen.getAllByText("Có lịch đặt").length).toBeGreaterThan(0);
 
     fireEvent.change(screen.getByLabelText("Danh sách phòng"), { target: { value: "free" } });
     expect(screen.queryByText("A101")).not.toBeInTheDocument();
@@ -95,5 +95,17 @@ describe("RoomDirectory filters", () => {
     await waitFor(() => expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 20));
     expect(await screen.findByText(/Có 1 phòng phù hợp/)).toBeInTheDocument();
     expect(screen.getAllByText("B301").length).toBeGreaterThan(0);
+  });
+
+  it("can show rooms booked in an exact window instead of discarding them", async () => {
+    render(<RoomDirectory meetings={meetingsWithBooking} />);
+    fireEvent.change(screen.getByLabelText("Từ lúc"), { target: { value: "2026-10-01T09:00" } });
+    fireEvent.change(screen.getByLabelText("Đến lúc"), { target: { value: "2026-10-01T10:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Xem phòng đang trống" }));
+    await screen.findByText(/Có 1 phòng phù hợp/);
+    fireEvent.change(screen.getByLabelText("Danh sách phòng"), { target: { value: "booked" } });
+    expect(screen.getByText("A101")).toBeInTheDocument();
+    expect(screen.getAllByText("Đã có lịch trong khung giờ").length).toBeGreaterThan(0);
+    expect(screen.queryByText("B301", { selector: ".room-card strong" })).not.toBeInTheDocument();
   });
 });

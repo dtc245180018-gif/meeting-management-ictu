@@ -21,21 +21,59 @@ const meeting = {
 };
 
 describe("MeetingList calendar integration", () => {
+  const popup = {
+    opener: {} as Window | null,
+    location: { replace: vi.fn() },
+    close: vi.fn(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.listEmployees).mockResolvedValue([]);
     vi.mocked(api.calendarLinks).mockResolvedValue({ google_url: "https://calendar.google.com/demo", outlook_ics_url: "/api/meetings/7/calendar.ics" });
     vi.mocked(api.calendarFileUrl).mockReturnValue("/api/meetings/7/calendar.ics");
-    vi.stubGlobal("open", vi.fn());
+    popup.location.replace.mockReset();
+    popup.close.mockReset();
+    vi.stubGlobal("open", vi.fn(() => popup as unknown as Window));
   });
 
   it("offers Google Calendar and Outlook ICS and shows booked equipment", async () => {
-    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} />);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
     expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toHaveAttribute("href", "/api/meetings/7/calendar.ics");
     fireEvent.click(screen.getByRole("button", { name: "Thêm vào Google Calendar" }));
     await waitFor(() => expect(api.calendarLinks).toHaveBeenCalledWith(7));
-    expect(window.open).toHaveBeenCalledWith("https://calendar.google.com/demo", "_blank", "noopener,noreferrer");
+    expect(window.open).toHaveBeenCalledWith("about:blank", "_blank");
+    expect(popup.location.replace).toHaveBeenCalledWith("https://calendar.google.com/demo");
     fireEvent.click(screen.getByRole("button", { name: "Xem chi tiết" }));
     expect(screen.getByText("TB-MC-01 · Máy chiếu")).toBeInTheDocument();
+  });
+
+  it("does not let another demo user manage the organizer's meeting", () => {
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="minhanh@ictu.edu.vn" />);
+    expect(screen.queryByRole("button", { name: `Thao tác cho ${meeting.title}` })).not.toBeInTheDocument();
+    expect(screen.queryByText("Mở ⋯ để thao tác")).not.toBeInTheDocument();
+  });
+
+  it("uses the active demo user when the organizer cancels", async () => {
+    vi.mocked(api.cancelMeeting).mockResolvedValue({ ...meeting, status: "cancelled" });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    fireEvent.click(screen.getByRole("button", { name: `Thao tác cho ${meeting.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Hủy lịch" }));
+    await waitFor(() => expect(api.cancelMeeting).toHaveBeenCalledWith(7, "leader@ictu.edu.vn"));
+  });
+
+  it("does not offer a normal Google Calendar action for a cancelled meeting", () => {
+    render(<MeetingList meetings={[{ ...meeting, status: "cancelled" }]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    expect(screen.queryByRole("button", { name: "Thêm vào Google Calendar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toBeInTheDocument();
+  });
+
+  it("closes the pre-opened tab when the calendar API fails", async () => {
+    vi.mocked(api.calendarLinks).mockRejectedValue(new Error("Không lấy được liên kết lịch"));
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@ictu.edu.vn" />);
+    fireEvent.click(screen.getByRole("button", { name: "Thêm vào Google Calendar" }));
+    await screen.findByText("Không lấy được liên kết lịch");
+    expect(popup.close).toHaveBeenCalledOnce();
   });
 });

@@ -5,8 +5,34 @@ from enum import StrEnum
 
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.types import TypeDecorator
 
 from .database import Base
+
+
+class UTCDateTime(TypeDecorator):
+    """Store UTC and restore timezone metadata that SQLite cannot preserve."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        return dialect.type_descriptor(DateTime(timezone=dialect.name != "sqlite"))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        value = value.astimezone(timezone.utc)
+        return value.replace(tzinfo=None) if dialect.name == "sqlite" else value
+
+    def process_result_value(self, value, _dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 class MeetingStatus(StrEnum):
@@ -46,16 +72,16 @@ class Meeting(Base):
     description: Mapped[str | None] = mapped_column(Text)
     organizer_email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     expected_attendees: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    start_time: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
+    end_time: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
     recurrence: Mapped[str | None] = mapped_column(String(20))
     recurrence_group: Mapped[str | None] = mapped_column(String(64), index=True)
     status: Mapped[MeetingStatus] = mapped_column(Enum(MeetingStatus), default=MeetingStatus.SCHEDULED, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
@@ -117,11 +143,11 @@ class RoomBooking(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     room_id: Mapped[int] = mapped_column(ForeignKey("rooms.id"), index=True, nullable=False)
     meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id"), unique=True, nullable=False)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    start_time: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
+    end_time: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
     status: Mapped[BookingStatus] = mapped_column(Enum(BookingStatus), default=BookingStatus.ACTIVE, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     room: Mapped[Room] = relationship(back_populates="bookings")
@@ -141,10 +167,10 @@ class Equipment(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
+        UTCDateTime(),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
@@ -162,11 +188,11 @@ class EquipmentBooking(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     equipment_id: Mapped[int] = mapped_column(ForeignKey("equipment.id"), index=True, nullable=False)
     meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True, nullable=False)
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
-    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    start_time: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
+    end_time: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
     status: Mapped[BookingStatus] = mapped_column(Enum(BookingStatus), default=BookingStatus.ACTIVE, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
 
     equipment: Mapped[Equipment] = relationship(back_populates="bookings")
@@ -183,7 +209,7 @@ class Reminder(Base):
     meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True, nullable=False)
     recipient_email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     channel: Mapped[str] = mapped_column(String(20), default="email", nullable=False)
-    remind_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True, nullable=False)
+    remind_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
     status: Mapped[NotificationStatus] = mapped_column(
         Enum(NotificationStatus), default=NotificationStatus.PENDING, nullable=False
     )
@@ -191,8 +217,8 @@ class Reminder(Base):
     error_message: Mapped[str | None] = mapped_column(Text)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     meeting: Mapped[Meeting] = relationship(back_populates="reminders")

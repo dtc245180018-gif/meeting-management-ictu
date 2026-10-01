@@ -9,6 +9,8 @@ import { api } from "./services/api";
 import type { Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
 import { loadAllHistory } from "./utils/historyPagination";
+import { formatIctuDateTime } from "./utils/dateTime";
+import { countPendingInvitations, scopeDashboardMeetings } from "./utils/dashboard";
 
 type Page = "overview" | "create" | "calendar" | "rooms" | "equipment" | "admin";
 
@@ -129,20 +131,18 @@ export default function App() {
     day: "2-digit",
   }).format(value);
   const today = businessDate(now);
-  const upcomingMeetings = meetings
+  const scopedMeetings = scopeDashboardMeetings(meetings, activeUser.email, demoRole === "admin");
+  const upcomingMeetings = scopedMeetings
     .filter((meeting) => meeting.status === "scheduled" && new Date(meeting.start_time).getTime() >= now.getTime())
     .sort((left, right) => new Date(left.start_time).getTime() - new Date(right.start_time).getTime());
   const scheduled = upcomingMeetings.length;
-  const todayMeetings = meetings.filter((meeting) => {
+  const todayMeetings = scopedMeetings.filter((meeting) => {
     const start = new Date(meeting.start_time);
     return meeting.status === "scheduled" && businessDate(start) === today;
   }).length;
   const booked = upcomingMeetings.filter((meeting) => meeting.booking?.status === "active").length;
   const withoutRoom = upcomingMeetings.filter((meeting) => !meeting.booking).length;
-  const pendingInvites = upcomingMeetings.reduce(
-    (count, meeting) => count + meeting.participants.filter((participant) => participant.status === "invited").length,
-    0,
-  );
+  const pendingInvites = countPendingInvitations(upcomingMeetings, activeUser.email, demoRole === "admin");
   const recentMeetings = upcomingMeetings.slice(0, 5);
   const calendarEmployeeSuggestions = employees
     .filter((employee) => {
@@ -163,6 +163,15 @@ export default function App() {
     event?.preventDefault();
     setFilterEmail(calendarEmailInput.trim());
     setHistoryPage(1);
+  };
+
+  const showMyInvitations = () => {
+    setCalendarMode("all");
+    setCalendarEmailInput(activeUser.email);
+    setFilterEmail(activeUser.email);
+    setFilterStatus("scheduled");
+    setHistoryPage(1);
+    setPage("calendar");
   };
 
   const renderHistoryFilters = () => (
@@ -204,7 +213,7 @@ export default function App() {
 
   const renderMeetings = (items: Meeting[], showPagination = false) => (
     <>
-      <MeetingList meetings={items} onChanged={loadMeetings} />
+      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} />
       {showPagination && totalPages > 1 && (
         <div className="pagination" aria-label="Phân trang lịch sử">
           <button disabled={historyPage === 1} onClick={() => setHistoryPage((current) => current - 1)}>Trước</button>
@@ -271,7 +280,7 @@ export default function App() {
             <p>Quản lý lịch, thành viên và phòng họp trong một không gian thống nhất dành cho ICTU.</p>
           </div>
           <div className="stats">
-            <div><strong>{meetings.length}</strong><span>Tổng lịch</span></div>
+            <div><strong>{scopedMeetings.length}</strong><span>Tổng lịch</span></div>
             <div><strong>{scheduled}</strong><span>Sắp tới</span></div>
             <div><strong>{booked}</strong><span>Đã có phòng</span></div>
             <div><strong>{withoutRoom}</strong><span>Chưa có phòng</span></div>
@@ -296,7 +305,7 @@ export default function App() {
             <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>{demoRole === "admin" ? "Góc nhìn quản trị · tổng hợp cuộc họp và tài nguyên toàn hệ thống." : "Góc nhìn nhân viên · thông báo và lịch liên quan đến tài khoản demo."}</p>
             <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
             <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
-            <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={() => goTo("calendar")}>Xem lời mời →</button></div>
+            <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={showMyInvitations}>Xem lời mời →</button></div>
             <div className="overview-card"><span>Thao tác nhanh</span><strong>＋</strong><button onClick={() => goTo("create")}>Tạo lịch họp mới →</button></div>
           </section>
         )}
@@ -311,7 +320,7 @@ export default function App() {
               {recentMeetings.map((meeting) => (
                 <div className="recent-item" key={meeting.id}>
                   <strong>{meeting.title}</strong>
-                  <span>{new Date(meeting.start_time).toLocaleString("vi-VN")} · {meeting.booking?.room.name ?? "Chưa đặt phòng"}</span>
+                  <span>{formatIctuDateTime(meeting.start_time)} · {meeting.booking?.room.name ?? "Chưa đặt phòng"}</span>
                 </div>
               ))}
             </div>

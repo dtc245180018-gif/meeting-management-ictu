@@ -154,4 +154,27 @@ describe("MeetingForm room-aware creation", () => {
       reminder_minutes: 30,
     })));
   });
+
+  it("preserves an expected size larger than the named invitation list", async () => {
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+    fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "one@ictu.edu.vn;two@ictu.edu.vn" } });
+    fireEvent.change(screen.getByLabelText("Số người dự kiến"), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Tìm phòng phù hợp" }));
+    await waitFor(() => expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 20));
+    fireEvent.click(screen.getByRole("button", { name: "Tạo lịch họp" }));
+    await waitFor(() => expect(api.createMeeting).toHaveBeenCalledWith(expect.objectContaining({ expected_attendees: 20 })));
+  });
+
+  it("raises the expected size when inviting all employees", async () => {
+    vi.mocked(api.listEmployees).mockResolvedValue([
+      { id: 1, full_name: "Người tổ chức", email: "leader@ictu.edu.vn", department: "ICTU", is_active: true },
+      { id: 2, full_name: "Nhân viên 1", email: "one@ictu.edu.vn", department: "ICTU", is_active: true },
+      { id: 3, full_name: "Nhân viên 2", email: "two@ictu.edu.vn", department: "ICTU", is_active: true },
+    ]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@ictu.edu.vn" } });
+    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
+    await waitFor(() => expect(screen.getByLabelText("Số người dự kiến")).toHaveValue(3));
+  });
 });

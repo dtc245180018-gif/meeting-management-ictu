@@ -111,10 +111,19 @@ npm run build
   `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` và `SMTP_USE_TLS`.
 - Không đưa mật khẩu, token hoặc OAuth Client Secret thật vào Git.
 
+Mọi thời điểm được lưu và trả về API ở UTC có offset rõ ràng, kể cả khi dùng
+SQLite. Giao diện luôn nhập và hiển thị theo múi giờ `Asia/Ho_Chi_Minh`, vì vậy
+kết quả không phụ thuộc múi giờ của máy đang mở trình duyệt.
+
 Ở trang Tổng quan, thẻ **Thông báo của bạn** hiển thị reminder của vai trò đang
 chọn. Nút `Làm mới` gọi lại API, trạng thái `Đang chờ gửi`/`Đã gửi` cho thấy
 worker reminder và chế độ email demo (`EMAIL_BACKEND=console`) đang hoạt động;
 bấm từng dòng để đánh dấu đã đọc.
+
+`EMAIL_BACKEND=console` chỉ mô phỏng việc gửi bằng cách ghi nội dung vào log.
+Muốn gửi email thật phải cấu hình `EMAIL_BACKEND=smtp` cùng các biến SMTP nêu
+trên. Worker sử dụng khóa hàng khi PostgreSQL hỗ trợ để giảm nguy cơ hai worker
+xử lý cùng một reminder.
 
 US15 hiện là đồng bộ một chiều: Backend sinh file ICS chuẩn và liên kết tạo sự
 kiện Google Calendar. Hệ thống chưa có OAuth nên không đọc thay đổi từ Google
