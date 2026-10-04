@@ -6,6 +6,7 @@ os.environ["LEADER_EMAIL"] = "leader@example.com"
 os.environ["EMPLOYEE_ONE_EMAIL"] = "employee.one@example.com"
 os.environ["EMPLOYEE_TWO_EMAIL"] = "employee.two@example.com"
 os.environ["EMAIL_BACKEND"] = "console"
+os.environ["SPRINT3_SEED_ACCOUNTS"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient
