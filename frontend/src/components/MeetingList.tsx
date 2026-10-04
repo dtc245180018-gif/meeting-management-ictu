@@ -21,6 +21,7 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [editing, setEditing] = useState<Meeting | null>(null);
   const [details, setDetails] = useState<Meeting | null>(null);
+  const [busyMeeting, setBusyMeeting] = useState<Meeting | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editStart, setEditStart] = useState("");
@@ -141,6 +142,12 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
     }
   };
 
+  const busyMailto = busyMeeting
+    ? `mailto:${busyMeeting.organizer_email}?subject=${encodeURIComponent(`Báo bận: ${busyMeeting.title}`)}&body=${encodeURIComponent(
+        `Kính gửi chủ cuộc họp,\n\nTôi là ${currentUserEmail} và đã chấp nhận tham dự cuộc họp "${busyMeeting.title}". Tuy nhiên, tôi vừa phát sinh lịch bận và muốn trao đổi lại về khả năng tham dự.\n\nTrân trọng.`,
+      )}`
+    : "";
+
   return (
     <section className="card wide-card">
       <div className="section-heading">
@@ -197,12 +204,33 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
                       {participant.email} · {participant.status === "invited" ? "Đã mời" : participant.status === "accepted" ? "Đã xác nhận" : "Từ chối"}
                     </span>
                   ))}
-                  {meeting.status === "scheduled" && meeting.participants.some((participant) => participant.email === currentUserEmail.toLowerCase()) && (
-                    <div className="invitation-actions">
-                      <button className="accept-invitation" type="button" onClick={() => void respond(meeting, "accepted")}>Chấp nhận</button>
-                      <button className="decline-invitation" type="button" onClick={() => void respond(meeting, "declined")}>Từ chối</button>
-                    </div>
-                  )}
+                  {meeting.status === "scheduled" && (() => {
+                    const currentParticipant = meeting.participants.find(
+                      (participant) => participant.email === currentUserEmail.toLowerCase(),
+                    );
+                    if (!currentParticipant) return null;
+                    if (currentParticipant.status === "accepted") {
+                      return (
+                        <div className="invitation-actions">
+                          <button className="accept-invitation" type="button" disabled>Đã chấp nhận</button>
+                          <button className="busy-invitation" type="button" onClick={() => setBusyMeeting(meeting)}>Báo bận</button>
+                        </div>
+                      );
+                    }
+                    if (currentParticipant.status === "declined") {
+                      return (
+                        <div className="invitation-actions">
+                          <button className="accept-invitation" type="button" onClick={() => void respond(meeting, "accepted")}>Chấp nhận lại</button>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="invitation-actions">
+                        <button className="accept-invitation" type="button" onClick={() => void respond(meeting, "accepted")}>Chấp nhận</button>
+                        <button className="decline-invitation" type="button" onClick={() => void respond(meeting, "declined")}>Từ chối</button>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
               {meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && (
@@ -268,6 +296,26 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
               <strong>Người tham dự ({details.participants.length})</strong>
               {details.participants.length === 0 && <span>Không có người tham dự.</span>}
               {details.participants.map((participant) => <span className={`participant ${participant.status}`} key={participant.id}>{participant.email} · {participant.status}</span>)}
+            </div>
+          </div>
+        </div>
+      )}
+      {busyMeeting && (
+        <div className="modal-backdrop" role="presentation" onClick={() => setBusyMeeting(null)}>
+          <div className="detail-modal busy-modal" role="dialog" aria-modal="true" aria-labelledby="busy-meeting-title" onClick={(event) => event.stopPropagation()}>
+            <div className="section-heading">
+              <div><span className="eyebrow">Thông báo lịch bận</span><h2 id="busy-meeting-title">Liên hệ chủ cuộc họp</h2></div>
+              <button aria-label="Đóng thông báo bận" onClick={() => setBusyMeeting(null)}>×</button>
+            </div>
+            <p>Bạn đã chấp nhận tham dự cuộc họp <strong>{busyMeeting.title}</strong>.</p>
+            <div className="busy-contact-card">
+              <span>Chủ cuộc họp</span>
+              <strong>{busyMeeting.organizer_email}</strong>
+            </div>
+            <p>Nếu phát sinh lịch bận, bạn phải liên hệ trực tiếp với chủ cuộc họp qua email công ty để trao đổi. Trạng thái tham dự hiện vẫn được giữ là <strong>Đã xác nhận</strong>.</p>
+            <div className="item-actions">
+              <a className="busy-email-link" href={busyMailto}>Soạn email cho chủ cuộc họp</a>
+              <button type="button" onClick={() => setBusyMeeting(null)}>Đóng</button>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../services/api";
 import { MeetingList } from "./MeetingList";
@@ -73,5 +73,39 @@ describe("MeetingList calendar integration", () => {
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" focusMeetingId={7} onFocusHandled={onFocusHandled} />);
     expect(screen.getByRole("dialog", { name: "Họp tích hợp lịch" })).toBeInTheDocument();
     expect(onFocusHandled).toHaveBeenCalled();
+  });
+
+  it("replaces decline with a busy contact flow after accepting", () => {
+    const acceptedMeeting = {
+      ...meeting,
+      participants: [{ id: 11, email: "employee.one@example.com", status: "accepted" as const }],
+    };
+    render(<MeetingList meetings={[acceptedMeeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" />);
+
+    expect(screen.getByRole("button", { name: "Đã chấp nhận" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Từ chối" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Báo bận" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Liên hệ chủ cuộc họp" });
+    expect(within(dialog).getByText("leader@example.com")).toBeInTheDocument();
+    expect(within(dialog).getByText(/phải liên hệ trực tiếp với chủ cuộc họp qua email công ty/i)).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "Soạn email cho chủ cuộc họp" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/^mailto:leader@example\.com\?subject=/),
+    );
+    expect(api.respondToInvitation).not.toHaveBeenCalled();
+  });
+
+  it("keeps accept and decline actions while an invitation is pending", async () => {
+    const invitedMeeting = {
+      ...meeting,
+      participants: [{ id: 12, email: "employee.one@example.com", status: "invited" as const }],
+    };
+    vi.mocked(api.respondToInvitation).mockResolvedValue({ ...invitedMeeting, participants: [] });
+    render(<MeetingList meetings={[invitedMeeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" />);
+
+    expect(screen.getByRole("button", { name: "Từ chối" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Chấp nhận" }));
+    await waitFor(() => expect(api.respondToInvitation).toHaveBeenCalledWith(7, "employee.one@example.com", "accepted"));
   });
 });
