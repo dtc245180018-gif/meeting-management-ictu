@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
+from app import main as app_main
 from app import models
 from app.database import SessionLocal
 from app.main import migrate_employee_emails
@@ -122,9 +124,14 @@ def test_real_users_cover_sprint_1_and_sprint_2_end_to_end(client):
     assert links.status_code == 200
     assert "calendar.google.com" in links.json()["google_url"]
 
-    assert len(client.get("/api/notifications", params={"email": LEADER}).json()) == 2
-    assert len(client.get("/api/notifications", params={"email": EMPLOYEE_ONE}).json()) == 2
-    assert len(client.get("/api/notifications", params={"email": EMPLOYEE_TWO}).json()) == 2
+    leader_notifications = client.get("/api/notifications", params={"email": LEADER}).json()
+    employee_one_notifications = client.get("/api/notifications", params={"email": EMPLOYEE_ONE}).json()
+    employee_two_notifications = client.get("/api/notifications", params={"email": EMPLOYEE_TWO}).json()
+    assert sum(item["kind"] == "reminder" for item in leader_notifications) == 2
+    assert sum(item["kind"] == "reminder" for item in employee_one_notifications) == 2
+    assert sum(item["kind"] == "invitation" for item in employee_one_notifications) == 2
+    assert sum(item["kind"] == "reminder" for item in employee_two_notifications) == 2
+    assert sum(item["kind"] == "invitation" for item in employee_two_notifications) == 2
 
     cancelled = client.post(
         f"/api/meetings/{first['id']}/cancel",
@@ -139,8 +146,10 @@ def test_real_users_cover_sprint_1_and_sprint_2_end_to_end(client):
         for item in client.get("/api/notifications", params={"email": EMPLOYEE_ONE}).json()
         if item["meeting_id"] == first["id"]
     ]
-    assert len(first_notifications) == 1
-    assert first_notifications[0]["status"] == "cancelled"
+    reminders_for_first = [item for item in first_notifications if item["kind"] == "reminder"]
+    cancellation_for_first = [item for item in first_notifications if item["kind"] == "meeting_cancelled"]
+    assert len(reminders_for_first) == 1 and reminders_for_first[0]["status"] == "cancelled"
+    assert len(cancellation_for_first) == 1 and cancellation_for_first[0]["status"] == "sent"
 
 
 def test_real_leader_has_admin_rights_and_employees_do_not(client):
@@ -238,4 +247,59 @@ def test_existing_database_references_are_migrated_to_real_emails(client):
             LEADER,
             EMPLOYEE_ONE,
             EMPLOYEE_TWO,
+        }
+
+
+def test_example_defaults_are_migrated_when_real_accounts_are_configured(client, monkeypatch):
+    real_leader = "real.leader@ictu.edu.vn"
+    real_employee_one = "real.employee.one@gmail.com"
+    real_employee_two = "real.employee.two@gmail.com"
+    start = acceptance_start() + timedelta(days=1)
+    with SessionLocal() as db:
+        meeting = models.Meeting(
+            title="Dữ liệu example.com cần chuyển email",
+            organizer_email=LEADER,
+            expected_attendees=3,
+            start_time=start,
+            end_time=start + timedelta(hours=1),
+            participants=[
+                models.Participant(email=EMPLOYEE_ONE),
+                models.Participant(email=EMPLOYEE_TWO),
+            ],
+        )
+        db.add(meeting)
+        db.flush()
+        db.add_all([
+            models.Reminder(
+                meeting_id=meeting.id,
+                recipient_email=email,
+                remind_at=start - timedelta(hours=1),
+            )
+            for email in (LEADER, EMPLOYEE_ONE, EMPLOYEE_TWO)
+        ])
+        db.commit()
+        meeting_id = meeting.id
+
+    monkeypatch.setattr(
+        app_main,
+        "get_settings",
+        lambda: SimpleNamespace(
+            leader_email=real_leader,
+            employee_one_email=real_employee_one,
+            employee_two_email=real_employee_two,
+        ),
+    )
+    app_main.migrate_employee_emails()
+
+    with SessionLocal() as db:
+        migrated = db.get(models.Meeting, meeting_id)
+        assert migrated.organizer_email == real_leader
+        assert {item.email for item in migrated.participants} == {
+            real_employee_one,
+            real_employee_two,
+        }
+        assert {item.recipient_email for item in migrated.reminders} == {
+            real_leader,
+            real_employee_one,
+            real_employee_two,
         }

@@ -3,7 +3,15 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from .models import BookingStatus, EquipmentStatus, InvitationStatus, MeetingStatus, NotificationStatus
+from .models import (
+    BookingStatus,
+    EquipmentStatus,
+    GoogleSyncStatus,
+    InvitationStatus,
+    MeetingStatus,
+    NotificationKind,
+    NotificationStatus,
+)
 
 
 class ParticipantOut(BaseModel):
@@ -148,6 +156,15 @@ class BookingOut(BaseModel):
     room: RoomOut
 
 
+class GoogleCalendarEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    sync_status: GoogleSyncStatus
+    html_link: str | None
+    error_message: str | None
+    synced_at: datetime | None
+
+
 class MeetingBase(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -263,6 +280,7 @@ class MeetingOut(BaseModel):
     participants: list[ParticipantOut]
     booking: BookingOut | None = None
     equipment_bookings: list[EquipmentBookingOut] = Field(default_factory=list)
+    google_calendar_event: GoogleCalendarEventOut | None = None
 
 
 class CancelRequest(BaseModel):
@@ -313,6 +331,39 @@ class CalendarLinksOut(BaseModel):
     outlook_ics_url: str
 
 
+class InvitationResponseRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    status: Literal["accepted", "declined"]
+
+
+class GoogleConnectionStatusOut(BaseModel):
+    configured: bool
+    connected: bool
+    user_email: EmailStr
+    google_email: EmailStr | None = None
+    connected_at: datetime | None = None
+    missing_settings: list[str] = Field(default_factory=list)
+
+
+class GoogleConnectUrlOut(BaseModel):
+    authorization_url: str
+
+
+class EmailIntegrationStatusOut(BaseModel):
+    backend: Literal["console", "smtp"]
+    configured: bool
+    sender: EmailStr | None = None
+    detail: str
+
+
+class GoogleSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requester_email: EmailStr
+
+
 class NotificationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -320,6 +371,9 @@ class NotificationOut(BaseModel):
     meeting_id: int
     recipient_email: EmailStr
     channel: str
+    kind: NotificationKind = NotificationKind.REMINDER
+    subject: str | None = None
+    body: str | None = None
     remind_at: datetime
     status: NotificationStatus
     attempts: int

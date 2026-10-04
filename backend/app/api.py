@@ -1,13 +1,16 @@
 from datetime import datetime
 
 from typing import Literal
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import models, reminders, schemas, services
+from . import google_calendar, models, reminders, schemas, services
 from .calendar_integration import calendar_provider
+from .config import get_settings
 from .database import get_db
 
 
@@ -23,6 +26,8 @@ def health():
 def create_meeting(payload: schemas.MeetingCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     result = services.create_meetings(db, payload)
     background_tasks.add_task(reminders.process_due_reminders_task)
+    for meeting in result:
+        background_tasks.add_task(google_calendar.sync_meeting_if_connected_task, meeting.id)
     return result
 
 
@@ -66,12 +71,38 @@ def edit_meeting(
 ):
     result = services.update_meeting(db, meeting_id, payload)
     background_tasks.add_task(reminders.process_due_reminders_task)
+    background_tasks.add_task(google_calendar.sync_meeting_if_connected_task, meeting_id)
     return result
 
 
 @router.post("/meetings/{meeting_id}/cancel", response_model=schemas.MeetingOut)
-def cancel_meeting(meeting_id: int, payload: schemas.CancelRequest, db: Session = Depends(get_db)):
-    return services.cancel_meeting(db, meeting_id, str(payload.requester_email))
+def cancel_meeting(
+    meeting_id: int,
+    payload: schemas.CancelRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    result = services.cancel_meeting(db, meeting_id, str(payload.requester_email))
+    background_tasks.add_task(reminders.process_due_reminders_task)
+    background_tasks.add_task(google_calendar.sync_meeting_if_connected_task, meeting_id)
+    return result
+
+
+@router.post("/meetings/{meeting_id}/invitations/respond", response_model=schemas.MeetingOut)
+def respond_to_invitation(
+    meeting_id: int,
+    payload: schemas.InvitationResponseRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    result = services.respond_to_invitation(
+        db,
+        meeting_id,
+        str(payload.email),
+        models.InvitationStatus(payload.status),
+    )
+    background_tasks.add_task(reminders.process_due_reminders_task)
+    return result
 
 
 @router.get("/rooms", response_model=list[schemas.RoomOut])
@@ -188,6 +219,56 @@ def meeting_calendar_links(meeting_id: int, db: Session = Depends(get_db)):
         google_url=calendar_provider.google_url(meeting),
         outlook_ics_url=f"/api/meetings/{meeting.id}/calendar.ics",
     )
+
+
+@router.get("/integrations/google/status", response_model=schemas.GoogleConnectionStatusOut)
+def google_connection_status(email: str = Query(min_length=3), db: Session = Depends(get_db)):
+    return google_calendar.connection_status(db, email)
+
+
+@router.get("/integrations/email/status", response_model=schemas.EmailIntegrationStatusOut)
+def email_connection_status():
+    return reminders.email_integration_status()
+
+
+@router.get("/integrations/google/connect", response_model=schemas.GoogleConnectUrlOut)
+def google_connect(email: str = Query(min_length=3)):
+    return schemas.GoogleConnectUrlOut(authorization_url=google_calendar.authorization_url(email))
+
+
+@router.get("/integrations/google/callback")
+def google_callback(
+    code: str | None = None,
+    state_value: str | None = Query(default=None, alias="state"),
+    error: str | None = None,
+    db: Session = Depends(get_db),
+):
+    if error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Google OAuth: {error}")
+    if not code or not state_value:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Thiếu mã xác thực Google")
+    connection = google_calendar.complete_oauth(db, code, state_value)
+    query = urlencode({"google_calendar": "connected", "email": connection.user_email})
+    return RedirectResponse(f"{get_settings().frontend_url.rstrip('/')}?{query}", status_code=status.HTTP_303_SEE_OTHER)
+
+
+@router.delete("/integrations/google", response_model=schemas.MessageOut)
+def google_disconnect(email: str = Query(min_length=3), db: Session = Depends(get_db)):
+    google_calendar.disconnect(db, email)
+    return schemas.MessageOut(message="Đã ngắt kết nối Google Calendar")
+
+
+@router.post(
+    "/meetings/{meeting_id}/google-calendar/sync",
+    response_model=schemas.GoogleCalendarEventOut,
+)
+def sync_google_calendar(
+    meeting_id: int,
+    payload: schemas.GoogleSyncRequest,
+    db: Session = Depends(get_db),
+):
+    meeting = services.get_meeting_or_404(db, meeting_id)
+    return google_calendar.sync_meeting(db, meeting, str(payload.requester_email))
 
 
 @router.get("/notifications", response_model=list[schemas.NotificationOut])

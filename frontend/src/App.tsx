@@ -5,6 +5,7 @@ import { RoomDirectory } from "./components/RoomDirectory";
 import { EquipmentDirectory } from "./components/EquipmentDirectory";
 import { AdminPanel } from "./components/AdminPanel";
 import { NotificationCenter } from "./components/NotificationCenter";
+import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
 import { api } from "./services/api";
 import type { Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
@@ -73,6 +74,17 @@ export default function App() {
     void loadMeetings();
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, [loadMeetings]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google_calendar") === "connected") {
+      setPage("overview");
+      setLogoutMessage(`Đã kết nối Google Calendar cho ${params.get("email") ?? "tài khoản hiện tại"}.`);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.has("meeting")) {
+      setPage("calendar");
+    }
+  }, []);
 
   useEffect(() => {
     const email = filterEmail.trim();
@@ -335,7 +347,7 @@ export default function App() {
             </div>
           </section>
         )}
-        {page === "overview" && <div className="page-layout"><NotificationCenter email={activeUser.email} /></div>}
+        {page === "overview" && <div className="page-layout integrations-grid"><GoogleCalendarPanel email={activeUser.email} /><NotificationCenter email={activeUser.email} /></div>}
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}

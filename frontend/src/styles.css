@@ -243,6 +243,10 @@ input:disabled { background: #eef2f6; }
 .meta span { padding: 5px 7px; border-radius: 3px; color: #54677c; background: #f0f4f8; font-size: .7rem; }
 .participants { display: grid; gap: 5px; margin-top: 9px; color: #54677c; font-size: .72rem; }
 .participants strong { color: var(--ictu-navy); font-size: .75rem; }
+.invitation-actions { display: flex; gap: 7px; margin-top: 6px; }
+.invitation-actions button { padding: 7px 11px; border: 1px solid #c9d7e4; border-radius: 4px; background: #fff; font-size: .74rem; font-weight: 800; }
+.invitation-actions .accept-invitation { border-color: #8ac9a4; color: #17633a; background: #eaf7ef; }
+.invitation-actions .decline-invitation { border-color: #efb5b5; color: #9a2f2f; background: #fff1f1; }
 .participant { width: fit-content; padding: 4px 7px; border-radius: 3px; background: #fff6e6; }
 .participant.accepted { background: #e3f6eb; color: #15734a; }
 .participant.declined { background: #fbe7e7; color: #9c3c3c; }
@@ -295,6 +299,9 @@ input:disabled { background: #eef2f6; }
 .inline-error { margin: 10px 0; }
 .notification-actions { display: flex; align-items: center; gap: 8px; }
 .notification-help { margin: 0 0 13px; padding: 10px 12px; border: 1px solid #d6e5ef; border-radius: 4px; color: var(--muted); background: #f7fbfe; font-size: .76rem; line-height: 1.5; }
+.email-integration-state { display: grid; gap: 3px; margin: 0 0 13px; padding: 9px 11px; border: 1px solid; border-radius: 5px; font-size: .72rem; }
+.email-integration-state.real { border-color: #9bd0ae; color: #17633a; background: #eaf7ef; }
+.email-integration-state.simulation { border-color: #f2d79f; color: #7d5218; background: #fff7e7; }
 .admin-tabs { display: flex; gap: 6px; margin: 16px 0; border-bottom: 1px solid var(--line); }
 .admin-tabs button { padding: 10px 14px; border: 0; border-bottom: 3px solid transparent; color: var(--muted); background: transparent; font-weight: 800; }
 .admin-tabs button.active { border-bottom-color: var(--ictu-orange); color: var(--ictu-blue); }
@@ -315,10 +322,21 @@ input:disabled { background: #eef2f6; }
 .notification-list button.read { opacity: .68; border-left-color: #9baaba; }
 .notification-list button > span { display: grid; gap: 4px; }
 .notification-list small { color: var(--muted); }
+.notification-list .notification-kind { width: fit-content; padding: 2px 6px; border-radius: 999px; color: var(--ictu-blue); background: #e9f3fb; font-size: .62rem; font-weight: 800; text-transform: uppercase; }
+.notification-preview { color: var(--muted); font-size: .72rem; }
 .notification-status { padding: 4px 7px; border-radius: 4px; color: #735018; background: #fff1d7; font-size: .68rem; white-space: nowrap; }
 .notification-status.sent { color: #17633a; background: #e5f5eb; }
 .notification-status.failed { color: #9a2f2f; background: #fdecec; }
 .notification-status.cancelled { color: #536170; background: #e9eef2; }
+.integrations-grid { grid-template-columns: minmax(300px, .78fr) minmax(0, 1.22fr); align-items: start; }
+.integration-state { padding: 5px 9px; border-radius: 999px; font-size: .7rem; font-weight: 800; }
+.integration-state.connected { color: #17633a; background: #e5f5eb; }
+.integration-content { display: grid; gap: 12px; }
+.integration-content p { margin: 0; color: var(--muted); line-height: 1.55; }
+.integration-content small { color: var(--muted); }
+.integration-content .button { width: fit-content; }
+.integration-warning { display: grid; gap: 6px; padding: 13px; border: 1px solid #f2d79f; border-radius: 5px; color: #7d5218; background: #fff7e7; font-size: .78rem; overflow-wrap: anywhere; }
+.item-actions .danger-outline { border-color: #efc6c6; color: #a33434; }
 .subtle { font-style: italic; }
 .empty { padding: 42px 10px; border: 1px dashed #ccd8e4; border-radius: 3px; color: var(--muted); text-align: center; }
 .pagination { display: flex; align-items: center; justify-content: center; gap: 12px; color: var(--muted); font-size: .8rem; }
@@ -425,6 +443,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .filter-actions { align-items: stretch; flex-direction: column; }
   .admin-item { grid-template-columns: 1fr; }
   .admin-item .item-actions { grid-column: auto; }
+  .integrations-grid { grid-template-columns: 1fr; }
   .notification-list button { align-items: flex-start; flex-direction: column; }
   .room-filter { align-items: stretch; flex-direction: column; }
   .room-criteria { display: flex; }

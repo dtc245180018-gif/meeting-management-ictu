@@ -11,10 +11,10 @@ from .config import get_settings
 from .database import Base, SessionLocal, engine
 
 
-LEGACY_EMAILS = (
-    "leader@ictu.edu.vn",
-    "minhanh@ictu.edu.vn",
-    "hoangnam@ictu.edu.vn",
+LEGACY_EMAIL_GROUPS = (
+    ("leader@ictu.edu.vn", "leader@example.com"),
+    ("minhanh@ictu.edu.vn", "employee.one@example.com"),
+    ("hoangnam@ictu.edu.vn", "employee.two@example.com"),
 )
 
 
@@ -28,8 +28,19 @@ def configured_user_emails() -> tuple[str, str, str]:
 
 
 def migrate_employee_emails() -> None:
-    """Replace the old sample addresses in every persisted reference."""
-    replacements = dict(zip(LEGACY_EMAILS, configured_user_emails(), strict=True))
+    """Replace every previous sample address in persisted references.
+
+    Both the original ICTU aliases and the later ``example.com`` defaults may
+    exist in a database that is upgraded to configured real accounts.
+    """
+    replacements = {
+        old_email: new_email
+        for old_emails, new_email in zip(
+            LEGACY_EMAIL_GROUPS, configured_user_emails(), strict=True
+        )
+        for old_email in old_emails
+        if old_email != new_email
+    }
     with SessionLocal() as db:
         for old_email, new_email in replacements.items():
             for meeting in db.scalars(
@@ -172,6 +183,20 @@ def apply_schema_migrations() -> None:
         for name, definition in additions.items():
             if name not in room_columns:
                 connection.execute(text(f"ALTER TABLE rooms ADD COLUMN {name} {definition}"))
+
+        reminder_columns = {column["name"] for column in inspector.get_columns("reminders")}
+        reminder_additions = {
+            "kind": "VARCHAR(32) NOT NULL DEFAULT 'REMINDER'",
+            "subject": "VARCHAR(300)",
+            "body": "TEXT",
+            "event_key": "VARCHAR(255)",
+        }
+        for name, definition in reminder_additions.items():
+            if name not in reminder_columns:
+                connection.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {definition}"))
+        connection.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS ix_reminders_event_key ON reminders (event_key)")
+        )
 
 
 @asynccontextmanager

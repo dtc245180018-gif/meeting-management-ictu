@@ -2,9 +2,12 @@ import type {
   Booking,
   CalendarLinks,
   Employee,
+  EmailIntegrationStatus,
   Equipment,
   EquipmentAdminInput,
   EquipmentStatus,
+  GoogleCalendarEvent,
+  GoogleConnectionStatus,
   Meeting,
   MeetingInput,
   Notification,
@@ -128,6 +131,25 @@ export const api = {
 
   calendarLinks: (meetingId: number) => request<CalendarLinks>(`/meetings/${meetingId}/calendar-links`),
   calendarFileUrl: (meetingId: number) => `${API_URL}/meetings/${meetingId}/calendar.ics`,
+
+  respondToInvitation: (meetingId: number, email: string, status: "accepted" | "declined") =>
+    request<Meeting>(`/meetings/${meetingId}/invitations/respond`, {
+      method: "POST",
+      body: JSON.stringify({ email, status }),
+    }),
+
+  googleStatus: (email: string) =>
+    request<GoogleConnectionStatus>(`/integrations/google/status?${new URLSearchParams({ email })}`),
+  emailStatus: () => request<EmailIntegrationStatus>("/integrations/email/status"),
+  googleConnectUrl: (email: string) =>
+    request<{ authorization_url: string }>(`/integrations/google/connect?${new URLSearchParams({ email })}`),
+  disconnectGoogle: (email: string) =>
+    request<{ message: string }>(`/integrations/google?${new URLSearchParams({ email })}`, { method: "DELETE" }),
+  syncGoogleCalendar: (meetingId: number, requesterEmail: string) =>
+    request<GoogleCalendarEvent>(`/meetings/${meetingId}/google-calendar/sync`, {
+      method: "POST",
+      body: JSON.stringify({ requester_email: requesterEmail }),
+    }),
 
   notifications: (email: string) =>
     request<Notification[]>(`/notifications?${new URLSearchParams({ email })}`),

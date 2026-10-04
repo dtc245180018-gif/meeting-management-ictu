@@ -22,8 +22,8 @@ Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo
 - US12: Đặt nhiều thiết bị cùng cuộc họp/lịch lặp với kiểm tra xung đột và rollback.
 - US13: Xem trạng thái thiết bị theo loại, trạng thái và khung thời gian.
 - US14: Quản trị thiết bị, bảo trì, kích hoạt và khóa bằng xóa mềm.
-- US15: Xuất ICS và liên kết Google Calendar một chiều.
-- US16: Nhắc lịch trong ứng dụng và gửi email nền qua console hoặc SMTP.
+- US15: Xuất ICS và đồng bộ tạo/cập nhật/hủy sự kiện qua Google Calendar OAuth.
+- US16: Thông báo trong ứng dụng, vòng đời lời mời và gửi email nền qua SMTP.
 
 Không thuộc Sprint 2: đăng nhập, quản lý tài khoản, phân quyền đầy đủ, báo cáo,
 mobile, chatbot, QR check-in và tích hợp HRM/ERP.
@@ -107,28 +107,32 @@ npm run build
   `Quản trị viên` (`leader@example.com`). Bộ chọn này phục vụ nghiệm thu
   Sprint 1–2, không thay thế xác thực; vai trò nhân viên không hiển thị menu
   Quản trị và API trả `403` khi nhân viên gọi chức năng quản trị.
-- `EMAIL_BACKEND=console`: chế độ phát triển, ghi email nhắc lịch vào log và đánh dấu đã gửi.
-- `EMAIL_BACKEND=smtp`: gửi SMTP bằng `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
+- `EMAIL_BACKEND=console`: chế độ phát triển, ghi email vào log và đánh dấu đã gửi.
+- `EMAIL_BACKEND=smtp`: gửi thật lời mời, cập nhật, hủy, phản hồi và reminder bằng `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
   `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` và `SMTP_USE_TLS`.
+- Google Calendar dùng OAuth Web application, refresh token được mã hóa bằng
+  `GOOGLE_TOKEN_ENCRYPTION_KEY`. Xem hướng dẫn cấu hình và nghiệm thu thật tại
+  [docs/REAL_INTEGRATIONS_SETUP.md](docs/REAL_INTEGRATIONS_SETUP.md).
 - Không đưa mật khẩu, token hoặc OAuth Client Secret thật vào Git.
 
 Mọi thời điểm được lưu và trả về API ở UTC có offset rõ ràng, kể cả khi dùng
 SQLite. Giao diện luôn nhập và hiển thị theo múi giờ `Asia/Ho_Chi_Minh`, vì vậy
 kết quả không phụ thuộc múi giờ của máy đang mở trình duyệt.
 
-Ở trang Tổng quan, thẻ **Thông báo của bạn** hiển thị reminder của vai trò đang
-chọn. Nút `Làm mới` gọi lại API, trạng thái `Đang chờ gửi`/`Đã gửi` cho thấy
-worker reminder và chế độ email console (`EMAIL_BACKEND=console`) đang hoạt động;
-bấm từng dòng để đánh dấu đã đọc.
+Ở trang Tổng quan, thẻ **Thông báo của bạn** tự làm mới mỗi 15 giây và hiển thị
+lời mời, thay đổi, hủy lịch, phản hồi và reminder của vai trò đang chọn. Trạng
+thái `Đang chờ gửi`/`Đã gửi`/`Gửi thất bại` phản ánh hàng đợi email; bấm từng
+dòng để đánh dấu đã đọc.
 
 `EMAIL_BACKEND=console` chỉ mô phỏng việc gửi bằng cách ghi nội dung vào log.
 Muốn gửi email thật phải cấu hình `EMAIL_BACKEND=smtp` cùng các biến SMTP nêu
 trên. Worker sử dụng khóa hàng khi PostgreSQL hỗ trợ để giảm nguy cơ hai worker
 xử lý cùng một reminder.
 
-US15 hiện là đồng bộ một chiều: Backend sinh file ICS chuẩn và liên kết tạo sự
-kiện Google Calendar. Hệ thống chưa có OAuth nên không đọc thay đổi từ Google
-Calendar/Outlook và không tự đồng bộ hai chiều.
+US15 đồng bộ một chiều từ hệ thống sang Google Calendar bằng OAuth: tạo, cập
+nhật và xóa sự kiện thật, kèm `sendUpdates=all` để Google thông báo khách mời.
+File ICS vẫn được giữ làm phương án tương thích Outlook. Thay đổi thực hiện trực
+tiếp trên Google không được kéo ngược về hệ thống.
 
 ## API Sprint 2
 
@@ -137,8 +141,9 @@ Calendar/Outlook và không tự đồng bộ hai chiều.
 | Phòng quản trị | `GET/POST /api/admin/rooms`, `PATCH/DELETE /api/admin/rooms/{id}` |
 | Thiết bị | `GET /api/equipment`, `GET /api/equipment/available` |
 | Thiết bị quản trị | `GET/POST /api/admin/equipment`, `PATCH/DELETE /api/admin/equipment/{id}` |
-| Lịch ngoài | `GET /api/meetings/{id}/calendar.ics`, `GET /api/meetings/{id}/calendar-links` |
-| Thông báo | `GET /api/notifications?email=...`, `POST /api/notifications/{id}/read` |
+| Lịch ngoài | `GET /api/meetings/{id}/calendar.ics`, `GET /api/integrations/google/status`, `GET /api/integrations/google/connect`, `GET /api/integrations/google/callback`, `DELETE /api/integrations/google`, `POST /api/meetings/{id}/google-calendar/sync` |
+| Lời mời | `POST /api/meetings/{id}/invitations/respond` |
+| Thông báo | `GET /api/integrations/email/status`, `GET /api/notifications?email=...`, `POST /api/notifications/{id}/read` |
 
 Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 `reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,

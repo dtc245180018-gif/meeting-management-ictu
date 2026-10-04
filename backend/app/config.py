@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_use_tls: bool = True
     reminder_max_attempts: int = 3
+    frontend_url: str = "http://localhost:5173"
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    google_redirect_uri: str = "http://localhost:8000/api/integrations/google/callback"
+    google_token_encryption_key: str = ""
+    google_oauth_state_secret: str = ""
+    google_calendar_id: str = "primary"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
