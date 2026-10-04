@@ -12,6 +12,17 @@ Tại thư mục `backend`:
 python scripts/prepare_sprint3_accounts.py
 ```
 
+Khi cần một mật khẩu chung cho buổi demo có giám sát, có thể chủ động xoay toàn
+bộ tài khoản bằng tùy chọn sau (thay giá trị mẫu bằng mật khẩu đã thống nhất):
+
+```powershell
+python scripts/prepare_sprint3_accounts.py --shared-demo-password "<mật-khẩu-demo>"
+```
+
+Không ghi mật khẩu demo thật vào tài liệu được commit. Tùy chọn này chỉ dành cho
+máy demo; mọi tài khoản vẫn có `must_change_password=true` và mỗi hash dùng salt
+riêng. Không sử dụng một mật khẩu chung khi triển khai thật.
+
 Kết quả:
 
 - bảng `user_accounts` có một bản ghi tương ứng với mỗi nhân viên;
