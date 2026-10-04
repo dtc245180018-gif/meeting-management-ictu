@@ -16,6 +16,7 @@ from .database import SessionLocal
 
 logger = logging.getLogger(__name__)
 ICTU_TIMEZONE = timezone(timedelta(hours=7), name="Asia/Ho_Chi_Minh")
+MEETING_START_NOTICE_MINUTES = 5
 _processing_lock = Lock()
 
 
@@ -153,6 +154,86 @@ def add_meeting_reminders(
         )
 
 
+def sync_meeting_starting_notifications(
+    meeting: models.Meeting,
+    recipients: list[str],
+) -> None:
+    """Keep one durable, automatic five-minute alert per attendee.
+
+    Unlike the optional email reminder, this in-app alert is always created and
+    only becomes visible when its due time is reached.
+    """
+    desired = {value.strip().lower() for value in recipients if value.strip()}
+    remind_at = meeting.start_time - timedelta(minutes=MEETING_START_NOTICE_MINUTES)
+    existing = {
+        item.recipient_email: item
+        for item in meeting.reminders
+        if item.kind == models.NotificationKind.MEETING_STARTING
+    }
+
+    for email, item in existing.items():
+        if email not in desired:
+            item.status = models.NotificationStatus.CANCELLED
+
+    for email in sorted(desired):
+        item = existing.get(email)
+        event_key = f"meeting-starting:{meeting.id}:{email}"
+        if item is None:
+            meeting.reminders.append(
+                models.Reminder(
+                    recipient_email=email,
+                    channel="email",
+                    kind=models.NotificationKind.MEETING_STARTING,
+                    subject=f"Sắp đến giờ họp: {meeting.title}",
+                    event_key=event_key,
+                    remind_at=remind_at,
+                )
+            )
+            continue
+
+        schedule_changed = item.remind_at != remind_at
+        item.remind_at = remind_at
+        item.subject = f"Sắp đến giờ họp: {meeting.title}"
+        item.event_key = event_key
+        if schedule_changed or item.status in {
+            models.NotificationStatus.CANCELLED,
+            models.NotificationStatus.FAILED,
+        }:
+            item.status = models.NotificationStatus.PENDING
+            item.attempts = 0
+            item.error_message = None
+            item.sent_at = None
+            item.is_read = False
+
+
+def backfill_meeting_starting_notifications() -> int:
+    """Add automatic join alerts to meetings created before this feature existed."""
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        meetings = list(
+            db.scalars(
+                select(models.Meeting)
+                .options(
+                    selectinload(models.Meeting.participants),
+                    selectinload(models.Meeting.reminders),
+                )
+                .where(
+                    models.Meeting.status == models.MeetingStatus.SCHEDULED,
+                    models.Meeting.end_time > now,
+                )
+            ).all()
+        )
+        for meeting in meetings:
+            recipients = [
+                meeting.organizer_email,
+                *(item.email for item in meeting.participants if item.status != models.InvitationStatus.DECLINED),
+            ]
+            sync_meeting_starting_notifications(meeting, recipients)
+        if meetings:
+            db.commit()
+        return len(meetings)
+
+
 def sync_pending_reminders(
     meeting: models.Meeting,
     recipients: list[str],
@@ -206,20 +287,31 @@ def sync_pending_reminders(
             active.is_read = False
 
 
-def cancel_pending_reminders(meeting: models.Meeting) -> None:
+def cancel_pending_reminders(
+    meeting: models.Meeting,
+    kinds: set[models.NotificationKind] | None = None,
+) -> None:
     for item in meeting.reminders:
-        if item.status == models.NotificationStatus.PENDING:
+        if item.status == models.NotificationStatus.PENDING and (kinds is None or item.kind in kinds):
             item.status = models.NotificationStatus.CANCELLED
 
 
 def _send_email(reminder: models.Reminder) -> None:
     settings = get_settings()
     meeting = reminder.meeting
-    subject = reminder.subject or f"Nhắc lịch họp: {meeting.title}"
-    body = reminder.body or (
-        f"Cuộc họp sắp bắt đầu.\n\n{_meeting_details(meeting)}\n\n"
-        f"Chi tiết: {_meeting_url(meeting.id)}"
-    )
+    if reminder.kind == models.NotificationKind.MEETING_STARTING:
+        subject = reminder.subject or f"Sắp đến giờ họp: {meeting.title}"
+        body = (
+            f"Cuộc họp sẽ bắt đầu trong {MEETING_START_NOTICE_MINUTES} phút.\n\n"
+            f"{_meeting_details(meeting)}\n\n"
+            f"Vào họp: {_meeting_url(meeting.id)}"
+        )
+    else:
+        subject = reminder.subject or f"Nhắc lịch họp: {meeting.title}"
+        body = reminder.body or (
+            f"Cuộc họp sắp bắt đầu.\n\n{_meeting_details(meeting)}\n\n"
+            f"Chi tiết: {_meeting_url(meeting.id)}"
+        )
     if settings.email_backend.lower() == "console":
         logger.info("EMAIL_BACKEND=console recipient=%s subject=%s\n%s", reminder.recipient_email, subject, body)
         return

@@ -131,7 +131,7 @@ export interface Notification {
   meeting_id: number;
   recipient_email: string;
   channel: string;
-  kind: "reminder" | "invitation" | "meeting_updated" | "meeting_cancelled" | "invitation_response";
+  kind: "reminder" | "meeting_starting" | "invitation" | "meeting_updated" | "meeting_cancelled" | "invitation_response";
   subject?: string;
   body?: string;
   remind_at: string;
@@ -142,6 +142,9 @@ export interface Notification {
   created_at: string;
   sent_at?: string;
   meeting_title?: string;
+  meeting_start_time?: string;
+  meeting_end_time?: string;
+  room_name?: string;
 }
 
 export interface RoomAdminInput {

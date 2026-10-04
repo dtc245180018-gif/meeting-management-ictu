@@ -6,6 +6,7 @@ import { formatIctuDateTime } from "../utils/dateTime";
 
 interface Props {
   email: string;
+  onOpenMeeting?: (meetingId: number) => void;
 }
 
 
@@ -18,6 +19,7 @@ const labels: Record<Notification["status"], string> = {
 
 const kindLabels: Record<Notification["kind"], string> = {
   reminder: "Nhắc lịch",
+  meeting_starting: "Sắp đến giờ họp",
   invitation: "Lời mời mới",
   meeting_updated: "Lịch đã cập nhật",
   meeting_cancelled: "Lịch đã hủy",
@@ -25,7 +27,7 @@ const kindLabels: Record<Notification["kind"], string> = {
 };
 
 
-export function NotificationCenter({ email }: Props) {
+export function NotificationCenter({ email, onOpenMeeting }: Props) {
   const [items, setItems] = useState<Notification[]>([]);
   const [emailStatus, setEmailStatus] = useState<EmailIntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,11 @@ export function NotificationCenter({ email }: Props) {
     }
   };
 
+  const openMeeting = async (item: Notification) => {
+    await read(item);
+    onOpenMeeting?.(item.meeting_id);
+  };
+
   return <section className="card notification-center" aria-labelledby="notification-title">
     <div className="section-heading"><div><span className="eyebrow">US16 · Thông báo và email</span><h2 id="notification-title">Thông báo của bạn</h2></div><div className="notification-actions"><span className="counter">{items.filter((item) => !item.is_read).length} chưa đọc</span><button className="button secondary" type="button" onClick={() => void load()}>Làm mới</button></div></div>
     <p className="notification-help">Hệ thống tự làm mới mỗi 15 giây và hiển thị trạng thái gửi email thật cho lời mời, thay đổi, hủy lịch, phản hồi và nhắc lịch. Bấm một thông báo để đánh dấu đã đọc.</p>
@@ -68,9 +75,18 @@ export function NotificationCenter({ email }: Props) {
     {loading && <p className="empty">Đang tải thông báo...</p>}
     {error && <p className="error-banner inline-error">{error}</p>}
     {!loading && !error && items.length === 0 && <p className="empty">Chưa có thông báo nhắc lịch.</p>}
-    <div className="notification-list">{items.map((item) => <button className={item.is_read ? "read" : "unread"} key={item.id} onClick={() => void read(item)}>
-      <span><small className="notification-kind">{kindLabels[item.kind]}</small><strong>{item.subject ?? item.meeting_title ?? `Cuộc họp #${item.meeting_id}`}</strong>{item.body && <span className="notification-preview">{item.body.split("\n")[0]}</span>}<small>{formatIctuDateTime(item.remind_at)}</small></span>
-      <b className={`notification-status ${item.status}`}>{item.status === "sent" && emailStatus?.backend === "console" ? "Đã xử lý (console)" : labels[item.status]}</b>
-    </button>)}</div>
+    <div className="notification-list">{items.map((item) => <article className={`notification-item ${item.is_read ? "read" : "unread"} ${item.kind === "meeting_starting" ? "meeting-starting" : ""}`} key={item.id}>
+      <button className="notification-main" type="button" onClick={() => void read(item)} aria-label={`Đọc thông báo ${item.subject ?? item.meeting_title ?? item.meeting_id}`}>
+        <small className="notification-kind">{kindLabels[item.kind]}</small>
+        <strong>{item.subject ?? item.meeting_title ?? `Cuộc họp #${item.meeting_id}`}</strong>
+        {item.kind === "meeting_starting" && <span className="meeting-starting-copy">Bắt đầu {item.meeting_start_time ? formatIctuDateTime(item.meeting_start_time) : "trong ít phút nữa"} · {item.room_name ?? "Chưa đặt phòng"}</span>}
+        {item.body && <span className="notification-preview">{item.body.split("\n")[0]}</span>}
+        <small>Thông báo lúc {formatIctuDateTime(item.remind_at)}</small>
+      </button>
+      <div className="notification-side">
+        <b className={`notification-status ${item.status}`}>{item.status === "sent" && emailStatus?.backend === "console" ? "Đã xử lý (console)" : labels[item.status]}</b>
+        {item.kind === "meeting_starting" && item.status !== "cancelled" && onOpenMeeting && <button className="notification-join" type="button" onClick={() => void openMeeting(item)}>Vào họp</button>}
+      </div>
+    </article>)}</div>
   </section>;
 }

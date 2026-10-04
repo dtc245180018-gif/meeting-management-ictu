@@ -311,6 +311,66 @@ def test_us16_reminders_create_reschedule_cancel_read_and_do_not_send_cancelled(
         assert db.get(models.Reminder, reminder.id).status == models.NotificationStatus.CANCELLED
 
 
+def test_employee_gets_automatic_join_notification_only_when_it_is_due(client):
+    start = datetime.now(timezone.utc) + timedelta(minutes=30)
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        start_time=start,
+        reminder_minutes=None,
+    )).json()[0]
+
+    before_due = client.get(
+        "/api/notifications",
+        params={"email": "employee.one@example.com"},
+    ).json()
+    assert not any(item["kind"] == "meeting_starting" for item in before_due)
+
+    with SessionLocal() as db:
+        alert = db.query(models.Reminder).filter(
+            models.Reminder.meeting_id == meeting["id"],
+            models.Reminder.recipient_email == "employee.one@example.com",
+            models.Reminder.kind == models.NotificationKind.MEETING_STARTING,
+        ).one()
+        assert alert.remind_at == start - timedelta(minutes=reminders.MEETING_START_NOTICE_MINUTES)
+        alert.remind_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+        process_due_reminders(db)
+
+    after_due = client.get(
+        "/api/notifications",
+        params={"email": "employee.one@example.com"},
+    ).json()
+    alert_out = next(item for item in after_due if item["kind"] == "meeting_starting")
+    assert alert_out["status"] == "sent"
+    assert alert_out["meeting_title"] == "Họp Sprint 2"
+    assert alert_out["meeting_start_time"] == meeting["start_time"]
+
+
+def test_declining_invitation_cancels_employee_join_notification(client):
+    start = future_time(days=31)
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        start_time=start,
+        reminder_minutes=30,
+    )).json()[0]
+
+    response = client.post(f"/api/meetings/{meeting['id']}/invitations/respond", json={
+        "email": "employee.one@example.com",
+        "status": "declined",
+    })
+    assert response.status_code == 200
+
+    with SessionLocal() as db:
+        employee_alerts = list(db.query(models.Reminder).filter(
+            models.Reminder.meeting_id == meeting["id"],
+            models.Reminder.recipient_email == "employee.one@example.com",
+            models.Reminder.kind.in_([
+                models.NotificationKind.REMINDER,
+                models.NotificationKind.MEETING_STARTING,
+            ]),
+        ).all())
+        assert employee_alerts
+        assert all(item.status == models.NotificationStatus.CANCELLED for item in employee_alerts)
+
+
 def test_datetime_is_normalized_to_utc_for_sqlite_calendar_and_reminders(client):
     meeting = client.post("/api/meetings", json=meeting_payload(
         start_time=datetime(2026, 10, 3, 9, tzinfo=timezone(timedelta(hours=7))),
@@ -320,7 +380,10 @@ def test_datetime_is_normalized_to_utc_for_sqlite_calendar_and_reminders(client)
     assert meeting.status_code == 201
     created = meeting.json()[0]
     assert datetime.fromisoformat(created["start_time"].replace("Z", "+00:00")) == datetime(2026, 10, 3, 2, tzinfo=timezone.utc)
-    notification = client.get("/api/notifications", params={"email": ADMIN}).json()[0]
+    notification = next(
+        item for item in client.get("/api/notifications", params={"email": ADMIN}).json()
+        if item["kind"] == "reminder"
+    )
     assert datetime.fromisoformat(notification["remind_at"].replace("Z", "+00:00")) == datetime(2026, 10, 3, 1, tzinfo=timezone.utc)
 
     calendar = client.get(f"/api/meetings/{created['id']}/calendar.ics").text

@@ -66,6 +66,7 @@ class NotificationStatus(StrEnum):
 
 class NotificationKind(StrEnum):
     REMINDER = "reminder"
+    MEETING_STARTING = "meeting_starting"
     INVITATION = "invitation"
     MEETING_UPDATED = "meeting_updated"
     MEETING_CANCELLED = "meeting_cancelled"

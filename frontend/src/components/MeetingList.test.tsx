@@ -67,4 +67,11 @@ describe("MeetingList calendar integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Đồng bộ Google Calendar" }));
     await screen.findByText("Tài khoản chưa kết nối Google Calendar");
   });
+
+  it("opens meeting details from a dashboard join notification", () => {
+    const onFocusHandled = vi.fn();
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" focusMeetingId={7} onFocusHandled={onFocusHandled} />);
+    expect(screen.getByRole("dialog", { name: "Họp tích hợp lịch" })).toBeInTheDocument();
+    expect(onFocusHandled).toHaveBeenCalled();
+  });
 });

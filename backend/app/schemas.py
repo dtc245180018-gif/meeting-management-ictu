@@ -382,6 +382,9 @@ class NotificationOut(BaseModel):
     created_at: datetime
     sent_at: datetime | None
     meeting_title: str | None = None
+    meeting_start_time: datetime | None = None
+    meeting_end_time: datetime | None = None
+    room_name: str | None = None
 
 
 class NotificationReadRequest(BaseModel):

@@ -207,6 +207,7 @@ async def lifespan(_: FastAPI):
     seed_rooms()
     seed_employees()
     seed_equipment()
+    reminders.backfill_meeting_starting_notifications()
     worker = asyncio.create_task(reminder_worker())
     try:
         yield

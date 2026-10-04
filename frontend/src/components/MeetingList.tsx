@@ -7,13 +7,15 @@ interface Props {
   meetings: Meeting[];
   onChanged: () => void;
   currentUserEmail: string;
+  focusMeetingId?: number | null;
+  onFocusHandled?: () => void;
 }
 
 function toLocalInput(value: string) {
   return toIctuDateTimeInput(value);
 }
 
-export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
+export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetingId, onFocusHandled }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -40,6 +42,14 @@ export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
   useEffect(() => {
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, []);
+
+  useEffect(() => {
+    if (!focusMeetingId) return;
+    const target = meetings.find((meeting) => meeting.id === focusMeetingId);
+    if (!target) return;
+    setDetails(target);
+    onFocusHandled?.();
+  }, [focusMeetingId, meetings, onFocusHandled]);
 
   const addEditParticipant = (value: string) => {
     const emails = value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
