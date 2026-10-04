@@ -53,3 +53,21 @@ def test_every_employee_receives_a_hashed_idempotent_sprint3_account(
             for email, account in accounts_by_email.items()
             if email != "leader@example.com"
         )
+
+    shared_demo_password = "SharedDemo123!"
+    assert app_main.set_shared_sprint3_demo_password(shared_demo_password) == 10
+
+    with credentials_path.open("r", encoding="utf-8-sig", newline="") as source:
+        rotated_credentials = list(csv.DictReader(source))
+
+    with SessionLocal() as db:
+        rotated_accounts = db.scalars(select(models.UserAccount)).all()
+        assert len({account.password_hash for account in rotated_accounts}) == 10
+        assert all(
+            verify_password(shared_demo_password, account.password_hash)
+            and account.must_change_password
+            for account in rotated_accounts
+        )
+        assert {row["temporary_password"] for row in rotated_credentials} == {
+            shared_demo_password
+        }

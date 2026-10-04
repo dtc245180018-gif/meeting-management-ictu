@@ -255,6 +255,51 @@ def seed_user_accounts() -> int:
     return len(created_accounts)
 
 
+def set_shared_sprint3_demo_password(password: str) -> int:
+    """Rotate every prepared account to one local-only demo password.
+
+    This helper exists for supervised Sprint 3 demos. Production deployments
+    must use unique passwords or an identity provider instead.
+    """
+    if not password:
+        raise ValueError("Demo password must not be empty")
+
+    settings = get_settings()
+    original_hashes: dict[int, str] = {}
+    credentials: list[dict[str, str]] = []
+
+    with SessionLocal() as db:
+        accounts = db.scalars(
+            select(models.UserAccount).order_by(models.UserAccount.id)
+        ).all()
+        for account in accounts:
+            original_hashes[account.id] = account.password_hash
+            account.password_hash = hash_password(password)
+            account.must_change_password = True
+            credentials.append(
+                {
+                    "full_name": account.employee.full_name,
+                    "email": account.email,
+                    "temporary_password": password,
+                    "role": account.role.value,
+                    "must_change_password": "true",
+                }
+            )
+        db.commit()
+
+        try:
+            _write_sprint3_credentials(
+                Path(settings.sprint3_credentials_file).expanduser(), credentials
+            )
+        except Exception:
+            for account in accounts:
+                account.password_hash = original_hashes[account.id]
+            db.commit()
+            raise
+
+    return len(accounts)
+
+
 def seed_equipment() -> None:
     with SessionLocal() as db:
         equipment_items = [
