@@ -64,6 +64,22 @@ class NotificationStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class NotificationKind(StrEnum):
+    REMINDER = "reminder"
+    MEETING_STARTING = "meeting_starting"
+    INVITATION = "invitation"
+    MEETING_UPDATED = "meeting_updated"
+    MEETING_CANCELLED = "meeting_cancelled"
+    INVITATION_RESPONSE = "invitation_response"
+
+
+class GoogleSyncStatus(StrEnum):
+    PENDING = "pending"
+    SYNCED = "synced"
+    FAILED = "failed"
+    DELETED = "deleted"
+
+
 class Meeting(Base):
     __tablename__ = "meetings"
 
@@ -93,6 +109,9 @@ class Meeting(Base):
         back_populates="meeting", cascade="all, delete-orphan"
     )
     reminders: Mapped[list[Reminder]] = relationship(back_populates="meeting", cascade="all, delete-orphan")
+    google_calendar_event: Mapped[GoogleCalendarEvent | None] = relationship(
+        back_populates="meeting", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class Participant(Base):
@@ -209,6 +228,12 @@ class Reminder(Base):
     meeting_id: Mapped[int] = mapped_column(ForeignKey("meetings.id", ondelete="CASCADE"), index=True, nullable=False)
     recipient_email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     channel: Mapped[str] = mapped_column(String(20), default="email", nullable=False)
+    kind: Mapped[NotificationKind] = mapped_column(
+        Enum(NotificationKind), default=NotificationKind.REMINDER, nullable=False
+    )
+    subject: Mapped[str | None] = mapped_column(String(300))
+    body: Mapped[str | None] = mapped_column(Text)
+    event_key: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
     remind_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True, nullable=False)
     status: Mapped[NotificationStatus] = mapped_column(
         Enum(NotificationStatus), default=NotificationStatus.PENDING, nullable=False
@@ -222,3 +247,58 @@ class Reminder(Base):
     sent_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
 
     meeting: Mapped[Meeting] = relationship(back_populates="reminders")
+
+
+class GoogleCalendarConnection(Base):
+    __tablename__ = "google_calendar_connections"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    google_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    encrypted_refresh_token: Mapped[str] = mapped_column(Text, nullable=False)
+    calendar_id: Mapped[str] = mapped_column(String(255), default="primary", nullable=False)
+    scopes: Mapped[str] = mapped_column(Text, nullable=False)
+    connected_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    events: Mapped[list[GoogleCalendarEvent]] = relationship(
+        back_populates="connection", cascade="all, delete-orphan"
+    )
+
+
+class GoogleCalendarEvent(Base):
+    __tablename__ = "google_calendar_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    meeting_id: Mapped[int] = mapped_column(
+        ForeignKey("meetings.id", ondelete="CASCADE"), unique=True, index=True, nullable=False
+    )
+    connection_id: Mapped[int] = mapped_column(
+        ForeignKey("google_calendar_connections.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    google_event_id: Mapped[str | None] = mapped_column(String(1024))
+    html_link: Mapped[str | None] = mapped_column(Text)
+    sync_status: Mapped[GoogleSyncStatus] = mapped_column(
+        Enum(GoogleSyncStatus), default=GoogleSyncStatus.PENDING, nullable=False
+    )
+    error_message: Mapped[str | None] = mapped_column(Text)
+    synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    meeting: Mapped[Meeting] = relationship(back_populates="google_calendar_event")
+    connection: Mapped[GoogleCalendarConnection] = relationship(back_populates="events")

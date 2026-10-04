@@ -7,6 +7,7 @@ vi.mock("../services/api", () => ({
   api: {
     listEmployees: vi.fn(), calendarLinks: vi.fn(), calendarFileUrl: vi.fn(),
     updateMeeting: vi.fn(), cancelMeeting: vi.fn(), availableRooms: vi.fn(), bookRoom: vi.fn(),
+    syncGoogleCalendar: vi.fn(), respondToInvitation: vi.fn(),
   },
 }));
 
@@ -21,29 +22,20 @@ const meeting = {
 };
 
 describe("MeetingList calendar integration", () => {
-  const popup = {
-    opener: {} as Window | null,
-    location: { replace: vi.fn() },
-    close: vi.fn(),
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.listEmployees).mockResolvedValue([]);
     vi.mocked(api.calendarLinks).mockResolvedValue({ google_url: "https://calendar.google.com/demo", outlook_ics_url: "/api/meetings/7/calendar.ics" });
     vi.mocked(api.calendarFileUrl).mockReturnValue("/api/meetings/7/calendar.ics");
-    popup.location.replace.mockReset();
-    popup.close.mockReset();
-    vi.stubGlobal("open", vi.fn(() => popup as unknown as Window));
+    vi.mocked(api.syncGoogleCalendar).mockResolvedValue({ sync_status: "synced", html_link: "https://calendar.google.com/event/7" });
   });
 
   it("offers Google Calendar and Outlook ICS and shows booked equipment", async () => {
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toHaveAttribute("href", "/api/meetings/7/calendar.ics");
-    fireEvent.click(screen.getByRole("button", { name: "Thêm vào Google Calendar" }));
-    await waitFor(() => expect(api.calendarLinks).toHaveBeenCalledWith(7));
-    expect(window.open).toHaveBeenCalledWith("about:blank", "_blank");
-    expect(popup.location.replace).toHaveBeenCalledWith("https://calendar.google.com/demo");
+    fireEvent.click(screen.getByRole("button", { name: "Đồng bộ Google Calendar" }));
+    await waitFor(() => expect(api.syncGoogleCalendar).toHaveBeenCalledWith(7, "leader@example.com"));
+    expect(await screen.findByText(/Đã đồng bộ cuộc họp #7/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Xem chi tiết" }));
     expect(screen.getByText("TB-MC-01 · Máy chiếu")).toBeInTheDocument();
   });
@@ -63,17 +55,23 @@ describe("MeetingList calendar integration", () => {
     await waitFor(() => expect(api.cancelMeeting).toHaveBeenCalledWith(7, "leader@example.com"));
   });
 
-  it("does not offer a normal Google Calendar action for a cancelled meeting", () => {
+  it("offers a Google cancellation sync for a cancelled meeting", () => {
     render(<MeetingList meetings={[{ ...meeting, status: "cancelled" }]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
-    expect(screen.queryByRole("button", { name: "Thêm vào Google Calendar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Đồng bộ trạng thái hủy" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toBeInTheDocument();
   });
 
-  it("closes the pre-opened tab when the calendar API fails", async () => {
-    vi.mocked(api.calendarLinks).mockRejectedValue(new Error("Không lấy được liên kết lịch"));
+  it("shows a clear error when Google Calendar sync fails", async () => {
+    vi.mocked(api.syncGoogleCalendar).mockRejectedValue(new Error("Tài khoản chưa kết nối Google Calendar"));
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
-    fireEvent.click(screen.getByRole("button", { name: "Thêm vào Google Calendar" }));
-    await screen.findByText("Không lấy được liên kết lịch");
-    expect(popup.close).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("button", { name: "Đồng bộ Google Calendar" }));
+    await screen.findByText("Tài khoản chưa kết nối Google Calendar");
+  });
+
+  it("opens meeting details from a dashboard join notification", () => {
+    const onFocusHandled = vi.fn();
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" focusMeetingId={7} onFocusHandled={onFocusHandled} />);
+    expect(screen.getByRole("dialog", { name: "Họp tích hợp lịch" })).toBeInTheDocument();
+    expect(onFocusHandled).toHaveBeenCalled();
   });
 });

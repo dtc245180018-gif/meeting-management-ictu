@@ -7,13 +7,15 @@ interface Props {
   meetings: Meeting[];
   onChanged: () => void;
   currentUserEmail: string;
+  focusMeetingId?: number | null;
+  onFocusHandled?: () => void;
 }
 
 function toLocalInput(value: string) {
   return toIctuDateTimeInput(value);
 }
 
-export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
+export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetingId, onFocusHandled }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -40,6 +42,14 @@ export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
   useEffect(() => {
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, []);
+
+  useEffect(() => {
+    if (!focusMeetingId) return;
+    const target = meetings.find((meeting) => meeting.id === focusMeetingId);
+    if (!target) return;
+    setDetails(target);
+    onFocusHandled?.();
+  }, [focusMeetingId, meetings, onFocusHandled]);
 
   const addEditParticipant = (value: string) => {
     const emails = value.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -109,19 +119,25 @@ export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
     }
   };
 
-  const addToGoogleCalendar = async (meeting: Meeting) => {
-    const popup = window.open("about:blank", "_blank");
-    if (!popup) {
-      setMessage("Trình duyệt đã chặn cửa sổ Google Calendar. Hãy cho phép popup rồi thử lại.");
-      return;
-    }
-    popup.opener = null;
+  const syncGoogleCalendar = async (meeting: Meeting) => {
     try {
-      const links = await api.calendarLinks(meeting.id);
-      popup.location.replace(links.google_url);
+      const result = await api.syncGoogleCalendar(meeting.id, currentUserEmail);
+      setMessage(result.sync_status === "deleted"
+        ? `Đã xóa sự kiện #${meeting.id} khỏi Google Calendar và gửi cập nhật hủy.`
+        : `Đã đồng bộ cuộc họp #${meeting.id} lên Google Calendar và gửi cập nhật tới khách mời.`);
+      onChanged();
     } catch (error) {
-      popup.close();
-      setMessage(error instanceof Error ? error.message : "Không thể mở Google Calendar");
+      setMessage(error instanceof Error ? error.message : "Không thể đồng bộ Google Calendar");
+    }
+  };
+
+  const respond = async (meeting: Meeting, response: "accepted" | "declined") => {
+    try {
+      await api.respondToInvitation(meeting.id, currentUserEmail, response);
+      setMessage(response === "accepted" ? `Bạn đã chấp nhận lời mời #${meeting.id}.` : `Bạn đã từ chối lời mời #${meeting.id}.`);
+      onChanged();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể phản hồi lời mời");
     }
   };
 
@@ -168,9 +184,11 @@ export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
               </div>
               <div className="item-actions">
                 <button onClick={() => setDetails(meeting)}>Xem chi tiết</button>
-                {meeting.status === "scheduled" && <button onClick={() => void addToGoogleCalendar(meeting)}>Thêm vào Google Calendar</button>}
+                {meeting.organizer_email === currentUserEmail.toLowerCase() && <button onClick={() => void syncGoogleCalendar(meeting)}>{meeting.status === "cancelled" ? "Đồng bộ trạng thái hủy" : meeting.google_calendar_event?.sync_status === "synced" ? "Đồng bộ lại Google Calendar" : "Đồng bộ Google Calendar"}</button>}
+                {meeting.google_calendar_event?.html_link && meeting.google_calendar_event.sync_status === "synced" && <a href={meeting.google_calendar_event.html_link} target="_blank" rel="noreferrer">Mở trên Google Calendar</a>}
                 <a className="calendar-download" href={api.calendarFileUrl(meeting.id)} download={`meeting-${meeting.id}.ics`}>Tải lịch Outlook/ICS</a>
               </div>
+              {meeting.google_calendar_event?.sync_status === "failed" && <p className="inline-error">Đồng bộ Google thất bại: {meeting.google_calendar_event.error_message}</p>}
               {meeting.participants.length > 0 && (
                 <div className="participants">
                   <strong>Lời mời</strong>
@@ -179,6 +197,12 @@ export function MeetingList({ meetings, onChanged, currentUserEmail }: Props) {
                       {participant.email} · {participant.status === "invited" ? "Đã mời" : participant.status === "accepted" ? "Đã xác nhận" : "Từ chối"}
                     </span>
                   ))}
+                  {meeting.status === "scheduled" && meeting.participants.some((participant) => participant.email === currentUserEmail.toLowerCase()) && (
+                    <div className="invitation-actions">
+                      <button className="accept-invitation" type="button" onClick={() => void respond(meeting, "accepted")}>Chấp nhận</button>
+                      <button className="decline-invitation" type="button" onClick={() => void respond(meeting, "declined")}>Từ chối</button>
+                    </div>
+                  )}
                 </div>
               )}
               {meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && (

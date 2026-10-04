@@ -5,6 +5,7 @@ import { RoomDirectory } from "./components/RoomDirectory";
 import { EquipmentDirectory } from "./components/EquipmentDirectory";
 import { AdminPanel } from "./components/AdminPanel";
 import { NotificationCenter } from "./components/NotificationCenter";
+import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
 import { api } from "./services/api";
 import type { Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
@@ -32,10 +33,15 @@ function initialRole(): UserRole {
   return matched ?? "admin";
 }
 
+function isMobileViewport() {
+  return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches;
+}
+
 export default function App() {
   const [page, setPage] = useState<Page>("overview");
   const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobileViewport);
+  const [focusedMeetingId, setFocusedMeetingId] = useState<number | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [historyMeetings, setHistoryMeetings] = useState<Meeting[]>([]);
@@ -58,6 +64,7 @@ export default function App() {
     setFilterEmail("");
     setCalendarEmailInput("");
     setLogoutMessage("");
+    if (isMobileViewport()) setSidebarCollapsed(true);
   };
 
   const loadMeetings = useCallback(async () => {
@@ -73,6 +80,17 @@ export default function App() {
     void loadMeetings();
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, [loadMeetings]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("google_calendar") === "connected") {
+      setPage("overview");
+      setLogoutMessage(`Đã kết nối Google Calendar cho ${params.get("email") ?? "tài khoản hiện tại"}.`);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (params.has("meeting")) {
+      setPage("calendar");
+    }
+  }, []);
 
   useEffect(() => {
     const email = filterEmail.trim();
@@ -162,6 +180,7 @@ export default function App() {
 
   const goTo = (nextPage: Page) => {
     setPage(nextPage);
+    if (isMobileViewport()) setSidebarCollapsed(true);
   };
 
   const showLogoutMessage = () => {
@@ -181,6 +200,21 @@ export default function App() {
     setFilterStatus("scheduled");
     setHistoryPage(1);
     setPage("calendar");
+    if (isMobileViewport()) setSidebarCollapsed(true);
+  };
+
+  const openMeetingFromNotification = (meetingId: number) => {
+    setCalendarMode("all");
+    setCalendarEmailInput(activeUser.email);
+    setFilterEmail(activeUser.email);
+    setFilterStatus("scheduled");
+    setFilterFrom("");
+    setFilterTo("");
+    const meetingIndex = meetings.findIndex((meeting) => meeting.id === meetingId);
+    setHistoryPage(meetingIndex >= 0 ? Math.floor(meetingIndex / pageSize) + 1 : 1);
+    setFocusedMeetingId(meetingId);
+    setPage("calendar");
+    if (isMobileViewport()) setSidebarCollapsed(true);
   };
 
   const renderHistoryFilters = () => (
@@ -222,7 +256,7 @@ export default function App() {
 
   const renderMeetings = (items: Meeting[], showPagination = false) => (
     <>
-      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} />
+      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} focusMeetingId={focusedMeetingId} onFocusHandled={() => setFocusedMeetingId(null)} />
       {showPagination && totalPages > 1 && (
         <div className="pagination" aria-label="Phân trang lịch sử">
           <button disabled={historyPage === 1} onClick={() => setHistoryPage((current) => current - 1)}>Trước</button>
@@ -235,6 +269,7 @@ export default function App() {
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      {!sidebarCollapsed && <button className="sidebar-backdrop" type="button" aria-label="Đóng thanh điều hướng" onClick={() => setSidebarCollapsed(true)} />}
       <aside className="sidebar" aria-label="Điều hướng chính">
         <div className="sidebar-brand">
           <img className="sidebar-logo" src="/assets/ICTU.png" alt="ICTU" />
@@ -335,7 +370,7 @@ export default function App() {
             </div>
           </section>
         )}
-        {page === "overview" && <div className="page-layout"><NotificationCenter email={activeUser.email} /></div>}
+        {page === "overview" && <div className="page-layout integrations-grid"><GoogleCalendarPanel email={activeUser.email} /><NotificationCenter email={activeUser.email} onOpenMeeting={openMeetingFromNotification} /></div>}
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}

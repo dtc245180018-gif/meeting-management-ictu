@@ -75,6 +75,30 @@ export interface Meeting {
   participants: Participant[];
   booking?: Booking;
   equipment_bookings?: EquipmentBooking[];
+  google_calendar_event?: GoogleCalendarEvent;
+}
+
+export interface GoogleCalendarEvent {
+  sync_status: "pending" | "synced" | "failed" | "deleted";
+  html_link?: string;
+  error_message?: string;
+  synced_at?: string;
+}
+
+export interface GoogleConnectionStatus {
+  configured: boolean;
+  connected: boolean;
+  user_email: string;
+  google_email?: string;
+  connected_at?: string;
+  missing_settings: string[];
+}
+
+export interface EmailIntegrationStatus {
+  backend: "console" | "smtp";
+  configured: boolean;
+  sender?: string;
+  detail: string;
 }
 
 export interface MeetingInput {
@@ -107,6 +131,9 @@ export interface Notification {
   meeting_id: number;
   recipient_email: string;
   channel: string;
+  kind: "reminder" | "meeting_starting" | "invitation" | "meeting_updated" | "meeting_cancelled" | "invitation_response";
+  subject?: string;
+  body?: string;
   remind_at: string;
   status: "pending" | "sent" | "failed" | "cancelled";
   attempts: number;
@@ -115,6 +142,9 @@ export interface Notification {
   created_at: string;
   sent_at?: string;
   meeting_title?: string;
+  meeting_start_time?: string;
+  meeting_end_time?: string;
+  room_name?: string;
 }
 
 export interface RoomAdminInput {

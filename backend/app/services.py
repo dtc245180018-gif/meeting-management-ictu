@@ -28,6 +28,7 @@ def meeting_query():
         selectinload(models.Meeting.booking).selectinload(models.RoomBooking.room),
         selectinload(models.Meeting.equipment_bookings).selectinload(models.EquipmentBooking.equipment),
         selectinload(models.Meeting.reminders),
+        selectinload(models.Meeting.google_calendar_event),
     )
 
 
@@ -194,7 +195,7 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
             meetings.append(meeting)
             if room is not None:
                 meeting.booking = models.RoomBooking(
-                    room_id=room.id,
+                    room=room,
                     start_time=start_time,
                     end_time=end_time,
                 )
@@ -212,6 +213,13 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
                 payload.reminder_minutes,
             )
 
+        # IDs are required for durable notification idempotency keys. Flushing
+        # still keeps meetings, bookings and notifications inside one commit.
+        db.flush()
+        for meeting in meetings:
+            reminders.add_invitation_notifications(meeting, participant_emails)
+            reminders.sync_meeting_starting_notifications(meeting, people)
+
         # One commit for meetings, rooms, equipment and reminders.
         db.commit()
         ids = [meeting.id for meeting in meetings]
@@ -226,6 +234,7 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể sửa cuộc họp đã hủy")
 
     old_start = meeting.start_time
+    old_participant_emails = {participant.email for participant in meeting.participants}
     new_start = payload.start_time or meeting.start_time
     new_end = payload.end_time or meeting.end_time
     if new_end <= new_start:
@@ -353,13 +362,30 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
 
     reminder_field_supplied = "reminder_minutes" in payload.model_fields_set
     if reminder_field_supplied and payload.reminder_minutes is None:
-        reminders.cancel_pending_reminders(meeting)
+        reminders.cancel_pending_reminders(meeting, {models.NotificationKind.REMINDER})
     else:
         reminders.sync_pending_reminders(
             meeting,
             [meeting.organizer_email, *participant_emails],
             old_start,
             payload.reminder_minutes,
+        )
+
+    reminders.sync_meeting_starting_notifications(
+        meeting,
+        [meeting.organizer_email, *participant_emails],
+    )
+
+    notification_changes = payload.model_fields_set - {"requester_email", "reminder_minutes"}
+    if notification_changes:
+        current_emails = set(participant_emails)
+        added_emails = sorted(current_emails - old_participant_emails)
+        removed_emails = sorted(old_participant_emails - current_emails)
+        reminders.add_invitation_notifications(meeting, added_emails)
+        reminders.add_update_notifications(
+            meeting,
+            sorted(current_emails - set(added_emails)),
+            removed_emails,
         )
 
     db.commit()
@@ -376,6 +402,37 @@ def cancel_meeting(db: Session, meeting_id: int, requester_email: str) -> models
     for booking in meeting.equipment_bookings:
         booking.status = models.BookingStatus.CANCELLED
     reminders.cancel_pending_reminders(meeting)
+    reminders.add_cancellation_notifications(
+        meeting,
+        [participant.email for participant in meeting.participants],
+    )
+    db.commit()
+    return get_meeting_or_404(db, meeting_id)
+
+
+def respond_to_invitation(
+    db: Session,
+    meeting_id: int,
+    email: str,
+    response: models.InvitationStatus,
+) -> models.Meeting:
+    meeting = get_meeting_or_404(db, meeting_id)
+    if meeting.status != models.MeetingStatus.SCHEDULED:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể phản hồi cuộc họp đã hủy")
+    normalized = email.strip().lower()
+    participant = next((item for item in meeting.participants if item.email == normalized), None)
+    if participant is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có lời mời trong cuộc họp này")
+    if response not in {models.InvitationStatus.ACCEPTED, models.InvitationStatus.DECLINED}:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Trạng thái phản hồi không hợp lệ")
+    participant.status = response
+    active_recipients = [
+        meeting.organizer_email,
+        *(item.email for item in meeting.participants if item.status != models.InvitationStatus.DECLINED),
+    ]
+    reminders.sync_pending_reminders(meeting, active_recipients, meeting.start_time)
+    reminders.sync_meeting_starting_notifications(meeting, active_recipients)
+    reminders.add_response_notification(meeting, normalized, response)
     db.commit()
     return get_meeting_or_404(db, meeting_id)
 
@@ -761,11 +818,22 @@ def deactivate_admin_equipment(db: Session, equipment_id: int, requester_email: 
 
 def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]:
     normalized = email.strip().lower()
+    now = datetime.now(timezone.utc)
     items = list(
         db.scalars(
             select(models.Reminder)
-            .options(selectinload(models.Reminder.meeting))
-            .where(models.Reminder.recipient_email == normalized)
+            .options(
+                selectinload(models.Reminder.meeting)
+                .selectinload(models.Meeting.booking)
+                .selectinload(models.RoomBooking.room)
+            )
+            .where(
+                models.Reminder.recipient_email == normalized,
+                or_(
+                    models.Reminder.kind != models.NotificationKind.MEETING_STARTING,
+                    models.Reminder.remind_at <= now,
+                ),
+            )
             .order_by(models.Reminder.remind_at.desc())
         ).all()
     )
@@ -775,6 +843,9 @@ def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]
             meeting_id=item.meeting_id,
             recipient_email=item.recipient_email,
             channel=item.channel,
+            kind=item.kind,
+            subject=item.subject,
+            body=item.body,
             remind_at=item.remind_at,
             status=item.status,
             attempts=item.attempts,
@@ -783,6 +854,9 @@ def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]
             created_at=item.created_at,
             sent_at=item.sent_at,
             meeting_title=item.meeting.title,
+            meeting_start_time=item.meeting.start_time,
+            meeting_end_time=item.meeting.end_time,
+            room_name=item.meeting.booking.room.name if item.meeting.booking and item.meeting.booking.room else None,
         )
         for item in items
     ]
@@ -806,6 +880,9 @@ def mark_notification_read(db: Session, notification_id: int, email: str) -> sch
         meeting_id=item.meeting_id,
         recipient_email=item.recipient_email,
         channel=item.channel,
+        kind=item.kind,
+        subject=item.subject,
+        body=item.body,
         remind_at=item.remind_at,
         status=item.status,
         attempts=item.attempts,
@@ -814,4 +891,7 @@ def mark_notification_read(db: Session, notification_id: int, email: str) -> sch
         created_at=item.created_at,
         sent_at=item.sent_at,
         meeting_title=item.meeting.title,
+        meeting_start_time=item.meeting.start_time,
+        meeting_end_time=item.meeting.end_time,
+        room_name=item.meeting.booking.room.name if item.meeting.booking and item.meeting.booking.room else None,
     )
