@@ -248,6 +248,13 @@ input:disabled { background: #eef2f6; }
 .invitation-actions button { padding: 7px 11px; border: 1px solid #c9d7e4; border-radius: 4px; background: #fff; font-size: .74rem; font-weight: 800; }
 .invitation-actions .accept-invitation { border-color: #8ac9a4; color: #17633a; background: #eaf7ef; }
 .invitation-actions .decline-invitation { border-color: #efb5b5; color: #9a2f2f; background: #fff1f1; }
+.invitation-actions .accept-invitation:disabled { cursor: default; opacity: 1; }
+.invitation-actions .busy-invitation { border-color: #e7bd67; color: #7a4b00; background: #fff7e4; }
+.busy-modal { max-width: 560px; }
+.busy-contact-card { display: grid; gap: 4px; margin: 14px 0; padding: 14px 16px; border: 1px solid #d8e4ed; border-radius: 6px; background: #f4f9fc; }
+.busy-contact-card span { color: #667f92; font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.busy-contact-card strong { color: var(--ictu-navy); overflow-wrap: anywhere; }
+.item-actions .busy-email-link { display: inline-flex; align-items: center; padding: 7px 10px; border: 1px solid var(--ictu-blue); border-radius: 3px; color: #fff; background: var(--ictu-blue); font-size: .76rem; font-weight: 700; text-decoration: none; }
 .participant { width: fit-content; padding: 4px 7px; border-radius: 3px; background: #fff6e6; }
 .participant.accepted { background: #e3f6eb; color: #15734a; }
 .participant.declined { background: #fbe7e7; color: #9c3c3c; }
