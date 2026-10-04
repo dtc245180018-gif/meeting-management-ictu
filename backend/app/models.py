@@ -80,6 +80,11 @@ class GoogleSyncStatus(StrEnum):
     DELETED = "deleted"
 
 
+class AccountRole(StrEnum):
+    ADMIN = "admin"
+    EMPLOYEE = "employee"
+
+
 class Meeting(Base):
     __tablename__ = "meetings"
 
@@ -135,6 +140,48 @@ class Employee(Base):
     email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     department: Mapped[str] = mapped_column(String(160), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    account: Mapped[UserAccount | None] = relationship(
+        back_populates="employee", cascade="all, delete-orphan", uselist=False
+    )
+
+
+class UserAccount(Base):
+    """Authentication-ready account data for the Sprint 3 login flow.
+
+    Sprint 2 does not expose login endpoints yet. Passwords are stored only as
+    salted hashes so the account table can be reused safely when authentication
+    is implemented.
+    """
+
+    __tablename__ = "user_accounts"
+    __table_args__ = (
+        UniqueConstraint("employee_id", name="uq_user_account_employee"),
+        UniqueConstraint("email", name="uq_user_account_email"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    employee_id: Mapped[int] = mapped_column(
+        ForeignKey("employees.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    role: Mapped[AccountRole] = mapped_column(
+        Enum(AccountRole), default=AccountRole.EMPLOYEE, nullable=False
+    )
+    must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    employee: Mapped[Employee] = relationship(back_populates="account")
 
 
 class Room(Base):

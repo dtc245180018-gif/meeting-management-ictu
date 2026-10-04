@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     google_token_encryption_key: str = ""
     google_oauth_state_secret: str = ""
     google_calendar_id: str = "primary"
+    sprint3_seed_accounts: bool = True
+    sprint3_credentials_file: str = "sprint3_credentials.local.csv"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

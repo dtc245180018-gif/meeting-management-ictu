@@ -16,6 +16,7 @@ dist/
 .env
 backend/.env
 frontend/.env
+backend/sprint3_credentials.local.*
 
 # IDE / OS
 .idea/

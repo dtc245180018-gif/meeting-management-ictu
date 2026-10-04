@@ -28,6 +28,10 @@ Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo
 Không thuộc Sprint 2: đăng nhập, quản lý tài khoản, phân quyền đầy đủ, báo cáo,
 mobile, chatbot, QR check-in và tích hợp HRM/ERP.
 
+Nền móng dữ liệu đăng nhập cho Sprint 3 đã được chuẩn bị: mỗi nhân viên có một
+tài khoản, mật khẩu chỉ lưu dạng băm và phải đổi ở lần đăng nhập đầu. Sprint 2
+chưa có endpoint đăng nhập/token; xem [docs/SPRINT3_ACCOUNT_FOUNDATION.md](docs/SPRINT3_ACCOUNT_FOUNDATION.md).
+
 ## Công nghệ
 
 - Frontend: React, TypeScript, Vite.
@@ -169,6 +173,16 @@ python scripts/reset_demo_data.py
 
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
 Kịch bản nghiệm thu đầy đủ US09–US16 nằm tại [docs/DEMO_SPRINT2.md](docs/DEMO_SPRINT2.md).
+
+Để tạo tài khoản và mật khẩu tạm cho toàn bộ nhân viên trước Sprint 3:
+
+```powershell
+cd backend
+python scripts/prepare_sprint3_accounts.py
+```
+
+Danh sách mật khẩu được lưu trong `backend/sprint3_credentials.local.csv` và bị
+Git bỏ qua; repository chỉ chứa mật khẩu đã băm trong database local.
 
 ## Quy ước Git
 

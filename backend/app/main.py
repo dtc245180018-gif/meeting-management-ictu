@@ -1,5 +1,7 @@
 import asyncio
+import csv
 from contextlib import asynccontextmanager, suppress
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +11,7 @@ from . import models, reminders
 from .api import router
 from .config import get_settings
 from .database import Base, SessionLocal, engine
+from .passwords import generate_temporary_password, hash_password
 
 
 LEGACY_EMAIL_GROUPS = (
@@ -82,10 +85,25 @@ def migrate_employee_emails() -> None:
 
             old_employee = db.scalar(select(models.Employee).where(models.Employee.email == old_email))
             new_employee = db.scalar(select(models.Employee).where(models.Employee.email == new_email))
+            old_account = db.scalar(
+                select(models.UserAccount).where(models.UserAccount.email == old_email)
+            )
+            new_account = db.scalar(
+                select(models.UserAccount).where(models.UserAccount.email == new_email)
+            )
             if old_employee and new_employee and old_employee.id != new_employee.id:
+                if old_account and not new_account:
+                    old_account.employee = new_employee
+                    old_account.email = new_email
+                elif old_account:
+                    db.delete(old_account)
                 db.delete(old_employee)
             elif old_employee:
                 old_employee.email = new_email
+                if old_account:
+                    old_account.email = new_email
+            elif old_account and not new_account:
+                old_account.email = new_email
         db.commit()
 
 
@@ -130,6 +148,111 @@ def seed_employees() -> None:
         if new_employees:
             db.add_all(new_employees)
             db.commit()
+
+
+def _write_sprint3_credentials(path: Path, credentials: list[dict[str, str]]) -> None:
+    """Merge generated credentials into a local, Git-ignored CSV file."""
+    fieldnames = [
+        "full_name",
+        "email",
+        "temporary_password",
+        "role",
+        "must_change_password",
+    ]
+    existing: dict[str, dict[str, str]] = {}
+    if path.exists():
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            for row in csv.DictReader(source):
+                email = (row.get("email") or "").strip().lower()
+                if email:
+                    existing[email] = {field: row.get(field, "") for field in fieldnames}
+
+    for credential in credentials:
+        existing[credential["email"]] = credential
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_path = path.with_suffix(f"{path.suffix}.tmp")
+    with temporary_path.open("w", encoding="utf-8-sig", newline="") as target:
+        writer = csv.DictWriter(target, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(
+            sorted(
+                existing.values(),
+                key=lambda row: (row["role"] != models.AccountRole.ADMIN.value, row["full_name"]),
+            )
+        )
+    temporary_path.replace(path)
+
+
+def seed_user_accounts() -> int:
+    """Create one password-hashed Sprint 3 account for every active employee."""
+    settings = get_settings()
+    if not settings.sprint3_seed_accounts:
+        return 0
+
+    admin_emails = settings.admin_email_list | {settings.leader_email.strip().lower()}
+    credentials: list[dict[str, str]] = []
+    created_accounts: list[models.UserAccount] = []
+
+    with SessionLocal() as db:
+        employees = db.scalars(
+            select(models.Employee)
+            .where(models.Employee.is_active.is_(True))
+            .order_by(models.Employee.id)
+        ).all()
+        accounts_by_employee = {
+            account.employee_id: account
+            for account in db.scalars(select(models.UserAccount)).all()
+        }
+
+        for employee in employees:
+            email = employee.email.strip().lower()
+            role = (
+                models.AccountRole.ADMIN
+                if email in admin_emails
+                else models.AccountRole.EMPLOYEE
+            )
+            existing = accounts_by_employee.get(employee.id)
+            if existing:
+                existing.email = email
+                existing.role = role
+                existing.is_active = employee.is_active
+                continue
+
+            temporary_password = generate_temporary_password()
+            account = models.UserAccount(
+                employee=employee,
+                email=email,
+                password_hash=hash_password(temporary_password),
+                role=role,
+                must_change_password=True,
+                is_active=True,
+            )
+            db.add(account)
+            created_accounts.append(account)
+            credentials.append(
+                {
+                    "full_name": employee.full_name,
+                    "email": email,
+                    "temporary_password": temporary_password,
+                    "role": role.value,
+                    "must_change_password": "true",
+                }
+            )
+
+        db.commit()
+
+        if credentials:
+            credentials_path = Path(settings.sprint3_credentials_file).expanduser()
+            try:
+                _write_sprint3_credentials(credentials_path, credentials)
+            except Exception:
+                for account in created_accounts:
+                    db.delete(account)
+                db.commit()
+                raise
+
+    return len(created_accounts)
 
 
 def seed_equipment() -> None:
@@ -206,6 +329,7 @@ async def lifespan(_: FastAPI):
     migrate_employee_emails()
     seed_rooms()
     seed_employees()
+    seed_user_accounts()
     seed_equipment()
     reminders.backfill_meeting_starting_notifications()
     worker = asyncio.create_task(reminder_worker())

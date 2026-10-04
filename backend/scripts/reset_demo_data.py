@@ -19,7 +19,14 @@ from sqlalchemy import delete
 
 from app import models
 from app.database import Base, SessionLocal, engine
-from app.main import apply_schema_migrations, migrate_employee_emails, seed_employees, seed_equipment, seed_rooms
+from app.main import (
+    apply_schema_migrations,
+    migrate_employee_emails,
+    seed_employees,
+    seed_equipment,
+    seed_rooms,
+    seed_user_accounts,
+)
 
 
 def main() -> None:
@@ -35,13 +42,16 @@ def main() -> None:
         db.execute(delete(models.Meeting))
         db.execute(delete(models.Room))
         db.execute(delete(models.Equipment))
-        db.execute(delete(models.Employee))
         db.commit()
 
     seed_rooms()
     seed_employees()
+    seed_user_accounts()
     seed_equipment()
-    print("Demo database reset: meetings, reminders and bookings cleared; rooms, equipment and employees restored.")
+    print(
+        "Demo database reset: meetings, reminders and bookings cleared; "
+        "rooms, equipment and employees restored; Sprint 3 accounts preserved."
+    )
 
 
 if __name__ == "__main__":
