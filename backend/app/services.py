@@ -402,6 +402,7 @@ def cancel_meeting(db: Session, meeting_id: int, requester_email: str) -> models
     for booking in meeting.equipment_bookings:
         booking.status = models.BookingStatus.CANCELLED
     reminders.cancel_pending_reminders(meeting)
+    reminders.cancel_meeting_starting_notifications(meeting)
     reminders.add_cancellation_notifications(
         meeting,
         [participant.email for participant in meeting.participants],
@@ -816,6 +817,37 @@ def deactivate_admin_equipment(db: Session, equipment_id: int, requester_email: 
     return equipment_to_out(db, equipment)
 
 
+def notification_to_out(item: models.Reminder, now: datetime | None = None) -> schemas.NotificationOut:
+    current = now or datetime.now(timezone.utc)
+    meeting = item.meeting
+    return schemas.NotificationOut(
+        id=item.id,
+        meeting_id=item.meeting_id,
+        recipient_email=item.recipient_email,
+        channel=item.channel,
+        kind=item.kind,
+        subject=item.subject,
+        body=item.body,
+        remind_at=item.remind_at,
+        status=item.status,
+        attempts=item.attempts,
+        error_message=item.error_message,
+        is_read=item.is_read,
+        created_at=item.created_at,
+        sent_at=item.sent_at,
+        meeting_title=meeting.title,
+        meeting_start_time=meeting.start_time,
+        meeting_end_time=meeting.end_time,
+        room_name=meeting.booking.room.name if meeting.booking and meeting.booking.room else None,
+        can_join=(
+            item.kind == models.NotificationKind.MEETING_STARTING
+            and item.status != models.NotificationStatus.CANCELLED
+            and meeting.status == models.MeetingStatus.SCHEDULED
+            and meeting.end_time > current
+        ),
+    )
+
+
 def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]:
     normalized = email.strip().lower()
     now = datetime.now(timezone.utc)
@@ -837,35 +869,17 @@ def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]
             .order_by(models.Reminder.remind_at.desc())
         ).all()
     )
-    return [
-        schemas.NotificationOut(
-            id=item.id,
-            meeting_id=item.meeting_id,
-            recipient_email=item.recipient_email,
-            channel=item.channel,
-            kind=item.kind,
-            subject=item.subject,
-            body=item.body,
-            remind_at=item.remind_at,
-            status=item.status,
-            attempts=item.attempts,
-            error_message=item.error_message,
-            is_read=item.is_read,
-            created_at=item.created_at,
-            sent_at=item.sent_at,
-            meeting_title=item.meeting.title,
-            meeting_start_time=item.meeting.start_time,
-            meeting_end_time=item.meeting.end_time,
-            room_name=item.meeting.booking.room.name if item.meeting.booking and item.meeting.booking.room else None,
-        )
-        for item in items
-    ]
+    return [notification_to_out(item, now) for item in items]
 
 
 def mark_notification_read(db: Session, notification_id: int, email: str) -> schemas.NotificationOut:
     item = db.scalar(
         select(models.Reminder)
-        .options(selectinload(models.Reminder.meeting))
+        .options(
+            selectinload(models.Reminder.meeting)
+            .selectinload(models.Meeting.booking)
+            .selectinload(models.RoomBooking.room)
+        )
         .where(models.Reminder.id == notification_id)
     )
     if not item:
@@ -875,23 +889,4 @@ def mark_notification_read(db: Session, notification_id: int, email: str) -> sch
     item.is_read = True
     db.commit()
     db.refresh(item)
-    return schemas.NotificationOut(
-        id=item.id,
-        meeting_id=item.meeting_id,
-        recipient_email=item.recipient_email,
-        channel=item.channel,
-        kind=item.kind,
-        subject=item.subject,
-        body=item.body,
-        remind_at=item.remind_at,
-        status=item.status,
-        attempts=item.attempts,
-        error_message=item.error_message,
-        is_read=item.is_read,
-        created_at=item.created_at,
-        sent_at=item.sent_at,
-        meeting_title=item.meeting.title,
-        meeting_start_time=item.meeting.start_time,
-        meeting_end_time=item.meeting.end_time,
-        room_name=item.meeting.booking.room.name if item.meeting.booking and item.meeting.booking.room else None,
-    )
+    return notification_to_out(item)

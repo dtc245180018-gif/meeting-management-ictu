@@ -145,6 +145,7 @@ export interface Notification {
   meeting_start_time?: string;
   meeting_end_time?: string;
   room_name?: string;
+  can_join: boolean;
 }
 
 export interface RoomAdminInput {

@@ -123,10 +123,12 @@ Mọi thời điểm được lưu và trả về API ở UTC có offset rõ rà
 SQLite. Giao diện luôn nhập và hiển thị theo múi giờ `Asia/Ho_Chi_Minh`, vì vậy
 kết quả không phụ thuộc múi giờ của máy đang mở trình duyệt.
 
-Ở trang Tổng quan, thẻ **Thông báo của bạn** tự làm mới mỗi 15 giây và hiển thị
-lời mời, thay đổi, hủy lịch, phản hồi và reminder của vai trò đang chọn. Trạng
-thái `Đang chờ gửi`/`Đã gửi`/`Gửi thất bại` phản ánh hàng đợi email; bấm từng
-dòng để đánh dấu đã đọc.
+Trang **Thông báo** riêng tự làm mới mỗi 15 giây, nhóm nội dung theo ngày và hiển
+thị mốc ngày/giờ cho lời mời, thay đổi, hủy lịch, phản hồi và reminder của vai
+trò đang chọn. Trạng thái `Đang chờ gửi`/`Đã gửi`/`Gửi thất bại` phản ánh hàng
+đợi email; bấm từng dòng để đánh dấu đã đọc. Thông báo cũ tự động bị xóa sau 30
+ngày. Thanh điều hướng hiển thị dấu chấm đỏ khi có thông báo chưa đọc hoặc lịch
+họp mới; thông báo của cuộc họp đã hủy/hết giờ không cho phép bấm **Vào họp**.
 
 `EMAIL_BACKEND=console` chỉ mô phỏng việc gửi bằng cách ghi nội dung vào log.
 Muốn gửi email thật phải cấu hình `EMAIL_BACKEND=smtp` cùng các biến SMTP nêu

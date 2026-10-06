@@ -385,6 +385,7 @@ class NotificationOut(BaseModel):
     meeting_start_time: datetime | None = None
     meeting_end_time: datetime | None = None
     room_name: str | None = None
+    can_join: bool = False
 
 
 class NotificationReadRequest(BaseModel):

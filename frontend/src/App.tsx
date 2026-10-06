@@ -13,7 +13,7 @@ import { loadAllHistory } from "./utils/historyPagination";
 import { formatIctuDateTime } from "./utils/dateTime";
 import { countPendingInvitations, scopeDashboardMeetings } from "./utils/dashboard";
 
-type Page = "overview" | "create" | "calendar" | "rooms" | "equipment" | "admin";
+type Page = "overview" | "create" | "calendar" | "notifications" | "rooms" | "equipment" | "admin";
 
 const CURRENT_USER_EMAIL = import.meta.env.VITE_CURRENT_USER_EMAIL ?? "";
 const EMPLOYEE_ONE_EMAIL = import.meta.env.VITE_EMPLOYEE_ONE_EMAIL || "employee.one@example.com";
@@ -55,6 +55,8 @@ export default function App() {
   const [historyPage, setHistoryPage] = useState(1);
   const [error, setError] = useState("");
   const [logoutMessage, setLogoutMessage] = useState("");
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [lastSeenMeetingId, setLastSeenMeetingId] = useState(0);
   const pageSize = 5;
   const activeUser = ROLE_USERS[activeRole];
 
@@ -79,7 +81,32 @@ export default function App() {
   useEffect(() => {
     void loadMeetings();
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
+    const timer = window.setInterval(() => { void loadMeetings(); }, 15_000);
+    return () => window.clearInterval(timer);
   }, [loadMeetings]);
+
+  useEffect(() => {
+    let active = true;
+    const loadBadge = async () => {
+      try {
+        const notifications = await api.notifications(activeUser.email);
+        if (active) setUnreadNotificationCount(notifications.filter((item) => !item.is_read).length);
+      } catch {
+        if (active) setUnreadNotificationCount(0);
+      }
+    };
+    void loadBadge();
+    const timer = window.setInterval(() => { void loadBadge(); }, 15_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [activeUser.email]);
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(`meeting-last-seen:${activeUser.email.toLowerCase()}`);
+    setLastSeenMeetingId(Number(stored) || 0);
+  }, [activeUser.email]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -170,6 +197,13 @@ export default function App() {
   const booked = upcomingMeetings.filter((meeting) => meeting.booking?.status === "active").length;
   const withoutRoom = upcomingMeetings.filter((meeting) => !meeting.booking).length;
   const pendingInvites = countPendingInvitations(upcomingMeetings, activeUser.email, activeRole === "admin");
+  const newestMeetingId = scopedMeetings.reduce((latest, meeting) => Math.max(latest, meeting.id), 0);
+  const hasNewMeetings = newestMeetingId > lastSeenMeetingId;
+  useEffect(() => {
+    if (page !== "calendar" || !newestMeetingId) return;
+    setLastSeenMeetingId(newestMeetingId);
+    window.localStorage.setItem(`meeting-last-seen:${activeUser.email.toLowerCase()}`, String(newestMeetingId));
+  }, [page, newestMeetingId, activeUser.email]);
   const recentMeetings = upcomingMeetings.slice(0, 5);
   const calendarEmployeeSuggestions = employees
     .filter((employee) => {
@@ -178,7 +212,14 @@ export default function App() {
     })
     .slice(0, 6);
 
+  const markMeetingsSeen = () => {
+    if (!newestMeetingId) return;
+    setLastSeenMeetingId(newestMeetingId);
+    window.localStorage.setItem(`meeting-last-seen:${activeUser.email.toLowerCase()}`, String(newestMeetingId));
+  };
+
   const goTo = (nextPage: Page) => {
+    if (nextPage === "calendar") markMeetingsSeen();
     setPage(nextPage);
     if (isMobileViewport()) setSidebarCollapsed(true);
   };
@@ -199,6 +240,7 @@ export default function App() {
     setFilterEmail(activeUser.email);
     setFilterStatus("scheduled");
     setHistoryPage(1);
+    markMeetingsSeen();
     setPage("calendar");
     if (isMobileViewport()) setSidebarCollapsed(true);
   };
@@ -213,6 +255,7 @@ export default function App() {
     const meetingIndex = meetings.findIndex((meeting) => meeting.id === meetingId);
     setHistoryPage(meetingIndex >= 0 ? Math.floor(meetingIndex / pageSize) + 1 : 1);
     setFocusedMeetingId(meetingId);
+    markMeetingsSeen();
     setPage("calendar");
     if (isMobileViewport()) setSidebarCollapsed(true);
   };
@@ -278,7 +321,8 @@ export default function App() {
         <nav className="side-nav">
           <button className={page === "overview" ? "active" : ""} title="Tổng quan" aria-current={page === "overview" ? "page" : undefined} onClick={() => goTo("overview")}><span className="nav-icon">⌂</span><span className="nav-label">Tổng quan</span></button>
           <button className={page === "create" ? "active" : ""} title="Tạo lịch họp" aria-current={page === "create" ? "page" : undefined} onClick={() => goTo("create")}><span className="nav-icon">＋</span><span className="nav-label">Tạo lịch họp</span></button>
-          <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon">▣</span><span className="nav-label">Lịch họp</span></button>
+          <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon nav-icon-indicator">▣{hasNewMeetings && <span className="nav-dot" aria-label="Có lịch họp mới" />}</span><span className="nav-label">Lịch họp</span></button>
+          <button className={page === "notifications" ? "active" : ""} title="Thông báo" aria-current={page === "notifications" ? "page" : undefined} onClick={() => goTo("notifications")}><span className="nav-icon nav-icon-indicator">♢{unreadNotificationCount > 0 && <span className="nav-dot" aria-label="Có thông báo mới" />}</span><span className="nav-label">Thông báo</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
           <button className={page === "equipment" ? "active" : ""} title="Thiết bị" aria-current={page === "equipment" ? "page" : undefined} onClick={() => goTo("equipment")}><span className="nav-icon">⚙</span><span className="nav-label">Thiết bị</span></button>
           {activeRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
@@ -350,7 +394,7 @@ export default function App() {
             <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
             <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
             <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={showMyInvitations}>Xem lời mời →</button></div>
-            <div className="overview-card"><span>Thao tác nhanh</span><strong>＋</strong><button onClick={() => goTo("create")}>Tạo lịch họp mới →</button></div>
+            <div className="overview-card"><span>Thông báo chưa đọc</span><strong>{unreadNotificationCount}</strong><button onClick={() => goTo("notifications")}>Quản lý thông báo →</button></div>
           </section>
         )}
         {page === "overview" && (
@@ -370,10 +414,11 @@ export default function App() {
             </div>
           </section>
         )}
-        {page === "overview" && <div className="page-layout integrations-grid"><GoogleCalendarPanel email={activeUser.email} /><NotificationCenter email={activeUser.email} onOpenMeeting={openMeetingFromNotification} /></div>}
+        {page === "overview" && <div className="page-layout"><GoogleCalendarPanel email={activeUser.email} /></div>}
         <div className="page-layout">
           {page === "create" && <MeetingForm onCreated={loadMeetings} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
+          {page === "notifications" && <NotificationCenter email={activeUser.email} onOpenMeeting={openMeetingFromNotification} onUnreadCountChange={setUnreadNotificationCount} />}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
           {page === "equipment" && <EquipmentDirectory />}
           {page === "admin" && activeRole === "admin" && <AdminPanel adminEmail={activeUser.email} />}

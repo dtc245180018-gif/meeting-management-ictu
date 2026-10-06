@@ -184,6 +184,8 @@ Mã ca: `TC-S2-09-01`.
 6. Tải lại ICS: phải có `METHOD:CANCEL` và `STATUS:CANCELLED`.
 7. Hủy lại cùng cuộc họp: thao tác idempotent, không lỗi 500 và không tạo thông
    báo hủy trùng.
+8. Mở trang **Thông báo**: reminder cũ của cuộc họp đã hủy không còn nút **Vào
+   họp**; thông báo được nhóm theo ngày và có mốc ngày/giờ rõ ràng.
 
 Kết quả đạt: meeting, phòng, thiết bị, reminder và Google Calendar cùng phản ánh
 trạng thái hủy; tài nguyên được giải phóng.
