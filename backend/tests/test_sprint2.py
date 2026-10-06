@@ -341,8 +341,78 @@ def test_employee_gets_automatic_join_notification_only_when_it_is_due(client):
     ).json()
     alert_out = next(item for item in after_due if item["kind"] == "meeting_starting")
     assert alert_out["status"] == "sent"
+    assert alert_out["can_join"] is True
     assert alert_out["meeting_title"] == "Họp Sprint 2"
     assert alert_out["meeting_start_time"] == meeting["start_time"]
+
+
+def test_cancelling_meeting_disables_an_already_sent_join_notification(client):
+    start = datetime.now(timezone.utc) + timedelta(minutes=10)
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        start_time=start,
+        reminder_minutes=None,
+    )).json()[0]
+
+    with SessionLocal() as db:
+        alert = db.query(models.Reminder).filter(
+            models.Reminder.meeting_id == meeting["id"],
+            models.Reminder.recipient_email == "employee.one@example.com",
+            models.Reminder.kind == models.NotificationKind.MEETING_STARTING,
+        ).one()
+        alert.remind_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        db.commit()
+        process_due_reminders(db)
+
+    delivered = client.get(
+        "/api/notifications", params={"email": "employee.one@example.com"}
+    ).json()
+    assert next(item for item in delivered if item["kind"] == "meeting_starting")["can_join"] is True
+
+    cancelled = client.post(
+        f"/api/meetings/{meeting['id']}/cancel",
+        json={"requester_email": ADMIN},
+    )
+    assert cancelled.status_code == 200
+
+    after_cancel = client.get(
+        "/api/notifications", params={"email": "employee.one@example.com"}
+    ).json()
+    alert_out = next(item for item in after_cancel if item["kind"] == "meeting_starting")
+    assert alert_out["status"] == "cancelled"
+    assert alert_out["can_join"] is False
+
+
+def test_notifications_are_deleted_after_thirty_days(client):
+    current = datetime.now(timezone.utc)
+    meeting = client.post("/api/meetings", json=meeting_payload()).json()[0]
+
+    with SessionLocal() as db:
+        expired = models.Reminder(
+            meeting_id=meeting["id"],
+            recipient_email="expired@example.com",
+            kind=models.NotificationKind.INVITATION,
+            event_key=f"retention-expired:{meeting['id']}",
+            remind_at=current - timedelta(days=31),
+            created_at=current - timedelta(days=31),
+            status=models.NotificationStatus.SENT,
+        )
+        retained = models.Reminder(
+            meeting_id=meeting["id"],
+            recipient_email="retained@example.com",
+            kind=models.NotificationKind.INVITATION,
+            event_key=f"retention-current:{meeting['id']}",
+            remind_at=current - timedelta(days=31),
+            created_at=current - timedelta(days=29),
+            status=models.NotificationStatus.SENT,
+        )
+        db.add_all([expired, retained])
+        db.commit()
+        expired_id = expired.id
+        retained_id = retained.id
+
+        assert reminders.cleanup_expired_notifications(db, current) == 1
+        assert db.get(models.Reminder, expired_id) is None
+        assert db.get(models.Reminder, retained_id) is not None
 
 
 def test_declining_invitation_cancels_employee_join_notification(client):

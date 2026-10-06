@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from threading import Lock
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, selectinload
 
 from . import models
@@ -296,6 +296,13 @@ def cancel_pending_reminders(
             item.status = models.NotificationStatus.CANCELLED
 
 
+def cancel_meeting_starting_notifications(meeting: models.Meeting) -> None:
+    """Disable the join action even when the alert was already delivered."""
+    for item in meeting.reminders:
+        if item.kind == models.NotificationKind.MEETING_STARTING:
+            item.status = models.NotificationStatus.CANCELLED
+
+
 def _send_email(reminder: models.Reminder) -> None:
     settings = get_settings()
     meeting = reminder.meeting
@@ -408,6 +415,28 @@ def process_due_reminders(db: Session, now: datetime | None = None) -> int:
         return _process_due_reminders(db, now)
 
 
+def cleanup_expired_notifications(db: Session, now: datetime | None = None) -> int:
+    """Permanently remove notification rows after the configured retention period.
+
+    Both creation and delivery timestamps must be older than the cutoff so a
+    reminder created far in advance is never removed before it becomes due.
+    """
+    current = now or datetime.now(timezone.utc)
+    retention_days = max(1, get_settings().notification_retention_days)
+    cutoff = current - timedelta(days=retention_days)
+    result = db.execute(
+        delete(models.Reminder).where(
+            models.Reminder.created_at < cutoff,
+            models.Reminder.remind_at < cutoff,
+        )
+    )
+    removed = result.rowcount or 0
+    if removed:
+        db.commit()
+    return removed
+
+
 def process_due_reminders_task() -> int:
     with SessionLocal() as db:
+        cleanup_expired_notifications(db)
         return process_due_reminders(db)

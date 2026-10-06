@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_use_tls: bool = True
     reminder_max_attempts: int = 3
+    notification_retention_days: int = 30
     frontend_url: str = "http://localhost:5173"
     google_client_id: str = ""
     google_client_secret: str = ""
