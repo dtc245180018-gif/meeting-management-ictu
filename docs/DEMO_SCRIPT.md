@@ -81,5 +81,5 @@ Dữ liệu demo có thể nạp nhiều lần. Script không xóa dữ liệu t
 
 - Đây là hệ thống họp nội bộ; người tổ chức có thể chọn nhân viên ICTU.
 - Người tổ chức không bị thêm lại vào danh sách người tham dự.
-- Email mời hiện được lưu dưới dạng danh sách người tham dự; gửi email thực tế và vòng đời chấp nhận/từ chối là phần mở rộng sau Sprint 1.
-- Nút **Đăng xuất** hiện chỉ hiển thị thông báo “Chức năng đăng xuất đang được cập nhật” vì hệ thống chưa có đăng nhập/phân quyền.
+- Email mời, phản hồi lời mời và Google Calendar đã được bổ sung ở Sprint 2.
+- Đăng nhập, đăng xuất và phân quyền thật đã được bổ sung ở Sprint 3; xem kịch bản hiện hành tại `DEMO_SPRINT3.md`.

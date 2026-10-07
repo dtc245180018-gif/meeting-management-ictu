@@ -11,7 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from . import models, reminders, schemas
+from . import account_services, models, reminders, schemas
 from .config import get_settings
 
 
@@ -124,7 +124,13 @@ def ensure_no_occurrence_overlaps(occurrences: list[tuple[datetime, datetime]]) 
             )
 
 
-def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.Meeting]:
+def create_meetings(
+    db: Session,
+    payload: schemas.MeetingCreate,
+    *,
+    account_id: int | None = None,
+    organizer_email: str | None = None,
+) -> list[models.Meeting]:
     # Locks are acquired in a deterministic order. PostgreSQL row locks provide
     # the production guarantee; these locks keep SQLite/TestClient atomic too.
     with ExitStack() as stack:
@@ -133,8 +139,9 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
         for equipment_id in sorted(payload.equipment_ids):
             stack.enter_context(_equipment_locks[equipment_id])
 
-        participant_emails = normalize_emails([str(email) for email in payload.participant_emails], str(payload.organizer_email))
-        people = [str(payload.organizer_email).lower(), *participant_emails]
+        organizer = (organizer_email or str(payload.organizer_email)).strip().lower()
+        participant_emails = normalize_emails([str(email) for email in payload.participant_emails], organizer)
+        people = [organizer, *participant_emails]
         occurrences = recurrence_times(payload)
         ensure_no_occurrence_overlaps(occurrences)
         for start_time, end_time in occurrences:
@@ -142,6 +149,7 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
 
         room: models.Room | None = None
         if payload.room_id is not None:
+            account_services.ensure_room_access(db, account_id, payload.room_id)
             room = db.scalar(
                 select(models.Room)
                 .where(models.Room.id == payload.room_id)
@@ -183,7 +191,7 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
             meeting = models.Meeting(
                 title=payload.title.strip(),
                 description=payload.description,
-                organizer_email=str(payload.organizer_email).lower(),
+                organizer_email=organizer,
                 expected_attendees=payload.expected_attendees,
                 start_time=start_time,
                 end_time=end_time,
@@ -226,9 +234,15 @@ def create_meetings(db: Session, payload: schemas.MeetingCreate) -> list[models.
         return list(db.scalars(meeting_query().where(models.Meeting.id.in_(ids)).order_by(models.Meeting.start_time)).all())
 
 
-def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate) -> models.Meeting:
+def update_meeting(
+    db: Session,
+    meeting_id: int,
+    payload: schemas.MeetingUpdate,
+    requester_email: str | None = None,
+) -> models.Meeting:
     meeting = get_meeting_or_404(db, meeting_id)
-    if meeting.organizer_email != str(payload.requester_email).lower():
+    requester = (requester_email or str(payload.requester_email)).lower()
+    if meeting.organizer_email != requester:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người tạo mới được sửa cuộc họp")
     if meeting.status == models.MeetingStatus.CANCELLED:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể sửa cuộc họp đã hủy")
@@ -267,6 +281,14 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
     if meeting.booking and (
         new_start != meeting.start_time or new_end != meeting.end_time
     ):
+        organizer_account_id = db.scalar(
+            select(models.UserAccount.id).where(
+                func.lower(models.UserAccount.email) == meeting.organizer_email
+            )
+        )
+        account_services.ensure_room_access(
+            db, organizer_account_id, meeting.booking.room_id
+        )
         ensure_room_available(db, meeting.booking.room_id, new_start, new_end, exclude_booking_id=meeting.booking.id)
         meeting.booking.start_time = new_start
         meeting.booking.end_time = new_end
@@ -392,11 +414,17 @@ def update_meeting(db: Session, meeting_id: int, payload: schemas.MeetingUpdate)
     return get_meeting_or_404(db, meeting_id)
 
 
-def cancel_meeting(db: Session, meeting_id: int, requester_email: str) -> models.Meeting:
+def cancel_meeting(
+    db: Session,
+    meeting_id: int,
+    requester_email: str,
+    reason: str | None = None,
+) -> models.Meeting:
     meeting = get_meeting_or_404(db, meeting_id)
     if meeting.organizer_email != requester_email.lower():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người tạo mới được hủy cuộc họp")
     meeting.status = models.MeetingStatus.CANCELLED
+    meeting.cancellation_reason = reason.strip() if reason and reason.strip() else None
     if meeting.booking:
         meeting.booking.status = models.BookingStatus.CANCELLED
     for booking in meeting.equipment_bookings:
@@ -545,7 +573,13 @@ def ensure_room_available(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Phòng đã được đặt trong khung giờ này")
 
 
-def available_rooms(db: Session, start_time: datetime, end_time: datetime, min_capacity: int) -> list[models.Room]:
+def available_rooms(
+    db: Session,
+    start_time: datetime,
+    end_time: datetime,
+    min_capacity: int,
+    account_id: int | None = None,
+) -> list[models.Room]:
     if end_time <= start_time:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Khoảng thời gian không hợp lệ")
     occupied_room_ids = select(models.RoomBooking.room_id).where(
@@ -562,13 +596,32 @@ def available_rooms(db: Session, start_time: datetime, end_time: datetime, min_c
         )
         .order_by(models.Room.capacity, models.Room.name)
     )
-    return list(db.scalars(stmt).all())
+    rooms = list(db.scalars(stmt).all())
+    return [room for room in rooms if account_services.room_access(db, account_id, room.id)[0]]
 
 
-def create_booking(db: Session, payload: schemas.BookingCreate) -> models.RoomBooking:
+def room_to_out(
+    db: Session,
+    room: models.Room,
+    account_id: int | None = None,
+) -> schemas.RoomOut:
+    allowed, reason = account_services.room_access(db, account_id, room.id)
+    return schemas.RoomOut.model_validate(room).model_copy(
+        update={"can_book": allowed, "restriction_reason": reason}
+    )
+
+
+def create_booking(
+    db: Session,
+    payload: schemas.BookingCreate,
+    *,
+    account_id: int | None = None,
+    requester_email: str | None = None,
+) -> models.RoomBooking:
     with _room_locks[payload.room_id]:
         meeting = get_meeting_or_404(db, payload.meeting_id)
-        if meeting.organizer_email != str(payload.requester_email).lower():
+        requester = (requester_email or str(payload.requester_email)).lower()
+        if meeting.organizer_email != requester:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ người tạo cuộc họp mới được đặt phòng")
         if meeting.status != models.MeetingStatus.SCHEDULED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Không thể đặt phòng cho cuộc họp đã hủy")
@@ -579,6 +632,14 @@ def create_booking(db: Session, payload: schemas.BookingCreate) -> models.RoomBo
         )
         if not room or not room.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
+        organizer_account_id = db.scalar(
+            select(models.UserAccount.id).where(
+                func.lower(models.UserAccount.email) == meeting.organizer_email
+            )
+        )
+        account_services.ensure_room_access(
+            db, organizer_account_id or account_id, room.id
+        )
         if meeting.booking and meeting.booking.status == models.BookingStatus.ACTIVE:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cuộc họp đã có phòng")
         required_capacity = max(meeting.expected_attendees, len(meeting.participants) + 1)
@@ -602,20 +663,30 @@ def create_booking(db: Session, payload: schemas.BookingCreate) -> models.RoomBo
         )
 
 
-def require_admin(requester_email: str) -> str:
+def require_admin(requester_email: str, db: Session | None = None) -> str:
     normalized = requester_email.strip().lower()
-    if normalized not in get_settings().admin_email_list:
+    is_database_admin = False
+    if db is not None:
+        account = db.scalar(
+            select(models.UserAccount).where(
+                func.lower(models.UserAccount.email) == normalized,
+                models.UserAccount.is_active.is_(True),
+                models.UserAccount.role == models.AccountRole.ADMIN,
+            )
+        )
+        is_database_admin = account is not None
+    if not is_database_admin and normalized not in get_settings().admin_email_list:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Chỉ quản trị viên được thực hiện thao tác này")
     return normalized
 
 
 def list_admin_rooms(db: Session, requester_email: str) -> list[models.Room]:
-    require_admin(requester_email)
+    require_admin(requester_email, db)
     return list(db.scalars(select(models.Room).order_by(models.Room.name)).all())
 
 
 def create_admin_room(db: Session, payload: schemas.RoomAdminCreate) -> models.Room:
-    require_admin(str(payload.requester_email))
+    require_admin(str(payload.requester_email), db)
     name = payload.name.strip()
     if db.scalar(select(models.Room.id).where(func.lower(models.Room.name) == name.lower())):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Tên phòng đã tồn tại")
@@ -629,7 +700,7 @@ def create_admin_room(db: Session, payload: schemas.RoomAdminCreate) -> models.R
 
 
 def update_admin_room(db: Session, room_id: int, payload: schemas.RoomAdminUpdate) -> models.Room:
-    require_admin(str(payload.requester_email))
+    require_admin(str(payload.requester_email), db)
     room = db.get(models.Room, room_id)
     if not room:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
@@ -654,7 +725,7 @@ def update_admin_room(db: Session, room_id: int, payload: schemas.RoomAdminUpdat
 
 
 def deactivate_admin_room(db: Session, room_id: int, requester_email: str) -> models.Room:
-    require_admin(requester_email)
+    require_admin(requester_email, db)
     room = db.get(models.Room, room_id)
     if not room:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
@@ -743,7 +814,7 @@ def list_equipment(
 
 
 def create_admin_equipment(db: Session, payload: schemas.EquipmentAdminCreate) -> schemas.EquipmentOut:
-    require_admin(str(payload.requester_email))
+    require_admin(str(payload.requester_email), db)
     code = payload.code.upper().strip()
     if db.scalar(select(models.Equipment.id).where(func.lower(models.Equipment.code) == code.lower())):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Mã thiết bị đã tồn tại")
@@ -761,7 +832,7 @@ def update_admin_equipment(
     equipment_id: int,
     payload: schemas.EquipmentAdminUpdate,
 ) -> schemas.EquipmentOut:
-    require_admin(str(payload.requester_email))
+    require_admin(str(payload.requester_email), db)
     equipment = db.get(models.Equipment, equipment_id)
     if not equipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy thiết bị")
@@ -806,7 +877,7 @@ def update_admin_equipment(
 
 
 def deactivate_admin_equipment(db: Session, equipment_id: int, requester_email: str) -> schemas.EquipmentOut:
-    require_admin(requester_email)
+    require_admin(requester_email, db)
     equipment = db.get(models.Equipment, equipment_id)
     if not equipment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy thiết bị")

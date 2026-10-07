@@ -6,8 +6,9 @@ import { EquipmentDirectory } from "./components/EquipmentDirectory";
 import { AdminPanel } from "./components/AdminPanel";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
-import { api } from "./services/api";
-import type { Employee, Meeting } from "./types";
+import { LoginPage } from "./components/LoginPage";
+import { api, authStorage } from "./services/api";
+import type { Account, Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
 import { loadAllHistory } from "./utils/historyPagination";
 import { formatIctuDateTime } from "./utils/dateTime";
@@ -15,31 +16,86 @@ import { countPendingInvitations, scopeDashboardMeetings } from "./utils/dashboa
 
 type Page = "overview" | "create" | "calendar" | "notifications" | "rooms" | "equipment" | "admin";
 
-const CURRENT_USER_EMAIL = import.meta.env.VITE_CURRENT_USER_EMAIL ?? "";
-const EMPLOYEE_ONE_EMAIL = import.meta.env.VITE_EMPLOYEE_ONE_EMAIL || "employee.one@example.com";
-const EMPLOYEE_TWO_EMAIL = import.meta.env.VITE_EMPLOYEE_TWO_EMAIL || "employee.two@example.com";
-type UserRole = "employeeOne" | "employeeTwo" | "admin";
-const ROLE_USERS: Record<UserRole, { email: string; label: string }> = {
-  employeeOne: { email: EMPLOYEE_ONE_EMAIL, label: "Nhân viên 1" },
-  employeeTwo: { email: EMPLOYEE_TWO_EMAIL, label: "Nhân viên 2" },
-  admin: { email: CURRENT_USER_EMAIL || "leader@example.com", label: "Quản trị viên" },
+const TEST_ACCOUNT: Account = {
+  id: 1,
+  employee_id: 1,
+  email: "leader@example.com",
+  full_name: "Quản trị viên",
+  department: "ICTU",
+  role: "admin",
+  must_change_password: false,
+  is_active: true,
+  created_at: "2026-01-01T00:00:00Z",
 };
-
-function initialRole(): UserRole {
-  const configuredEmail = CURRENT_USER_EMAIL.trim().toLowerCase();
-  const matched = (Object.keys(ROLE_USERS) as UserRole[]).find(
-    (role) => ROLE_USERS[role].email.toLowerCase() === configuredEmail,
-  );
-  return matched ?? "admin";
-}
 
 function isMobileViewport() {
   return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches;
 }
 
 export default function App() {
+  const testing = import.meta.env.MODE === "test";
+  const [account, setAccount] = useState<Account | undefined>(testing ? TEST_ACCOUNT : undefined);
+  const [authLoading, setAuthLoading] = useState(!testing);
+  const [authNotice, setAuthNotice] = useState("");
+
+  useEffect(() => {
+    if (testing) return;
+    let active = true;
+    const restore = async () => {
+      if (!authStorage.get()) {
+        setAuthLoading(false);
+        return;
+      }
+      try {
+        const current = await api.me();
+        if (active) setAccount(current);
+      } catch {
+        authStorage.clear();
+      } finally {
+        if (active) setAuthLoading(false);
+      }
+    };
+    const expired = () => {
+      authStorage.clear();
+      setAccount(undefined);
+      setAuthNotice("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    };
+    window.addEventListener("ictu-auth-expired", expired);
+    void restore();
+    return () => {
+      active = false;
+      window.removeEventListener("ictu-auth-expired", expired);
+    };
+  }, [testing]);
+
+  const logout = async () => {
+    try {
+      await api.logout();
+    } catch {
+      // The local session must still be cleared if the server is unavailable.
+    }
+    authStorage.clear();
+    setAccount(undefined);
+    setAuthNotice("Bạn đã đăng xuất an toàn.");
+  };
+
+  if (authLoading) return <main className="auth-loading">Đang khôi phục phiên đăng nhập...</main>;
+  if (!account || account.must_change_password) {
+    return <>
+      {authNotice && <div className="auth-global-notice" role="status">{authNotice}</div>}
+      <LoginPage
+        account={account}
+        onAuthenticated={(next) => { setAuthNotice(""); setAccount(next); }}
+        onPasswordChanged={() => { setAccount(undefined); setAuthNotice("Đã đổi mật khẩu. Hãy đăng nhập bằng mật khẩu mới."); }}
+      />
+    </>;
+  }
+  return <AuthenticatedApp account={account} onLogout={logout} />;
+}
+
+
+function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: () => Promise<void> }) {
   const [page, setPage] = useState<Page>("overview");
-  const [activeRole, setActiveRole] = useState<UserRole>(initialRole);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobileViewport);
   const [focusedMeetingId, setFocusedMeetingId] = useState<number | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -54,20 +110,12 @@ export default function App() {
   const [filterTo, setFilterTo] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
   const [error, setError] = useState("");
-  const [logoutMessage, setLogoutMessage] = useState("");
+  const [systemMessage, setSystemMessage] = useState("");
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastSeenMeetingId, setLastSeenMeetingId] = useState(0);
   const pageSize = 5;
-  const activeUser = ROLE_USERS[activeRole];
-
-  const switchRole = (role: UserRole) => {
-    setActiveRole(role);
-    setPage("overview");
-    setFilterEmail("");
-    setCalendarEmailInput("");
-    setLogoutMessage("");
-    if (isMobileViewport()) setSidebarCollapsed(true);
-  };
+  const activeUser = { email: account.email, label: account.full_name };
+  const activeRole = account.role;
 
   const loadMeetings = useCallback(async () => {
     try {
@@ -112,7 +160,7 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("google_calendar") === "connected") {
       setPage("overview");
-      setLogoutMessage(`Đã kết nối Google Calendar cho ${params.get("email") ?? "tài khoản hiện tại"}.`);
+      setSystemMessage(`Đã kết nối Google Calendar cho ${params.get("email") ?? "tài khoản hiện tại"}.`);
       window.history.replaceState({}, "", window.location.pathname);
     } else if (params.has("meeting")) {
       setPage("calendar");
@@ -224,10 +272,6 @@ export default function App() {
     if (isMobileViewport()) setSidebarCollapsed(true);
   };
 
-  const showLogoutMessage = () => {
-    setLogoutMessage("Chức năng đăng xuất đang được cập nhật.");
-  };
-
   const searchCalendar = (event?: FormEvent) => {
     event?.preventDefault();
     setFilterEmail(calendarEmailInput.trim());
@@ -299,7 +343,7 @@ export default function App() {
 
   const renderMeetings = (items: Meeting[], showPagination = false) => (
     <>
-      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} focusMeetingId={focusedMeetingId} onFocusHandled={() => setFocusedMeetingId(null)} />
+      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} canManageAll={activeRole === "admin"} focusMeetingId={focusedMeetingId} onFocusHandled={() => setFocusedMeetingId(null)} />
       {showPagination && totalPages > 1 && (
         <div className="pagination" aria-label="Phân trang lịch sử">
           <button disabled={historyPage === 1} onClick={() => setHistoryPage((current) => current - 1)}>Trước</button>
@@ -320,7 +364,7 @@ export default function App() {
         </div>
         <nav className="side-nav">
           <button className={page === "overview" ? "active" : ""} title="Tổng quan" aria-current={page === "overview" ? "page" : undefined} onClick={() => goTo("overview")}><span className="nav-icon">⌂</span><span className="nav-label">Tổng quan</span></button>
-          <button className={page === "create" ? "active" : ""} title="Tạo lịch họp" aria-current={page === "create" ? "page" : undefined} onClick={() => goTo("create")}><span className="nav-icon">＋</span><span className="nav-label">Tạo lịch họp</span></button>
+          {activeRole !== "participant" && <button className={page === "create" ? "active" : ""} title="Tạo lịch họp" aria-current={page === "create" ? "page" : undefined} onClick={() => goTo("create")}><span className="nav-icon">＋</span><span className="nav-label">Tạo lịch họp</span></button>}
           <button className={page === "calendar" ? "active" : ""} title="Lịch họp" aria-current={page === "calendar" ? "page" : undefined} onClick={() => goTo("calendar")}><span className="nav-icon nav-icon-indicator">▣{hasNewMeetings && <span className="nav-dot" aria-label="Có lịch họp mới" />}</span><span className="nav-label">Lịch họp</span></button>
           <button className={page === "notifications" ? "active" : ""} title="Thông báo" aria-current={page === "notifications" ? "page" : undefined} onClick={() => goTo("notifications")}><span className="nav-icon nav-icon-indicator">♢{unreadNotificationCount > 0 && <span className="nav-dot" aria-label="Có thông báo mới" />}</span><span className="nav-label">Thông báo</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
@@ -328,7 +372,7 @@ export default function App() {
           {activeRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
         </nav>
         <div className="sidebar-footer-actions">
-          <button className="sidebar-logout" type="button" onClick={showLogoutMessage} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
+          <button className="sidebar-logout" type="button" onClick={() => void onLogout()} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
           <button className="sidebar-toggle" type="button" aria-label={sidebarCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
             <span className="nav-icon">{sidebarCollapsed ? "›" : "‹"}</span><span className="sidebar-toggle-label">{sidebarCollapsed ? "Mở rộng" : "Thu gọn"}</span>
           </button>
@@ -345,25 +389,19 @@ export default function App() {
         </div>
         <div className="header-user">
           <button className="sidebar-reopen" type="button" aria-label="Mở thanh điều hướng" onClick={() => setSidebarCollapsed(false)}>☰</button>
-          <div><strong>{activeUser.label}</strong><span>{activeUser.email}</span></div>
-          <button className="logout-button" type="button" onClick={showLogoutMessage}>Đăng xuất</button>
+          <div><strong>{activeUser.label}</strong><span>{activeUser.email} · {activeRole}</span></div>
+          <button className="logout-button" type="button" onClick={() => void onLogout()}>Đăng xuất</button>
         </div>
       </header>
       <div className="welcome-bar" aria-label="Thông báo chào mừng">
         <div className="welcome-marquee">Chào mừng đến với hệ thống quản lý lịch họp ICTU</div>
       </div>
-      <section className="role-switch" aria-label="Chuyển tài khoản kiểm thử quyền">
-        <div><span className="eyebrow">Kiểm thử phân quyền</span><strong>Tài khoản hiện tại: {activeUser.label}</strong><small>Quyền quản trị được API kiểm tra bằng ADMIN_EMAILS; đăng nhập đầy đủ thuộc Sprint 3.</small></div>
-        <div className="role-switch-buttons">
-          {(Object.keys(ROLE_USERS) as UserRole[]).map((role) => <button key={role} className={activeRole === role ? "active" : ""} type="button" onClick={() => switchRole(role)}>{ROLE_USERS[role].label}</button>)}
-        </div>
-      </section>
-      {logoutMessage && <div className="logout-notice" role="status">{logoutMessage}</div>}
+      {systemMessage && <div className="logout-notice" role="status">{systemMessage}</div>}
       <main>
         {page === "overview" && (
         <section className="hero">
           <div>
-            <span className="eyebrow light">ICTU MEETING · SPRINT 2</span>
+              <span className="eyebrow light">ICTU MEETING · SPRINT 3</span>
             <h1>Lịch họp rõ ràng,<br />phối hợp hiệu quả.</h1>
             <p>Quản lý lịch, thành viên và phòng họp trong một không gian thống nhất dành cho ICTU.</p>
           </div>
@@ -416,7 +454,7 @@ export default function App() {
         )}
         {page === "overview" && <div className="page-layout"><GoogleCalendarPanel email={activeUser.email} /></div>}
         <div className="page-layout">
-          {page === "create" && <MeetingForm onCreated={loadMeetings} />}
+          {page === "create" && activeRole !== "participant" && <MeetingForm onCreated={loadMeetings} organizerEmail={activeUser.email} />}
           {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
           {page === "notifications" && <NotificationCenter email={activeUser.email} onOpenMeeting={openMeetingFromNotification} onUnreadCountChange={setUnreadNotificationCount} />}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
@@ -425,7 +463,7 @@ export default function App() {
         </div>
       </main>
 
-      <footer>Meeting Management ICTU · Sprint 2 · Nhóm 4</footer>
+      <footer>Meeting Management ICTU · Sprint 3 · Nhóm 4</footer>
       </div>
     </div>
   );

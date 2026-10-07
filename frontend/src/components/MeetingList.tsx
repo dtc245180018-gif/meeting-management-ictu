@@ -7,6 +7,7 @@ interface Props {
   meetings: Meeting[];
   onChanged: () => void;
   currentUserEmail: string;
+  canManageAll?: boolean;
   focusMeetingId?: number | null;
   onFocusHandled?: () => void;
 }
@@ -15,7 +16,7 @@ function toLocalInput(value: string) {
   return toIctuDateTimeInput(value);
 }
 
-export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetingId, onFocusHandled }: Props) {
+export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAll = false, focusMeetingId, onFocusHandled }: Props) {
   const [message, setMessage] = useState("");
   const [rooms, setRooms] = useState<Record<number, Room[]>>({});
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -60,7 +61,7 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
 
   const saveEdit = async () => {
     if (!editing) return;
-    if (editing.organizer_email !== currentUserEmail.toLowerCase()) {
+    if (!canManageAll && editing.organizer_email !== currentUserEmail.toLowerCase()) {
       setMessage("Chỉ người tổ chức mới được chỉnh sửa cuộc họp.");
       return;
     }
@@ -82,13 +83,15 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
   };
 
   const cancel = async (meeting: Meeting) => {
-    if (meeting.organizer_email !== currentUserEmail.toLowerCase()) {
+    if (!canManageAll && meeting.organizer_email !== currentUserEmail.toLowerCase()) {
       setMessage("Chỉ người tổ chức mới được hủy cuộc họp.");
       return;
     }
     if (!window.confirm(`Bạn có chắc muốn hủy cuộc họp "${meeting.title}"?`)) return;
+    const reason = window.prompt("Lý do hủy cuộc họp (không bắt buộc)", "") ?? "";
     try {
-      await api.cancelMeeting(meeting.id, currentUserEmail);
+      if (reason.trim()) await api.cancelMeeting(meeting.id, currentUserEmail, reason.trim());
+      else await api.cancelMeeting(meeting.id, currentUserEmail);
       setMessage(`Đã hủy cuộc họp #${meeting.id}; phòng, thiết bị và nhắc lịch liên quan đã được giải phóng.`);
       onChanged();
     } catch (error) {
@@ -106,7 +109,7 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
   };
 
   const book = async (meeting: Meeting, room: Room) => {
-    if (meeting.organizer_email !== currentUserEmail.toLowerCase()) {
+    if (!canManageAll && meeting.organizer_email !== currentUserEmail.toLowerCase()) {
       setMessage("Chỉ người tổ chức mới được đặt phòng cho cuộc họp.");
       return;
     }
@@ -129,6 +132,14 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
       onChanged();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể đồng bộ Google Calendar");
+    }
+  };
+
+  const downloadCalendar = async (meeting: Meeting) => {
+    try {
+      await api.downloadCalendar(meeting.id);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Không thể tải lịch Outlook/ICS");
     }
   };
 
@@ -171,8 +182,8 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
                 <h3>{meeting.title}</h3>
                 <div className="meeting-controls">
                   <span className={`status ${meeting.status}`}>{meeting.status === "scheduled" ? "Đã lên lịch" : "Đã hủy"}</span>
-                  {meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && <button className="more-button" onClick={() => setOpenMenu(openMenu === meeting.id ? null : meeting.id)} aria-label={`Thao tác cho ${meeting.title}`}>⋯</button>}
-                  {openMenu === meeting.id && meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && (
+                  {meeting.status === "scheduled" && (canManageAll || meeting.organizer_email === currentUserEmail.toLowerCase()) && <button className="more-button" onClick={() => setOpenMenu(openMenu === meeting.id ? null : meeting.id)} aria-label={`Thao tác cho ${meeting.title}`}>⋯</button>}
+                  {openMenu === meeting.id && meeting.status === "scheduled" && (canManageAll || meeting.organizer_email === currentUserEmail.toLowerCase()) && (
                     <div className="more-menu">
                       {meeting.status === "scheduled" && <button onClick={() => { setEditing(meeting); setOpenMenu(null); }}>Chỉnh sửa</button>}
                       {meeting.status === "scheduled" && !meeting.booking && <button onClick={() => { findRooms(meeting); setOpenMenu(null); }}>Tìm phòng trống</button>}
@@ -191,9 +202,9 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
               </div>
               <div className="item-actions">
                 <button onClick={() => setDetails(meeting)}>Xem chi tiết</button>
-                {meeting.organizer_email === currentUserEmail.toLowerCase() && <button onClick={() => void syncGoogleCalendar(meeting)}>{meeting.status === "cancelled" ? "Đồng bộ trạng thái hủy" : meeting.google_calendar_event?.sync_status === "synced" ? "Đồng bộ lại Google Calendar" : "Đồng bộ Google Calendar"}</button>}
+                {(canManageAll || meeting.organizer_email === currentUserEmail.toLowerCase()) && <button onClick={() => void syncGoogleCalendar(meeting)}>{meeting.status === "cancelled" ? "Đồng bộ trạng thái hủy" : meeting.google_calendar_event?.sync_status === "synced" ? "Đồng bộ lại Google Calendar" : "Đồng bộ Google Calendar"}</button>}
                 {meeting.google_calendar_event?.html_link && meeting.google_calendar_event.sync_status === "synced" && <a href={meeting.google_calendar_event.html_link} target="_blank" rel="noreferrer">Mở trên Google Calendar</a>}
-                <a className="calendar-download" href={api.calendarFileUrl(meeting.id)} download={`meeting-${meeting.id}.ics`}>Tải lịch Outlook/ICS</a>
+                <button className="calendar-download" type="button" onClick={() => void downloadCalendar(meeting)}>Tải lịch Outlook/ICS</button>
               </div>
               {meeting.google_calendar_event?.sync_status === "failed" && <p className="inline-error">Đồng bộ Google thất bại: {meeting.google_calendar_event.error_message}</p>}
               {meeting.participants.length > 0 && (
@@ -233,7 +244,7 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, focusMeetin
                   })()}
                 </div>
               )}
-              {meeting.status === "scheduled" && meeting.organizer_email === currentUserEmail.toLowerCase() && (
+              {meeting.status === "scheduled" && (canManageAll || meeting.organizer_email === currentUserEmail.toLowerCase()) && (
                 <div className="item-actions"><span className="action-hint">Mở ⋯ để thao tác</span></div>
               )}
               {editing?.id === meeting.id && (

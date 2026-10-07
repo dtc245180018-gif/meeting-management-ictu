@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     google_calendar_id: str = "primary"
     sprint3_seed_accounts: bool = True
     sprint3_credentials_file: str = "sprint3_credentials.local.csv"
+    auth_required: bool = True
+    auth_secret_key: str = ""
+    auth_token_minutes: int = 480
+    initial_account_password: str = "ICTU123"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

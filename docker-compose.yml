@@ -42,6 +42,10 @@ services:
       GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
       SPRINT3_SEED_ACCOUNTS: ${SPRINT3_SEED_ACCOUNTS:-true}
       SPRINT3_CREDENTIALS_FILE: ${SPRINT3_CREDENTIALS_FILE:-sprint3_credentials.local.csv}
+      AUTH_REQUIRED: ${AUTH_REQUIRED:-true}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
+      AUTH_TOKEN_MINUTES: ${AUTH_TOKEN_MINUTES:-480}
+      INITIAL_ACCOUNT_PASSWORD: ${INITIAL_ACCOUNT_PASSWORD:-ICTU123}
     ports:
       - "8000:8000"
     depends_on:
@@ -53,9 +57,6 @@ services:
       context: ./frontend
       args:
         VITE_API_URL: ${VITE_API_URL:-/api}
-        VITE_CURRENT_USER_EMAIL: ${VITE_CURRENT_USER_EMAIL:-leader@example.com}
-        VITE_EMPLOYEE_ONE_EMAIL: ${VITE_EMPLOYEE_ONE_EMAIL:-employee.one@example.com}
-        VITE_EMPLOYEE_TWO_EMAIL: ${VITE_EMPLOYEE_TWO_EMAIL:-employee.two@example.com}
     ports:
       - "5173:80"
     depends_on:

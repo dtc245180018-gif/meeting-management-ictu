@@ -183,11 +183,11 @@ Danh sách email dùng khi demo:
 - Backend kiểm tra tất cả lần lặp trước khi ghi dữ liệu.
 - Tạo lịch và đặt phòng nằm trong cùng transaction, nên không xảy ra trạng thái đặt được một phần.
 
-## 10. Demo trạng thái đăng xuất (15 giây)
+## 10. Demo đăng xuất (15 giây)
 
 1. Bấm **Đăng xuất** ở góc phải hoặc cuối sidebar.
-2. Hiển thị thông báo: `Chức năng đăng xuất đang được cập nhật.`
-3. Giải thích đăng nhập và phân quyền sẽ được bổ sung ở giai đoạn sau.
+2. Hệ thống thu hồi phiên hiện tại và quay về trang đăng nhập.
+3. Thử mở lại trang nghiệp vụ để xác nhận phải đăng nhập lại.
 
 ## 11. Đối chiếu User Story Sprint 1
 

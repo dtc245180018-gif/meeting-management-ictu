@@ -14,9 +14,21 @@ import type {
   Room,
   RoomAdminInput,
   SuggestedTime,
+  Account,
+  AccountPage,
+  AccountRole,
+  ReportOverview,
+  RoomPermission,
 } from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
+const TOKEN_KEY = "ictu-meeting-token";
+
+export const authStorage = {
+  get: () => window.localStorage.getItem(TOKEN_KEY),
+  set: (token: string) => window.localStorage.setItem(TOKEN_KEY, token),
+  clear: () => window.localStorage.removeItem(TOKEN_KEY),
+};
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response;
@@ -25,6 +37,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        ...(authStorage.get() ? { Authorization: `Bearer ${authStorage.get()}` } : {}),
         ...options?.headers,
       },
     });
@@ -33,6 +46,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event("ictu-auth-expired"));
     const payload = await response.json().catch(() => null);
     throw new Error(payload?.detail ?? "Không thể kết nối tới máy chủ");
   }
@@ -40,6 +54,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  login: (email: string, password: string) =>
+    request<{ access_token: string; token_type: "bearer"; user: Account }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  me: () => request<Account>("/auth/me"),
+  logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ message: string }>("/auth/change-password", {
+      method: "POST",
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
   listMeetings: () => request<Meeting[]>("/meetings"),
 
   createMeeting: (payload: MeetingInput) =>
@@ -48,10 +74,10 @@ export const api = {
   updateMeeting: (id: number, payload: Partial<MeetingInput> & { requester_email: string }) =>
     request<Meeting>(`/meetings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
 
-  cancelMeeting: (id: number, requesterEmail: string) =>
+  cancelMeeting: (id: number, requesterEmail: string, reason?: string) =>
     request<Meeting>(`/meetings/${id}/cancel`, {
       method: "POST",
-      body: JSON.stringify({ requester_email: requesterEmail }),
+      body: JSON.stringify({ requester_email: requesterEmail, reason }),
     }),
 
   history: (email: string, options: { status?: string; dateFrom?: string; dateTo?: string; offset?: number; limit?: number } = {}) => {
@@ -131,6 +157,8 @@ export const api = {
 
   calendarLinks: (meetingId: number) => request<CalendarLinks>(`/meetings/${meetingId}/calendar-links`),
   calendarFileUrl: (meetingId: number) => `${API_URL}/meetings/${meetingId}/calendar.ics`,
+  downloadCalendar: (meetingId: number) =>
+    downloadAuthenticated(`${API_URL}/meetings/${meetingId}/calendar.ics`),
 
   respondToInvitation: (meetingId: number, email: string, status: "accepted" | "declined") =>
     request<Meeting>(`/meetings/${meetingId}/invitations/respond`, {
@@ -155,4 +183,47 @@ export const api = {
     request<Notification[]>(`/notifications?${new URLSearchParams({ email })}`),
   markNotificationRead: (id: number, email: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: "POST", body: JSON.stringify({ email }) }),
+
+  adminUsers: (options: { search?: string; role?: AccountRole | ""; active?: string; page?: number; pageSize?: number } = {}) => {
+    const params = new URLSearchParams({
+      page: String(options.page ?? 1),
+      page_size: String(options.pageSize ?? 10),
+    });
+    if (options.search) params.set("search", options.search);
+    if (options.role) params.set("role", options.role);
+    if (options.active) params.set("is_active", options.active);
+    return request<AccountPage>(`/admin/users?${params.toString()}`);
+  },
+  createUser: (payload: { full_name: string; email: string; department: string; role: AccountRole }) =>
+    request<Account>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
+  updateUser: (id: number, payload: Partial<{ full_name: string; department: string; role: AccountRole; is_active: boolean; reset_password: boolean }>) =>
+    request<Account>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
+  roomPermissions: (accountId: number) =>
+    request<RoomPermission[]>(`/admin/users/${accountId}/room-permissions`),
+  updateRoomPermission: (accountId: number, roomId: number, canBook: boolean, reason?: string) =>
+    request<RoomPermission>(`/admin/users/${accountId}/room-permissions/${roomId}`, {
+      method: "PUT",
+      body: JSON.stringify({ can_book: canBook, reason }),
+    }),
+  reportOverview: (params: URLSearchParams) =>
+    request<ReportOverview>(`/admin/reports/overview?${params.toString()}`),
+  reportExportUrl: (format: "xlsx" | "pdf", params: URLSearchParams) => {
+    const query = new URLSearchParams(params);
+    query.set("format", format);
+    return `${API_URL}/admin/reports/export?${query.toString()}`;
+  },
 };
+
+export async function downloadAuthenticated(url: string): Promise<void> {
+  const response = await fetch(url, {
+    headers: authStorage.get() ? { Authorization: `Bearer ${authStorage.get()}` } : {},
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? "Không thể xuất báo cáo");
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "ictu-meeting-report";
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(await response.blob());
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}

@@ -154,13 +154,14 @@ export function RoomDirectory({ meetings, initialSearch }: Props) {
         {filteredRooms.length === 0 && <p className="empty">Không có phòng thuộc trạng thái này.</p>}
         {filteredRooms.map((room) => {
           const isBooked = bookedRoomIds.has(room.id);
-          return <article className={`room-card ${isBooked ? "booked" : "free"}`} key={room.id}>
+          const restricted = room.can_book === false;
+          return <article className={`room-card ${restricted ? "restricted" : isBooked ? "booked" : "free"}`} key={room.id}>
             <strong>{room.name}</strong>
             <span>{room.capacity} chỗ ngồi</span>
             <small>{room.location}</small>
             <small>Tòa nhà {room.building || "Chưa khai báo"} · Tầng {room.floor ?? "-"} · {room.room_type || "Phòng họp"}</small>
             <small>Thiết bị: {[room.projector && "máy chiếu", room.display && "màn hình", room.microphone && "micro", room.video_conferencing && "họp trực tuyến"].filter(Boolean).join(", ") || "Chưa khai báo"}</small>
-            <b>{hasSearchWindow && availableRooms ? (isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ") : (isBooked ? "Có lịch đặt" : "Chưa có lịch đặt")}</b>
+            <b>{restricted ? `Bạn không được đặt phòng này${room.restriction_reason ? ` · ${room.restriction_reason}` : ""}` : hasSearchWindow && availableRooms ? (isBooked ? "Đã có lịch trong khung giờ" : "Trống trong khung giờ") : (isBooked ? "Có lịch đặt" : "Chưa có lịch đặt")}</b>
           </article>;
         })}
       </div> : <p className="empty room-directory-empty">Danh sách phòng đang được ẩn. Hãy chọn bộ lọc hoặc bấm “Xem danh sách phòng”.</p>}

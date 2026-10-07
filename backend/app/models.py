@@ -82,7 +82,11 @@ class GoogleSyncStatus(StrEnum):
 
 class AccountRole(StrEnum):
     ADMIN = "admin"
-    EMPLOYEE = "employee"
+    ORGANIZER = "organizer"
+    # Backward-compatible Python alias for Sprint 2 code/tests. Persisted
+    # ``EMPLOYEE`` values are migrated to ``ORGANIZER`` on startup.
+    EMPLOYEE = "organizer"
+    PARTICIPANT = "participant"
 
 
 class Meeting(Base):
@@ -98,6 +102,7 @@ class Meeting(Base):
     recurrence: Mapped[str | None] = mapped_column(String(20))
     recurrence_group: Mapped[str | None] = mapped_column(String(64), index=True)
     status: Mapped[MeetingStatus] = mapped_column(Enum(MeetingStatus), default=MeetingStatus.SCHEDULED, nullable=False)
+    cancellation_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -147,12 +152,7 @@ class Employee(Base):
 
 
 class UserAccount(Base):
-    """Authentication-ready account data for the Sprint 3 login flow.
-
-    Sprint 2 does not expose login endpoints yet. Passwords are stored only as
-    salted hashes so the account table can be reused safely when authentication
-    is implemented.
-    """
+    """Login account linked one-to-one with an ICTU employee."""
 
     __tablename__ = "user_accounts"
     __table_args__ = (
@@ -167,10 +167,13 @@ class UserAccount(Base):
     email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
     role: Mapped[AccountRole] = mapped_column(
-        Enum(AccountRole), default=AccountRole.EMPLOYEE, nullable=False
+        Enum(AccountRole), default=AccountRole.ORGANIZER, nullable=False
     )
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    token_version: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    password_changed_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
     )
@@ -182,6 +185,9 @@ class UserAccount(Base):
     )
 
     employee: Mapped[Employee] = relationship(back_populates="account")
+    room_policies: Mapped[list[RoomAccessPolicy]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
+    )
 
 
 class Room(Base):
@@ -201,6 +207,56 @@ class Room(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     bookings: Mapped[list[RoomBooking]] = relationship(back_populates="room")
+    access_policies: Mapped[list[RoomAccessPolicy]] = relationship(
+        back_populates="room", cascade="all, delete-orphan"
+    )
+
+
+class RoomAccessPolicy(Base):
+    """Explicit per-account permission for a room.
+
+    Missing rows mean allowed. This keeps existing installations permissive
+    while letting administrators deny or restore individual access.
+    """
+
+    __tablename__ = "room_access_policies"
+    __table_args__ = (
+        UniqueConstraint("account_id", "room_id", name="uq_room_access_account_room"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    room_id: Mapped[int] = mapped_column(
+        ForeignKey("rooms.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    can_book: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(300))
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    account: Mapped[UserAccount] = relationship(back_populates="room_policies")
+    room: Mapped[Room] = relationship(back_populates="access_policies")
+
+
+class AccountAuditLog(Base):
+    __tablename__ = "account_audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    actor_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="SET NULL"), index=True
+    )
+    target_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="SET NULL"), index=True
+    )
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
 
 class RoomBooking(Base):

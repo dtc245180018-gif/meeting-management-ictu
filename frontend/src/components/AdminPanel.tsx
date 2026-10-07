@@ -1,6 +1,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api } from "../services/api";
 import type { Equipment, EquipmentAdminInput, Room, RoomAdminInput } from "../types";
+import { UserManagement } from "./UserManagement";
+import { ReportsPanel } from "./ReportsPanel";
 
 
 interface Props {
@@ -15,7 +17,7 @@ const emptyEquipment = { code: "", name: "", category: "projector", location: ""
 
 
 export function AdminPanel({ adminEmail }: Props) {
-  const [tab, setTab] = useState<"rooms" | "equipment">("rooms");
+  const [tab, setTab] = useState<"users" | "rooms" | "equipment" | "reports">("rooms");
   const [rooms, setRooms] = useState<Room[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [roomForm, setRoomForm] = useState(emptyRoom);
@@ -114,16 +116,19 @@ export function AdminPanel({ adminEmail }: Props) {
 
   return <section className="card wide-card admin-panel">
     <div className="section-heading">
-      <div><span className="eyebrow">US11 · US14 · Quản trị tạm thời</span><h2>Quản trị tài nguyên</h2></div>
+      <div><span className="eyebrow">US18 · US19 · US20 · US21 · US22 · US23 · US24</span><h2>Quản trị hệ thống</h2></div>
       <span className="badge">{adminEmail}</span>
     </div>
-    <p className="notice">Sprint 2 kiểm tra quản trị viên bằng ADMIN_EMAILS. Xác thực và phân quyền đầy đủ thuộc Sprint 3.</p>
+    <p className="notice">Mọi thao tác quản trị được kiểm tra bằng vai trò từ phiên đăng nhập và được ghi nhật ký.</p>
     <div className="admin-tabs">
+      <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Tài khoản & phân quyền</button>
       <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}>Quản lý phòng</button>
       <button className={tab === "equipment" ? "active" : ""} onClick={() => setTab("equipment")}>Quản lý thiết bị</button>
+      <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Báo cáo & xuất file</button>
     </div>
     {message && <p className="notice" role="status">{message}</p>}
-    {loading && <p className="empty">Đang tải dữ liệu quản trị...</p>}
+    {loading && (tab === "rooms" || tab === "equipment") && <p className="empty">Đang tải dữ liệu quản trị...</p>}
+    {tab === "users" && <UserManagement />}
     {!loading && tab === "rooms" && <div className="admin-layout">
       <form className="admin-form" onSubmit={saveRoom}>
         <h3>{editingRoomId ? "Sửa phòng" : "Thêm phòng"}</h3>
@@ -149,5 +154,6 @@ export function AdminPanel({ adminEmail }: Props) {
       </form>
       <div className="admin-list">{equipment.map((item) => <article className="admin-item" key={item.id}><div><strong>{item.code} · {item.name}</strong><span>{item.category} · {item.location}</span></div><b>{item.status}</b><div className="item-actions"><button onClick={() => editEquipment(item)}>Sửa</button><button className="danger" onClick={() => void deactivateEquipment(item)}>{item.status === "inactive" ? "Kích hoạt" : "Khóa"}</button></div></article>)}</div>
     </div>}
+    {tab === "reports" && <ReportsPanel />}
   </section>;
 }

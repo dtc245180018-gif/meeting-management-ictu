@@ -1,7 +1,8 @@
 # Meeting Management ICTU
 
-Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Nhánh
-`sprint-2` mở rộng luồng Sprint 1 mà không thay đổi các chức năng cốt lõi đã ổn định.
+Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Sprint 3
+mở rộng Sprint 1–2 bằng đăng nhập thật, phân quyền, chính sách phòng, báo cáo và
+trải nghiệm mobile/PWA mà không làm mất dữ liệu cũ.
 
 ## Phạm vi Sprint 1
 
@@ -25,12 +26,19 @@ Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo
 - US15: Xuất ICS và đồng bộ tạo/cập nhật/hủy sự kiện qua Google Calendar OAuth.
 - US16: Thông báo trong ứng dụng, vòng đời lời mời và gửi email nền qua SMTP.
 
-Không thuộc Sprint 2: đăng nhập, quản lý tài khoản, phân quyền đầy đủ, báo cáo,
-mobile, chatbot, QR check-in và tích hợp HRM/ERP.
+## Phạm vi Sprint 3
 
-Nền móng dữ liệu đăng nhập cho Sprint 3 đã được chuẩn bị: mỗi nhân viên có một
-tài khoản, mật khẩu chỉ lưu dạng băm và phải đổi ở lần đăng nhập đầu. Sprint 2
-chưa có endpoint đăng nhập/token; xem [docs/SPRINT3_ACCOUNT_FOUNDATION.md](docs/SPRINT3_ACCOUNT_FOUNDATION.md).
+- US17: Giao diện responsive và PWA có thể cài đặt, hỗ trợ cache app shell.
+- US18: Đăng nhập, đăng xuất, đổi mật khẩu lần đầu và quản lý trạng thái tài khoản.
+- US19: Danh sách tài khoản có tìm kiếm, lọc, phân trang, khóa và mở khóa.
+- US20: RBAC phía backend cho `admin`, `organizer`, `participant`; thu hồi phiên khi đổi quyền.
+- US21: Quyền đặt từng phòng theo từng tài khoản, áp dụng đồng nhất ở tìm kiếm và đặt phòng.
+- US22: Báo cáo sử dụng phòng theo thời gian, phòng, tầng và khu nhà.
+- US23: Báo cáo hủy cuộc họp theo ngày, lý do, phòng và người tổ chức.
+- US24: Xuất báo cáo theo cùng bộ lọc ra Excel và PDF tiếng Việt, chỉ dành cho quản trị viên.
+
+Chi tiết cấu hình, API và kiểm thử xem [hướng dẫn Sprint 3](docs/SPRINT3_GUIDE.md).
+Kịch bản nghiệm thu thủ công US17–US24 nằm tại [docs/DEMO_SPRINT3.md](docs/DEMO_SPRINT3.md).
 
 ## Công nghệ
 
@@ -43,6 +51,7 @@ chưa có endpoint đăng nhập/token; xem [docs/SPRINT3_ACCOUNT_FOUNDATION.md]
 
 ```bash
 cp .env.example .env
+# Điền AUTH_SECRET_KEY bằng chuỗi ngẫu nhiên riêng trước khi chạy.
 docker compose up --build
 ```
 
@@ -100,17 +109,15 @@ npm run test
 npm run build
 ```
 
-## Cấu hình Sprint 2
+## Cấu hình xác thực và tích hợp
 
-- `ADMIN_EMAILS`: danh sách email quản trị tạm thời, phân tách bằng dấu phẩy.
-  API quản trị nhận email người thao tác và đối chiếu cấu hình này. Đây chỉ là
-  cơ chế tạm thời trước Sprint 3, chưa thay thế xác thực/phân quyền.
-- `VITE_CURRENT_USER_EMAIL`: email quản trị viên mà giao diện gửi tới API quản trị/thông báo.
-- Trên giao diện có bộ chọn **Kiểm thử phân quyền** cho `Nhân viên 1`
-  (`employee.one@example.com`), `Nhân viên 2` (`employee.two@example.com`) và
-  `Quản trị viên` (`leader@example.com`). Bộ chọn này phục vụ nghiệm thu
-  Sprint 1–2, không thay thế xác thực; vai trò nhân viên không hiển thị menu
-  Quản trị và API trả `403` khi nhân viên gọi chức năng quản trị.
+- `AUTH_REQUIRED=true`: bật xác thực Bearer cho API nghiệp vụ.
+- `AUTH_SECRET_KEY`: khóa ký phiên bí mật, tối thiểu 32 ký tự, không đưa lên Git.
+- `AUTH_TOKEN_MINUTES`: thời gian sống của phiên; mặc định 480 phút.
+- `INITIAL_ACCOUNT_PASSWORD=ICTU123`: mật khẩu tạm được băm riêng từng tài khoản;
+  người dùng bắt buộc đổi ở lần đăng nhập đầu.
+- `ADMIN_EMAILS` chỉ còn phục vụ migration/tương thích dữ liệu Sprint 2. Quyền
+  quản trị khi chạy thật được đọc từ `user_accounts.role`, không tin email do frontend gửi.
 - `EMAIL_BACKEND=console`: chế độ phát triển, ghi email vào log và đánh dấu đã gửi.
 - `EMAIL_BACKEND=smtp`: gửi thật lời mời, cập nhật, hủy, phản hồi và reminder bằng `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`,
   `SMTP_PASSWORD`, `SMTP_FROM_EMAIL` và `SMTP_USE_TLS`.
@@ -124,10 +131,10 @@ SQLite. Giao diện luôn nhập và hiển thị theo múi giờ `Asia/Ho_Chi_M
 kết quả không phụ thuộc múi giờ của máy đang mở trình duyệt.
 
 Trang **Thông báo** riêng tự làm mới mỗi 15 giây, nhóm nội dung theo ngày và hiển
-thị mốc ngày/giờ cho lời mời, thay đổi, hủy lịch, phản hồi và reminder của vai
-trò đang chọn. Trạng thái `Đang chờ gửi`/`Đã gửi`/`Gửi thất bại` phản ánh hàng
-đợi email; bấm từng dòng để đánh dấu đã đọc. Thông báo cũ tự động bị xóa sau 30
-ngày. Thanh điều hướng hiển thị dấu chấm đỏ khi có thông báo chưa đọc hoặc lịch
+thị mốc ngày/giờ cho lời mời, thay đổi, hủy lịch, phản hồi và reminder của tài
+khoản đang đăng nhập. Trạng thái `Đang chờ gửi`/`Đã gửi`/`Gửi thất bại` phản ánh
+hàng đợi email; bấm từng dòng để đánh dấu đã đọc. Thông báo cũ tự động bị xóa
+sau 30 ngày. Thanh điều hướng hiển thị dấu chấm đỏ khi có thông báo chưa đọc hoặc lịch
 họp mới; thông báo của cuộc họp đã hủy/hết giờ không cho phép bấm **Vào họp**.
 
 `EMAIL_BACKEND=console` chỉ mô phỏng việc gửi bằng cách ghi nội dung vào log.
@@ -140,7 +147,7 @@ nhật và xóa sự kiện thật, kèm `sendUpdates=all` để Google thông b
 File ICS vẫn được giữ làm phương án tương thích Outlook. Thay đổi thực hiện trực
 tiếp trên Google không được kéo ngược về hệ thống.
 
-## API Sprint 2
+## API chính
 
 | Nhóm | API |
 | --- | --- |
@@ -150,6 +157,10 @@ tiếp trên Google không được kéo ngược về hệ thống.
 | Lịch ngoài | `GET /api/meetings/{id}/calendar.ics`, `GET /api/integrations/google/status`, `GET /api/integrations/google/connect`, `GET /api/integrations/google/callback`, `DELETE /api/integrations/google`, `POST /api/meetings/{id}/google-calendar/sync` |
 | Lời mời | `POST /api/meetings/{id}/invitations/respond` |
 | Thông báo | `GET /api/integrations/email/status`, `GET /api/notifications?email=...`, `POST /api/notifications/{id}/read` |
+| Xác thực | `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/change-password`, `POST /api/auth/logout` |
+| Tài khoản | `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}` |
+| Quyền phòng | `GET /api/admin/users/{id}/room-permissions`, `PUT /api/admin/users/{id}/room-permissions/{room_id}` |
+| Báo cáo | `GET /api/admin/reports/overview`, `GET /api/admin/reports/export?format=xlsx|pdf` |
 
 Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 `reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,
@@ -176,15 +187,16 @@ python scripts/reset_demo_data.py
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
 Kịch bản nghiệm thu đầy đủ US09–US16 nằm tại [docs/DEMO_SPRINT2.md](docs/DEMO_SPRINT2.md).
 
-Để tạo tài khoản và mật khẩu tạm cho toàn bộ nhân viên trước Sprint 3:
+Để tạo tài khoản và mật khẩu tạm cho toàn bộ nhân viên:
 
 ```powershell
 cd backend
 python scripts/prepare_sprint3_accounts.py
 ```
 
-Danh sách mật khẩu được lưu trong `backend/sprint3_credentials.local.csv` và bị
-Git bỏ qua; repository chỉ chứa mật khẩu đã băm trong database local.
+Mặc định tài khoản mới dùng mật khẩu tạm `ICTU123`, chỉ lưu dạng băm trong cơ sở
+dữ liệu và bắt buộc đổi ở lần đăng nhập đầu. File
+`backend/sprint3_credentials.local.csv` bị Git bỏ qua.
 
 ## Quy ước Git
 
