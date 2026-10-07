@@ -5,7 +5,7 @@ import { MeetingList } from "./MeetingList";
 
 vi.mock("../services/api", () => ({
   api: {
-    listEmployees: vi.fn(), calendarLinks: vi.fn(), calendarFileUrl: vi.fn(),
+    listEmployees: vi.fn(), calendarLinks: vi.fn(), calendarFileUrl: vi.fn(), downloadCalendar: vi.fn(),
     updateMeeting: vi.fn(), cancelMeeting: vi.fn(), availableRooms: vi.fn(), bookRoom: vi.fn(),
     syncGoogleCalendar: vi.fn(), respondToInvitation: vi.fn(),
   },
@@ -32,7 +32,8 @@ describe("MeetingList calendar integration", () => {
 
   it("offers Google Calendar and Outlook ICS and shows booked equipment", async () => {
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
-    expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toHaveAttribute("href", "/api/meetings/7/calendar.ics");
+    fireEvent.click(screen.getByRole("button", { name: "Tải lịch Outlook/ICS" }));
+    expect(api.downloadCalendar).toHaveBeenCalledWith(7);
     fireEvent.click(screen.getByRole("button", { name: "Đồng bộ Google Calendar" }));
     await waitFor(() => expect(api.syncGoogleCalendar).toHaveBeenCalledWith(7, "leader@example.com"));
     expect(await screen.findByText(/Đã đồng bộ cuộc họp #7/)).toBeInTheDocument();
@@ -49,6 +50,7 @@ describe("MeetingList calendar integration", () => {
   it("uses the active demo user when the organizer cancels", async () => {
     vi.mocked(api.cancelMeeting).mockResolvedValue({ ...meeting, status: "cancelled" });
     vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(window, "prompt").mockReturnValue("");
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     fireEvent.click(screen.getByRole("button", { name: `Thao tác cho ${meeting.title}` }));
     fireEvent.click(screen.getByRole("button", { name: "Hủy lịch" }));
@@ -58,7 +60,7 @@ describe("MeetingList calendar integration", () => {
   it("offers a Google cancellation sync for a cancelled meeting", () => {
     render(<MeetingList meetings={[{ ...meeting, status: "cancelled" }]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     expect(screen.getByRole("button", { name: "Đồng bộ trạng thái hủy" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Tải lịch Outlook/ICS" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tải lịch Outlook/ICS" })).toBeInTheDocument();
   });
 
   it("shows a clear error when Google Calendar sync fails", async () => {

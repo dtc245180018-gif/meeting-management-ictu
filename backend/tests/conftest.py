@@ -7,6 +7,10 @@ os.environ["EMPLOYEE_ONE_EMAIL"] = "employee.one@example.com"
 os.environ["EMPLOYEE_TWO_EMAIL"] = "employee.two@example.com"
 os.environ["EMAIL_BACKEND"] = "console"
 os.environ["SPRINT3_SEED_ACCOUNTS"] = "false"
+# Existing Sprint 1/2 regression cases intentionally exercise their original
+# payload contracts. Sprint 3 security tests enable authentication explicitly.
+os.environ["AUTH_REQUIRED"] = "false"
+os.environ["AUTH_SECRET_KEY"] = "test-only-secret-key-with-at-least-32-chars"
 
 import pytest
 from fastapi.testclient import TestClient

@@ -19,6 +19,8 @@ export interface Room {
   microphone?: boolean;
   video_conferencing?: boolean;
   is_active?: boolean;
+  can_book?: boolean;
+  restriction_reason?: string;
 }
 
 export type EquipmentStatus = "available" | "booked" | "maintenance" | "inactive";
@@ -72,6 +74,7 @@ export interface Meeting {
   recurrence?: "weekly" | "monthly";
   recurrence_group?: string;
   status: MeetingStatus;
+  cancellation_reason?: string;
   participants: Participant[];
   booking?: Booking;
   equipment_bookings?: EquipmentBooking[];
@@ -171,4 +174,76 @@ export interface EquipmentAdminInput {
   location: string;
   status?: "available" | "maintenance" | "inactive";
   is_active?: boolean;
+}
+
+export type AccountRole = "admin" | "organizer" | "participant";
+
+export interface Account {
+  id: number;
+  employee_id: number;
+  email: string;
+  full_name: string;
+  department: string;
+  role: AccountRole;
+  must_change_password: boolean;
+  is_active: boolean;
+  last_login_at?: string;
+  created_at: string;
+}
+
+export interface AccountPage {
+  items: Account[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface RoomPermission {
+  account_id: number;
+  room_id: number;
+  room_name: string;
+  can_book: boolean;
+  reason?: string;
+}
+
+export interface ReportOverview {
+  generated_at: string;
+  timezone: string;
+  date_from: string;
+  date_to: string;
+  summary: {
+    total_meetings: number;
+    scheduled_meetings: number;
+    completed_meetings: number;
+    cancelled_meetings: number;
+    cancellation_rate: number;
+    total_bookings: number;
+    total_booking_minutes: number;
+  };
+  room_usage: Array<{
+    room_id: number;
+    room_name: string;
+    building: string;
+    floor: number;
+    booking_count: number;
+    booked_minutes: number;
+    scheduled_count: number;
+    completed_count: number;
+    cancelled_count: number;
+  }>;
+  cancellation_trend: Array<{
+    date: string;
+    total_count: number;
+    cancelled_count: number;
+    cancellation_rate: number;
+  }>;
+  cancellation_reasons: Array<{ reason: string; count: number }>;
+  organizer_cancellations: Array<{
+    organizer_email: string;
+    total_count: number;
+    cancelled_count: number;
+    cancellation_rate: number;
+  }>;
+  top_room?: ReportOverview["room_usage"][number];
 }

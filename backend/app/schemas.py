@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .models import (
+    AccountRole,
     BookingStatus,
     EquipmentStatus,
     GoogleSyncStatus,
@@ -37,6 +38,8 @@ class RoomOut(BaseModel):
     microphone: bool
     video_conferencing: bool
     is_active: bool
+    can_book: bool = True
+    restriction_reason: str | None = None
 
 
 class RoomAdminCreate(BaseModel):
@@ -277,6 +280,7 @@ class MeetingOut(BaseModel):
     recurrence: str | None
     recurrence_group: str | None
     status: MeetingStatus
+    cancellation_reason: str | None = None
     participants: list[ParticipantOut]
     booking: BookingOut | None = None
     equipment_bookings: list[EquipmentBookingOut] = Field(default_factory=list)
@@ -287,6 +291,7 @@ class CancelRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     requester_email: EmailStr
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class SuggestedTimeRequest(BaseModel):
@@ -392,3 +397,139 @@ class NotificationReadRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     email: EmailStr
+
+
+# Sprint 3 authentication, administration and reporting contracts.
+class AccountOut(BaseModel):
+    id: int
+    employee_id: int
+    email: EmailStr
+    full_name: str
+    department: str
+    role: AccountRole
+    must_change_password: bool
+    is_active: bool
+    last_login_at: datetime | None = None
+    created_at: datetime
+
+
+class LoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=200)
+
+
+class LoginOut(BaseModel):
+    access_token: str
+    token_type: Literal["bearer"] = "bearer"
+    user: AccountOut
+
+
+class ChangePasswordRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=8, max_length=200)
+
+    @model_validator(mode="after")
+    def passwords_differ(self):
+        if self.current_password == self.new_password:
+            raise ValueError("Mật khẩu mới phải khác mật khẩu hiện tại")
+        return self
+
+
+class AccountCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str = Field(min_length=2, max_length=160)
+    email: EmailStr
+    department: str = Field(min_length=2, max_length=160)
+    role: AccountRole = AccountRole.PARTICIPANT
+
+
+class AccountUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str | None = Field(default=None, min_length=2, max_length=160)
+    department: str | None = Field(default=None, min_length=2, max_length=160)
+    role: AccountRole | None = None
+    is_active: bool | None = None
+    reset_password: bool = False
+
+
+class AccountPage(BaseModel):
+    items: list[AccountOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class RoomPermissionOut(BaseModel):
+    account_id: int
+    room_id: int
+    room_name: str
+    can_book: bool
+    reason: str | None = None
+
+
+class RoomPermissionUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    can_book: bool
+    reason: str | None = Field(default=None, max_length=300)
+
+
+class ReportSummary(BaseModel):
+    total_meetings: int
+    scheduled_meetings: int
+    completed_meetings: int
+    cancelled_meetings: int
+    cancellation_rate: float
+    total_bookings: int
+    total_booking_minutes: int
+
+
+class RoomUsageRow(BaseModel):
+    room_id: int
+    room_name: str
+    building: str
+    floor: int
+    booking_count: int
+    booked_minutes: int
+    scheduled_count: int
+    completed_count: int
+    cancelled_count: int
+
+
+class CancellationTrendRow(BaseModel):
+    date: str
+    total_count: int
+    cancelled_count: int
+    cancellation_rate: float
+
+
+class CancellationReasonRow(BaseModel):
+    reason: str
+    count: int
+
+
+class OrganizerCancellationRow(BaseModel):
+    organizer_email: EmailStr
+    total_count: int
+    cancelled_count: int
+    cancellation_rate: float
+
+
+class ReportOverviewOut(BaseModel):
+    generated_at: datetime
+    timezone: str = "Asia/Ho_Chi_Minh"
+    date_from: datetime
+    date_to: datetime
+    summary: ReportSummary
+    room_usage: list[RoomUsageRow]
+    cancellation_trend: list[CancellationTrendRow]
+    cancellation_reasons: list[CancellationReasonRow]
+    organizer_cancellations: list[OrganizerCancellationRow]
+    top_room: RoomUsageRow | None = None

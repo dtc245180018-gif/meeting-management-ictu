@@ -1,0 +1,24 @@
+{
+  "name": "Meeting Management ICTU",
+  "short_name": "ICTU Meeting",
+  "description": "Hệ thống quản lý lịch họp nội bộ ICTU",
+  "lang": "vi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f7fb",
+  "theme_color": "#004a99",
+  "icons": [
+    {
+      "src": "/assets/ICTU-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/ICTU-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

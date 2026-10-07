@@ -11,7 +11,7 @@ from . import models, reminders
 from .api import router
 from .config import get_settings
 from .database import Base, SessionLocal, engine
-from .passwords import generate_temporary_password, hash_password
+from .passwords import hash_password
 
 
 LEGACY_EMAIL_GROUPS = (
@@ -215,11 +215,11 @@ def seed_user_accounts() -> int:
             existing = accounts_by_employee.get(employee.id)
             if existing:
                 existing.email = email
-                existing.role = role
-                existing.is_active = employee.is_active
+                # Role and lock state are administrator-owned Sprint 3 data.
+                # Never overwrite them on every application restart.
                 continue
 
-            temporary_password = generate_temporary_password()
+            temporary_password = getattr(settings, "initial_account_password", "ICTU123")
             account = models.UserAccount(
                 employee=employee,
                 email=email,
@@ -330,13 +330,34 @@ async def reminder_worker() -> None:
 
 
 def apply_schema_migrations() -> None:
-    """Apply the forward-only schema changes used by the Sprint 1 app."""
+    """Apply small forward-only migrations without deleting existing data."""
+    if engine.dialect.name == "postgresql":
+        # PostgreSQL requires enum values to be committed before they can be
+        # used by UPDATE in a later transaction.
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
+            connection.execute(text("ALTER TYPE accountrole ADD VALUE IF NOT EXISTS 'ORGANIZER'"))
+            connection.execute(text("ALTER TYPE accountrole ADD VALUE IF NOT EXISTS 'PARTICIPANT'"))
     inspector = inspect(engine)
     with engine.begin() as connection:
         meeting_columns = {column["name"] for column in inspector.get_columns("meetings")}
         if "expected_attendees" not in meeting_columns:
             connection.execute(text("ALTER TABLE meetings ADD COLUMN expected_attendees INTEGER NOT NULL DEFAULT 1"))
             connection.execute(text("UPDATE meetings SET expected_attendees = 1 + (SELECT COUNT(*) FROM participants WHERE participants.meeting_id = meetings.id)"))
+        if "cancellation_reason" not in meeting_columns:
+            connection.execute(text("ALTER TABLE meetings ADD COLUMN cancellation_reason TEXT"))
+
+        account_columns = {column["name"] for column in inspector.get_columns("user_accounts")}
+        account_additions = {
+            "token_version": "INTEGER NOT NULL DEFAULT 0",
+            "last_login_at": "TIMESTAMP",
+            "password_changed_at": "TIMESTAMP",
+        }
+        for name, definition in account_additions.items():
+            if name not in account_columns:
+                connection.execute(text(f"ALTER TABLE user_accounts ADD COLUMN {name} {definition}"))
+        # SQLAlchemy stores enum member names by default. EMPLOYEE was the
+        # Sprint 2 value and is now the ORGANIZER role.
+        connection.execute(text("UPDATE user_accounts SET role = 'ORGANIZER' WHERE role = 'EMPLOYEE'"))
 
         room_columns = {column["name"] for column in inspector.get_columns("rooms")}
         additions = {

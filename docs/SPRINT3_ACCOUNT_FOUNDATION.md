@@ -1,52 +1,33 @@
-# Nền móng tài khoản đăng nhập Sprint 3
+# Tài khoản đăng nhập Sprint 3
 
-Repository đã chuẩn bị một tài khoản cho mỗi nhân viên đang hoạt động. Đây là
-dữ liệu nền để Sprint 3 xây API đăng nhập, phiên đăng nhập và phân quyền; Sprint 2
-chưa hiển thị form đăng nhập và chưa phát hành token.
+Nền móng tài khoản của Sprint 2 đã được hoàn thiện thành luồng xác thực/RBAC
+Sprint 3. Tài liệu vận hành hiện hành nằm tại [SPRINT3_GUIDE.md](SPRINT3_GUIDE.md).
 
-## Cách tạo tài khoản
-
-Tại thư mục `backend`:
+## Chuẩn bị tài khoản
 
 ```powershell
+cd backend
 python scripts/prepare_sprint3_accounts.py
 ```
 
-Khi cần một mật khẩu chung cho buổi demo có giám sát, có thể chủ động xoay toàn
-bộ tài khoản bằng tùy chọn sau (thay giá trị mẫu bằng mật khẩu đã thống nhất):
+Script tạo idempotent một `user_accounts` cho mỗi nhân viên đang hoạt động.
+Admin được xác định từ `ADMIN_EMAILS`/`LEADER_EMAIL` trong lần seed đầu; các tài
+khoản còn lại nhận vai trò `organizer`. Mật khẩu tạm mặc định là `ICTU123`, mỗi
+tài khoản có PBKDF2-HMAC-SHA256 hash và salt riêng, đồng thời bật
+`must_change_password=true`.
 
-```powershell
-python scripts/prepare_sprint3_accounts.py --shared-demo-password "<mật-khẩu-demo>"
-```
+File `backend/sprint3_credentials.local.csv` chỉ dùng bàn giao cục bộ và bị Git
+bỏ qua. Không chụp màn hình, commit hoặc chia sẻ công khai file này.
 
-Không ghi mật khẩu demo thật vào tài liệu được commit. Tùy chọn này chỉ dành cho
-máy demo; mọi tài khoản vẫn có `must_change_password=true` và mỗi hash dùng salt
-riêng. Không sử dụng một mật khẩu chung khi triển khai thật.
+## Trạng thái hoàn thành
 
-Kết quả:
+- API đăng nhập, lấy phiên hiện tại, đổi mật khẩu và đăng xuất.
+- Bearer token ký HMAC, có hạn dùng và `token_version` để thu hồi.
+- Vai trò `admin`, `organizer`, `participant` được backend kiểm tra.
+- Khóa/mở tài khoản, đặt lại mật khẩu, tìm kiếm/lọc/phân trang.
+- Audit log cho thay đổi tài khoản và quyền phòng.
+- Không còn bộ chuyển tài khoản kiểm thử trên frontend; danh tính nghiệp vụ lấy
+  từ token, không lấy từ `requester_email` của trình duyệt.
 
-- bảng `user_accounts` có một bản ghi tương ứng với mỗi nhân viên;
-- email trong `ADMIN_EMAILS` và `LEADER_EMAIL` nhận vai trò `admin`, các tài khoản
-  còn lại nhận vai trò `employee`;
-- mật khẩu trong database chỉ là PBKDF2-HMAC-SHA256 có salt riêng;
-- mọi tài khoản bật `must_change_password=true`;
-- mật khẩu tạm thời được ghi vào
-  `backend/sprint3_credentials.local.csv` (hoặc đường dẫn cấu hình bằng
-  `SPRINT3_CREDENTIALS_FILE`).
-
-Tệp CSV chứa mật khẩu rõ để bàn giao nội bộ nên đã bị Git bỏ qua. Không chụp màn
-hình, gửi lên repository hoặc chia sẻ công khai tệp này. Nếu tệp bị mất, không
-thể khôi phục mật khẩu từ hash; Sprint 3 cần bổ sung luồng quản trị đặt lại mật khẩu.
-
-## Trạng thái bảo mật và việc còn lại ở Sprint 3
-
-Đã có: email đăng nhập duy nhất, hash mật khẩu, vai trò, trạng thái hoạt động,
-cờ buộc đổi mật khẩu và thời điểm tạo/cập nhật.
-
-Chưa có và không được coi là đã hoàn thành: API đăng nhập, access/refresh token,
-cookie bảo mật, đăng xuất, đổi/quên mật khẩu, giới hạn đăng nhập sai, audit log,
-middleware phân quyền và thay thế bộ chọn tài khoản kiểm thử trên frontend.
-
-Khi Sprint 3 triển khai đăng nhập, phải dùng hàm `verify_password` hiện có để
-kiểm tra mật khẩu, phát phiên ở backend và lấy danh tính từ phiên; không tiếp tục
-tin vào `requester_email` do frontend tự gửi.
+Hệ thống hiện dùng access token có thời hạn, chưa triển khai refresh token hay
+quên mật khẩu qua email. Khi hết hạn, người dùng đăng nhập lại.

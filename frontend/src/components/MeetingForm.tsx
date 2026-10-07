@@ -41,10 +41,11 @@ function validateForm(form: MeetingInput, participants: string[]) {
 
 interface Props {
   onCreated: () => void;
+  organizerEmail?: string;
 }
 
-export function MeetingForm({ onCreated }: Props) {
-  const [form, setForm] = useState(initialForm);
+export function MeetingForm({ onCreated, organizerEmail }: Props) {
+  const [form, setForm] = useState({ ...initialForm, organizer_email: organizerEmail ?? "" });
   const [participantInput, setParticipantInput] = useState("");
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
   const [participantError, setParticipantError] = useState("");
@@ -78,6 +79,10 @@ export function MeetingForm({ onCreated }: Props) {
   useEffect(() => {
     void api.listEmployees().then(setEmployees).catch(() => setEmployees([]));
   }, []);
+
+  useEffect(() => {
+    if (organizerEmail) setForm((current) => ({ ...current, organizer_email: organizerEmail }));
+  }, [organizerEmail]);
 
   const participants = useMemo(
     () => selectedParticipants.filter((email) => email !== form.organizer_email.trim().toLowerCase()),
@@ -205,7 +210,7 @@ export function MeetingForm({ onCreated }: Props) {
         equipment_ids: selectedEquipment.map((item) => item.id),
       });
       setMessage(`Đã tạo ${created.length} lịch họp, ghi nhận ${currentParticipants.length} lời mời${selectedRoom ? `, đặt ${selectedRoom.name}` : ""}${selectedEquipment.length ? ` và ${selectedEquipment.length} thiết bị` : ""} thành công.`);
-      setForm(initialForm);
+      setForm({ ...initialForm, organizer_email: organizerEmail ?? "" });
       setParticipantInput("");
       setSelectedParticipants([]);
       setParticipantError("");
@@ -312,7 +317,7 @@ export function MeetingForm({ onCreated }: Props) {
           <span className="eyebrow">US01 · US03 · US04 · US05 · US12 · US16</span>
           <h2>Tạo lịch họp</h2>
         </div>
-        <span className="badge">Sprint 2</span>
+        <span className="badge">Sprint 3</span>
       </div>
       <form onSubmit={submit} className="form-grid">
         <label className="full">Tên cuộc họp
@@ -322,8 +327,8 @@ export function MeetingForm({ onCreated }: Props) {
           <textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Nội dung và mục tiêu cuộc họp" />
         </label>
         <label>Người tổ chức
-          <input aria-label="Người tổ chức" required list="ictu-employees" type="email" value={form.organizer_email} onChange={(e) => updateForm({ organizer_email: e.target.value }, true)} placeholder="Chọn hoặc nhập email nhân viên ICTU" />
-          {organizerSuggestions.length > 0 && (
+          <input aria-label="Người tổ chức" required list="ictu-employees" type="email" readOnly={Boolean(organizerEmail)} value={form.organizer_email} onChange={(e) => updateForm({ organizer_email: e.target.value }, true)} placeholder="Chọn hoặc nhập email nhân viên ICTU" />
+          {!organizerEmail && organizerSuggestions.length > 0 && (
             <div className="employee-suggestions" role="listbox" aria-label="Gợi ý người tổ chức">
               {organizerSuggestions.map((employee) => (
                 <button type="button" key={employee.email} onClick={() => updateForm({ organizer_email: employee.email }, true)}>
@@ -333,7 +338,7 @@ export function MeetingForm({ onCreated }: Props) {
               ))}
             </div>
           )}
-          <small className="field-hint">Nhân viên ICTU có thể đứng tên tổ chức cuộc họp.</small>
+          <small className="field-hint">{organizerEmail ? "Người tổ chức được lấy từ tài khoản đang đăng nhập." : "Nhân viên ICTU có thể đứng tên tổ chức cuộc họp."}</small>
         </label>
         <div className="participant-field">
           <div className="participant-label-row">
