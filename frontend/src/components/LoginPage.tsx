@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { api, authStorage } from "../services/api";
 import type { Account } from "../types";
+import { InstallAppButton } from "./InstallAppButton";
 
 
 interface Props {
@@ -121,6 +122,7 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
         <p className="subtle">Tài khoản mới sử dụng mật khẩu tạm thời do quản trị viên cung cấp.</p>
       </>}
       {message && <p className="error-banner" role="alert">{message}</p>}
+      <InstallAppButton />
     </section>
   </main>;
 }
