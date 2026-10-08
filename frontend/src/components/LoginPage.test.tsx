@@ -58,4 +58,21 @@ describe("LoginPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ẩn mật khẩu" }));
     expect(passwordInput).toHaveAttribute("type", "password");
   });
+
+  it("shows the new ICTU login identity and only the requested author", () => {
+    render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
+
+    expect(screen.getByText("HỆ THỐNG QUẢN LÝ LỊCH HỌP")).toBeInTheDocument();
+    expect(screen.getByText("Dev Nguyễn Ngọc Thắng · KTPM K23A")).toBeInTheDocument();
+    expect(screen.queryByText(/Mai Văn Đạt/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Quên mật khẩu?" }));
+    expect(screen.getByRole("status")).toHaveTextContent("liên hệ quản trị viên");
+  });
+
+  it("shows inline validation matching the login design", () => {
+    render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+    expect(screen.getByText("Vui lòng nhập tên đăng nhập.")).toBeInTheDocument();
+    expect(api.login).not.toHaveBeenCalled();
+  });
 });

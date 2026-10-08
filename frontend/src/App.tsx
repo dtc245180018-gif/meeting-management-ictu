@@ -465,7 +465,7 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
         </div>
       </main>
 
-      <footer>Meeting Management ICTU · Sprint 3 · Nhóm 4</footer>
+      <footer>© 2026 Meeting Management ICTU · Phát triển bởi Nguyễn Ngọc Thắng</footer>
       </div>
     </div>
   );

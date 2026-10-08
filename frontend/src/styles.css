@@ -16,6 +16,7 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 
@@ -499,16 +500,33 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 
 /* Sprint 3 authentication, reporting and mobile hardening. */
 .auth-loading { display: grid; min-height: 100vh; place-items: center; color: var(--ictu-blue); font-weight: 800; }
-.auth-global-notice { position: fixed; z-index: 3; top: 12px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; }
-.auth-page { display: grid; grid-template-columns: minmax(320px, 1.05fr) minmax(320px, .95fr); min-height: 100vh; padding: 0; }
-.auth-brand { display: grid; align-content: center; justify-items: start; gap: 12px; padding: clamp(36px, 8vw, 110px); color: #fff; background: linear-gradient(145deg, #003f82, #0068b7); }
-.auth-brand img { width: 92px; height: 92px; object-fit: contain; border-radius: 50%; background: #fff; }
-.auth-brand h1 { margin: 0; font-size: clamp(2.2rem, 5vw, 4.8rem); line-height: .95; }
-.auth-brand p { max-width: 560px; color: rgba(255,255,255,.85); font-size: 1.05rem; line-height: 1.6; }
-.auth-card { align-self: center; width: min(86%, 520px); margin: 40px auto; padding: clamp(24px, 4vw, 44px); border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: 0 20px 60px rgba(0, 48, 92, .14); }
-.auth-card h2 { margin: 7px 0 8px; color: var(--ictu-navy); }
-.auth-card form { display: grid; gap: 15px; margin-top: 22px; }
+.auth-global-notice { position: fixed; z-index: 30; top: 116px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 8px 22px rgba(0, 48, 92, .12); }
+.auth-page { display: grid; grid-template-rows: auto 1fr auto; width: 100%; min-height: 100vh; margin: 0; padding: 0; background: #f3f6fa; }
+.auth-header { color: #fff; background: linear-gradient(90deg, #00509d, #075da9); box-shadow: 0 3px 9px rgba(0, 48, 92, .18); }
+.auth-header-inner { display: flex; align-items: center; gap: 18px; width: 100%; min-height: 106px; padding: 14px 30px; }
+.auth-header img { width: 74px; height: 74px; flex: 0 0 74px; object-fit: contain; border-radius: 50%; background: #fff; }
+.auth-header-inner div { display: grid; gap: 3px; }
+.auth-header strong { font-size: clamp(1.25rem, 2.2vw, 2rem); letter-spacing: .025em; }
+.auth-header span { color: #e4f1fb; font-size: clamp(.82rem, 1.4vw, 1.05rem); }
+.auth-stage { display: grid; place-items: center; width: 100%; padding: 26px 18px 30px; }
+.auth-card { width: min(100%, 550px); min-height: 638px; margin: 0; padding: 52px 50px 48px; border: 0; border-radius: 11px; background: #fff; box-shadow: 0 10px 30px rgba(30, 58, 89, .08); }
+.auth-card h1 { margin: 0; color: #064f9d; font-size: 2.15rem; text-align: center; }
+.auth-intro { margin: 12px auto 0; color: var(--muted); font-size: .86rem; line-height: 1.55; text-align: center; }
+.auth-card form { display: grid; gap: 18px; margin-top: 34px; }
+.auth-card .auth-login-form { gap: 0; margin-top: 46px; }
 .auth-card label { display: grid; gap: 7px; color: var(--ink); font-size: .8rem; font-weight: 800; }
+.auth-card input { min-height: 53px; padding-right: 20px; padding-left: 20px; border-color: #cdd7e2; border-radius: 5px; color: #35485d; background: #fff; }
+.auth-card input::placeholder { color: #8b929b; opacity: 1; }
+.auth-input-field { display: grid; }
+.auth-input-field + .password-field { margin-top: 28px; }
+.auth-card input.input-invalid { border-color: #ff3038; box-shadow: none; }
+.auth-field-error { display: block; margin: 7px 5px 0; color: #ff3038; font-size: .76rem; }
+.auth-forgot { justify-self: end; margin-top: 31px; padding: 0; border: 0; color: #0056a6; background: transparent; font-size: .83rem; }
+.auth-forgot:hover { text-decoration: underline; }
+.auth-help-message { margin: 14px 0 0; padding: 10px 12px; border: 1px solid #b9d6e9; border-radius: 5px; color: #14517f; background: #eef7fd; font-size: .78rem; line-height: 1.5; }
+.auth-security-note { margin-top: 39px; padding: 20px 20px; border: 1px solid #e5e9ee; border-radius: 6px; color: #405673; background: #f8fafc; font-size: .78rem; line-height: 1.65; text-align: center; }
+.auth-footer { display: grid; justify-items: center; gap: 7px; min-height: 104px; padding: 20px 18px 24px; color: #43536a; font-size: .82rem; text-align: center; }
+.auth-footer strong { color: var(--ictu-navy); }
 .pwa-install-auth { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .pwa-install-auth .pwa-install-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; border: 1px solid #b9d3ea; border-radius: 4px; color: var(--ictu-blue); background: #eef7fe; font-size: .8rem; font-weight: 800; }
 .pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
@@ -517,10 +535,13 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .password-field { display: grid; gap: 7px; }
 .password-input-wrap { position: relative; min-width: 0; }
 .password-input-wrap input { padding-right: 68px; }
-.password-toggle { position: absolute; top: 50%; right: 6px; min-width: 52px; padding: 6px 8px; transform: translateY(-50%); border: 0; border-radius: 3px; color: var(--ictu-blue); background: transparent; font-size: .75rem; font-weight: 800; }
+.password-toggle { position: absolute; top: 50%; right: 9px; width: 36px; height: 36px; display: grid; place-items: center; padding: 7px; transform: translateY(-50%); border: 0; border-radius: 3px; color: #738198; background: transparent; }
+.password-toggle svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .password-toggle:hover { background: #eaf4fc; }
 .password-toggle:focus-visible { outline: 2px solid var(--ictu-blue); outline-offset: 1px; }
-.auth-card .primary-action { min-height: 44px; margin-top: 4px; }
+.auth-card .primary-action { min-height: 52px; margin-top: 27px; border: 1px solid #0758ad; border-radius: 5px; color: #fff; background: #0758ad; box-shadow: 0 3px 7px rgba(0, 72, 145, .2); font-weight: 800; }
+.auth-card .primary-action:hover:not(:disabled) { border-color: var(--ictu-navy); background: var(--ictu-navy); }
+.auth-card .primary-action:disabled { cursor: wait; opacity: .7; }
 .admin-users { position: relative; display: grid; grid-template-columns: minmax(250px, .56fr) minmax(0, 1.44fr); gap: 18px; align-items: start; }
 .compact-form { position: sticky; top: 16px; }
 .admin-user-directory { min-width: 0; }
@@ -568,11 +589,15 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 
 @media (max-width: 720px) {
   html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
-  .auth-page { grid-template-columns: 1fr; }
-  .auth-brand { min-height: 230px; padding: 32px 24px; }
-  .auth-brand img { width: 64px; height: 64px; }
-  .auth-brand h1 { font-size: 2.4rem; }
-  .auth-card { width: auto; margin: 20px 16px 36px; }
+  .auth-header-inner { min-height: 82px; gap: 11px; padding: 12px 16px; }
+  .auth-header img { width: 56px; height: 56px; flex-basis: 56px; }
+  .auth-header strong { font-size: 1rem; }
+  .auth-header span { font-size: .69rem; }
+  .auth-stage { align-items: start; padding: 20px 14px; }
+  .auth-card { min-height: 0; padding: 34px 24px; }
+  .auth-card .auth-login-form { margin-top: 34px; }
+  .auth-security-note { margin-top: 30px; }
+  .auth-global-notice { top: 92px; }
   .app-content > main { padding-right: 12px; padding-left: 12px; }
   .app-content > main .page-layout { padding-bottom: 24px; }
   .hero, .recent-meetings, .card, .filter-card { min-width: 0; max-width: 100%; }
