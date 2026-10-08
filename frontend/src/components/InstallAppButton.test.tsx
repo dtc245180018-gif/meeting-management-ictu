@@ -26,4 +26,14 @@ describe("InstallAppButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cài ứng dụng" }));
     expect(screen.getByRole("status")).toHaveTextContent("biểu tượng cài đặt");
   });
+
+  it("removes the install action after the app is installed", async () => {
+    render(<InstallAppButton location="header" />);
+    expect(screen.getByRole("button", { name: "Tải ứng dụng" })).toBeInTheDocument();
+
+    window.dispatchEvent(new Event("appinstalled"));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Tải ứng dụng" })).not.toBeInTheDocument());
+    expect(screen.queryByText("Đã cài")).not.toBeInTheDocument();
+  });
 });
