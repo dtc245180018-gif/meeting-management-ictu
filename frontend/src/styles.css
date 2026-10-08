@@ -503,6 +503,12 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .auth-card h2 { margin: 7px 0 8px; color: var(--ictu-navy); }
 .auth-card form { display: grid; gap: 15px; margin-top: 22px; }
 .auth-card label { display: grid; gap: 7px; color: var(--ink); font-size: .8rem; font-weight: 800; }
+.password-field { display: grid; gap: 7px; }
+.password-input-wrap { position: relative; min-width: 0; }
+.password-input-wrap input { padding-right: 68px; }
+.password-toggle { position: absolute; top: 50%; right: 6px; min-width: 52px; padding: 6px 8px; transform: translateY(-50%); border: 0; border-radius: 3px; color: var(--ictu-blue); background: transparent; font-size: .75rem; font-weight: 800; }
+.password-toggle:hover { background: #eaf4fc; }
+.password-toggle:focus-visible { outline: 2px solid var(--ictu-blue); outline-offset: 1px; }
 .auth-card .primary-action { min-height: 44px; margin-top: 4px; }
 .admin-users { position: relative; display: grid; grid-template-columns: minmax(250px, .56fr) minmax(0, 1.44fr); gap: 18px; align-items: start; }
 .compact-form { position: sticky; top: 16px; }
