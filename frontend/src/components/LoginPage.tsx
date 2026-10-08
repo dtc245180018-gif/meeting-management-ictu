@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { api, authStorage } from "../services/api";
 import type { Account } from "../types";
+import { InstallAppButton } from "./InstallAppButton";
 
 
 interface Props {
@@ -119,11 +120,14 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
   return <main className="auth-page">
     <header className="auth-header">
       <div className="auth-header-inner">
-        <img src="/assets/ICTU.png" alt="Logo ICTU" />
-        <div>
-          <strong>HỆ THỐNG QUẢN LÝ LỊCH HỌP</strong>
-          <span>Trường Đại học Công nghệ Thông tin và Truyền thông</span>
+        <div className="auth-header-brand">
+          <img src="/assets/ICTU.png" alt="Logo ICTU" />
+          <div className="auth-header-copy">
+            <strong>HỆ THỐNG QUẢN LÝ LỊCH HỌP</strong>
+            <span>Trường Đại học Công nghệ Thông tin và Truyền thông</span>
+          </div>
         </div>
+        <InstallAppButton location="header" />
       </div>
     </header>
     <section className="auth-stage">
@@ -152,12 +156,12 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
         </>}
         {message && <p className="error-banner" role="alert">{message}</p>}
         {helpMessage && <p className="auth-help-message" role="status">{helpMessage}</p>}
-        <div className="auth-security-note">Hệ thống chỉ phục vụ quản lý lịch họp nội bộ ICTU;<br /><strong>KHÔNG</strong> sử dụng tài khoản cho bất kỳ hoạt động ngoài phạm vi được cấp quyền.</div>
+        <div className="auth-security-note">Hệ thống chỉ mang mục đích học tập và tham khảo,<br /><strong>KHÔNG</strong> mang mục đích mạo danh hay lừa đảo hoặc<br />bất kỳ hoạt động mua bán nào.</div>
       </section>
     </section>
     <footer className="auth-footer">
       <span>© 2026 Meeting Management ICTU.</span>
-      <strong>Dev Nguyễn Ngọc Thắng · KTPM K23A</strong>
+      <strong className="auth-developer">Dev Nguyễn Ngọc Thắng · KTPM K23A <span className="verified-badge" role="img" aria-label="Tác giả đã xác minh" title="Đã xác minh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 2.1 1.8 2.8-.2.9 2.7 2.4 1.5-.7 2.7 1.3 2.5-1.8 2.1.2 2.8-2.7.9-1.5 2.4-2.7-.7-2.5 1.3-2.1-1.8-2.8.2-.9-2.7-2.4-1.5.7-2.7-1.3-2.5 1.8-2.1-.2-2.8 2.7-.9L9.3 3.6l2.7.7L12 2Z"/><path d="m8.4 12.1 2.2 2.2 5-5" /></svg></span></strong>
     </footer>
   </main>;
 }

@@ -500,14 +500,22 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 
 /* Sprint 3 authentication, reporting and mobile hardening. */
 .auth-loading { display: grid; min-height: 100vh; place-items: center; color: var(--ictu-blue); font-weight: 800; }
-.auth-global-notice { position: fixed; z-index: 30; top: 116px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 8px 22px rgba(0, 48, 92, .12); }
+.auth-global-notice { position: fixed; z-index: 30; top: 94px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 8px 22px rgba(0, 48, 92, .12); }
 .auth-page { display: grid; grid-template-rows: auto 1fr auto; width: 100%; min-height: 100vh; margin: 0; padding: 0; background: #f3f6fa; }
 .auth-header { color: #fff; background: linear-gradient(90deg, #00509d, #075da9); box-shadow: 0 3px 9px rgba(0, 48, 92, .18); }
-.auth-header-inner { display: flex; align-items: center; gap: 18px; width: 100%; min-height: 106px; padding: 14px 30px; }
-.auth-header img { width: 74px; height: 74px; flex: 0 0 74px; object-fit: contain; border-radius: 50%; background: #fff; }
-.auth-header-inner div { display: grid; gap: 3px; }
-.auth-header strong { font-size: clamp(1.25rem, 2.2vw, 2rem); letter-spacing: .025em; }
-.auth-header span { color: #e4f1fb; font-size: clamp(.82rem, 1.4vw, 1.05rem); }
+.auth-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: 100%; min-height: 84px; padding: 10px 30px; }
+.auth-header-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.auth-header img { width: 60px; height: 60px; flex: 0 0 60px; object-fit: contain; border-radius: 50%; background: #fff; }
+.auth-header-copy { display: grid; gap: 2px; min-width: 0; }
+.auth-header-copy strong { font-size: clamp(1.08rem, 1.8vw, 1.55rem); letter-spacing: .025em; white-space: nowrap; }
+.auth-header-copy span { color: #e4f1fb; font-size: clamp(.72rem, 1.2vw, .92rem); }
+.pwa-install-header { flex: 0 0 auto; }
+.pwa-install-header .pwa-install-button { display: flex; align-items: center; gap: 7px; min-height: 38px; padding: 5px 11px 5px 7px; border: 1px solid rgba(255,255,255,.7); border-radius: 7px; color: #fff; background: rgba(255,255,255,.1); font-size: .72rem; font-weight: 800; }
+.pwa-install-header .pwa-install-button:hover { background: rgba(255,255,255,.2); }
+.pwa-install-header .pwa-install-button:disabled { cursor: default; opacity: .72; }
+.app-store-icon { width: 27px; height: 27px; }
+.app-store-icon rect { fill: #fff; stroke: none; }
+.app-store-icon path { fill: none; stroke: var(--ictu-blue); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .auth-stage { display: grid; place-items: center; width: 100%; padding: 26px 18px 30px; }
 .auth-card { width: min(100%, 550px); min-height: 638px; margin: 0; padding: 52px 50px 48px; border: 0; border-radius: 11px; background: #fff; box-shadow: 0 10px 30px rgba(30, 58, 89, .08); }
 .auth-card h1 { margin: 0; color: #064f9d; font-size: 2.15rem; text-align: center; }
@@ -527,6 +535,11 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .auth-security-note { margin-top: 39px; padding: 20px 20px; border: 1px solid #e5e9ee; border-radius: 6px; color: #405673; background: #f8fafc; font-size: .78rem; line-height: 1.65; text-align: center; }
 .auth-footer { display: grid; justify-items: center; gap: 7px; min-height: 104px; padding: 20px 18px 24px; color: #43536a; font-size: .82rem; text-align: center; }
 .auth-footer strong { color: var(--ictu-navy); }
+.auth-developer { display: inline-flex; align-items: center; gap: 5px; }
+.verified-badge { width: 20px; height: 20px; display: inline-grid; place-items: center; color: #17a75a; }
+.verified-badge svg { width: 100%; height: 100%; }
+.verified-badge svg path:first-child { fill: #e6f8ee; stroke: #17a75a; stroke-width: 1.5; stroke-linejoin: round; }
+.verified-badge svg path:last-child { fill: none; stroke: #17a75a; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .pwa-install-auth { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .pwa-install-auth .pwa-install-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; border: 1px solid #b9d3ea; border-radius: 4px; color: var(--ictu-blue); background: #eef7fe; font-size: .8rem; font-weight: 800; }
 .pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
@@ -589,15 +602,18 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 
 @media (max-width: 720px) {
   html, body, #root { width: 100%; max-width: 100%; overflow-x: hidden; }
-  .auth-header-inner { min-height: 82px; gap: 11px; padding: 12px 16px; }
-  .auth-header img { width: 56px; height: 56px; flex-basis: 56px; }
-  .auth-header strong { font-size: 1rem; }
-  .auth-header span { font-size: .69rem; }
+  .auth-header-inner { min-height: 70px; gap: 10px; padding: 9px 14px; }
+  .auth-header-brand { gap: 9px; }
+  .auth-header img { width: 48px; height: 48px; flex-basis: 48px; }
+  .auth-header-copy strong { max-width: 205px; overflow: hidden; font-size: .86rem; text-overflow: ellipsis; }
+  .auth-header-copy span { display: none; }
+  .pwa-install-header .pwa-install-button { width: 38px; justify-content: center; padding: 5px; }
+  .pwa-install-header .pwa-install-label { display: none; }
   .auth-stage { align-items: start; padding: 20px 14px; }
   .auth-card { min-height: 0; padding: 34px 24px; }
   .auth-card .auth-login-form { margin-top: 34px; }
   .auth-security-note { margin-top: 30px; }
-  .auth-global-notice { top: 92px; }
+  .auth-global-notice { top: 78px; }
   .app-content > main { padding-right: 12px; padding-left: 12px; }
   .app-content > main .page-layout { padding-bottom: 24px; }
   .hero, .recent-meetings, .card, .filter-card { min-width: 0; max-width: 100%; }
