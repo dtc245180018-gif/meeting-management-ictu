@@ -63,7 +63,9 @@ describe("LoginPage", () => {
     render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
 
     expect(screen.getByText("HỆ THỐNG QUẢN LÝ LỊCH HỌP")).toBeInTheDocument();
-    expect(screen.getByText("Dev Nguyễn Ngọc Thắng · KTPM K23A")).toBeInTheDocument();
+    expect(screen.getByText(/Dev Nguyễn Ngọc Thắng · KTPM K23A/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Tác giả đã xác minh")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tải ứng dụng" })).toBeInTheDocument();
     expect(screen.queryByText(/Mai Văn Đạt/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Quên mật khẩu?" }));
     expect(screen.getByRole("status")).toHaveTextContent("liên hệ quản trị viên");
