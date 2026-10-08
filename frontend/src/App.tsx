@@ -7,6 +7,7 @@ import { AdminPanel } from "./components/AdminPanel";
 import { NotificationCenter } from "./components/NotificationCenter";
 import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
 import { LoginPage } from "./components/LoginPage";
+import { InstallAppButton } from "./components/InstallAppButton";
 import { api, authStorage } from "./services/api";
 import type { Account, Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
@@ -372,6 +373,7 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
           {activeRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
         </nav>
         <div className="sidebar-footer-actions">
+          <InstallAppButton location="sidebar" />
           <button className="sidebar-logout" type="button" onClick={() => void onLogout()} title="Đăng xuất"><span className="nav-icon">↪</span><span className="sidebar-toggle-label">Đăng xuất</span></button>
           <button className="sidebar-toggle" type="button" aria-label={sidebarCollapsed ? "Mở rộng thanh điều hướng" : "Thu gọn thanh điều hướng"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}>
             <span className="nav-icon">{sidebarCollapsed ? "›" : "‹"}</span><span className="sidebar-toggle-label">{sidebarCollapsed ? "Mở rộng" : "Thu gọn"}</span>

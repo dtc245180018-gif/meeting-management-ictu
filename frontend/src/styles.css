@@ -41,6 +41,12 @@ button { cursor: pointer; }
 .sidebar-toggle { margin-top: auto; padding: 10px; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; color: #c7e0f2; background: transparent; font-size: .76rem; }
 .sidebar-toggle:hover { background: rgba(255,255,255,.1); }
 .sidebar-footer-actions { display: grid; gap: 8px; margin-top: auto; }
+.pwa-install-sidebar .pwa-install-button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 43px; padding: 0 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; color: #c7e0f2; background: transparent; font-size: .76rem; font-weight: 700; text-align: left; }
+.pwa-install-sidebar .pwa-install-button:hover { color: #fff; background: rgba(255,255,255,.1); }
+.pwa-install-sidebar .pwa-install-button:disabled { cursor: default; opacity: .72; }
+.pwa-install-icon { width: 20px; flex: 0 0 20px; font-size: 1.1rem; text-align: center; }
+.sidebar-collapsed .pwa-install-sidebar .pwa-install-button { justify-content: center; padding-right: 0; padding-left: 0; }
+.sidebar-collapsed .pwa-install-sidebar .pwa-install-label { display: none; }
 .sidebar-logout { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 43px; padding: 0 12px; border: 1px solid rgba(255,255,255,.16); border-radius: 4px; color: #c7e0f2; background: transparent; font-size: .76rem; font-weight: 700; text-align: left; }
 .sidebar-logout:hover { color: #fff; background: rgba(255,255,255,.1); }
 .sidebar-collapsed .sidebar-logout { justify-content: center; padding-right: 0; padding-left: 0; }
@@ -503,6 +509,11 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .auth-card h2 { margin: 7px 0 8px; color: var(--ictu-navy); }
 .auth-card form { display: grid; gap: 15px; margin-top: 22px; }
 .auth-card label { display: grid; gap: 7px; color: var(--ink); font-size: .8rem; font-weight: 800; }
+.pwa-install-auth { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.pwa-install-auth .pwa-install-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; border: 1px solid #b9d3ea; border-radius: 4px; color: var(--ictu-blue); background: #eef7fe; font-size: .8rem; font-weight: 800; }
+.pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
+.pwa-install-auth .pwa-install-button:disabled { cursor: default; color: #55718b; background: #eef2f6; }
+.pwa-install-notice { position: fixed; z-index: 100; right: 18px; bottom: 18px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; }
 .password-field { display: grid; gap: 7px; }
 .password-input-wrap { position: relative; min-width: 0; }
 .password-input-wrap input { padding-right: 68px; }
