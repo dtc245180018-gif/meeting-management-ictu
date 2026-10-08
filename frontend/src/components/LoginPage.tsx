@@ -10,6 +10,45 @@ interface Props {
 }
 
 
+interface PasswordFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  autoComplete: "current-password" | "new-password";
+  minLength?: number;
+  onChange: (value: string) => void;
+}
+
+
+function PasswordField({ id, label, value, autoComplete, minLength, onChange }: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false);
+
+  return <div className="password-field">
+    <label htmlFor={id}>{label}</label>
+    <div className="password-input-wrap">
+      <input
+        id={id}
+        type={visible ? "text" : "password"}
+        autoComplete={autoComplete}
+        minLength={minLength}
+        required
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      <button
+        type="button"
+        className="password-toggle"
+        aria-label={`${visible ? "Ẩn" : "Hiện"} ${label.toLowerCase()}`}
+        aria-pressed={visible}
+        onClick={() => setVisible((current) => !current)}
+      >
+        {visible ? "Ẩn" : "Hiện"}
+      </button>
+    </div>
+  </div>;
+}
+
+
 export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,9 +105,9 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
         <h2>Đổi mật khẩu lần đầu</h2>
         <p className="subtle">Xin chào {account.full_name}. Bạn cần đặt mật khẩu riêng trước khi sử dụng hệ thống.</p>
         <form onSubmit={submitPassword}>
-          <label>Mật khẩu tạm thời<input type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
-          <label>Mật khẩu mới<input type="password" autoComplete="new-password" minLength={8} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
-          <label>Xác nhận mật khẩu mới<input type="password" autoComplete="new-password" minLength={8} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
+          <PasswordField id="current-password" label="Mật khẩu tạm thời" autoComplete="current-password" value={currentPassword} onChange={setCurrentPassword} />
+          <PasswordField id="new-password" label="Mật khẩu mới" autoComplete="new-password" minLength={8} value={newPassword} onChange={setNewPassword} />
+          <PasswordField id="confirm-password" label="Xác nhận mật khẩu mới" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={setConfirmPassword} />
           <button className="primary-action" disabled={loading}>{loading ? "Đang cập nhật..." : "Đổi mật khẩu"}</button>
         </form>
       </> : <>
@@ -76,7 +115,7 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
         <h2>Chào mừng trở lại</h2>
         <form onSubmit={submitLogin}>
           <label>Email ICTU<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="tenban@ictu.edu.vn" /></label>
-          <label>Mật khẩu<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+          <PasswordField id="login-password" label="Mật khẩu" autoComplete="current-password" value={password} onChange={setPassword} />
           <button className="primary-action" disabled={loading}>{loading ? "Đang đăng nhập..." : "Đăng nhập"}</button>
         </form>
         <p className="subtle">Tài khoản mới sử dụng mật khẩu tạm thời do quản trị viên cung cấp.</p>

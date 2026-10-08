@@ -46,4 +46,16 @@ describe("LoginPage", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("chưa khớp");
     expect(api.changePassword).not.toHaveBeenCalled();
   });
+
+  it("shows and hides the login password", () => {
+    render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
+    const passwordInput = screen.getByLabelText("Mật khẩu");
+
+    expect(passwordInput).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "Hiện mật khẩu" }));
+    expect(passwordInput).toHaveAttribute("type", "text");
+    expect(screen.getByRole("button", { name: "Ẩn mật khẩu" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Ẩn mật khẩu" }));
+    expect(passwordInput).toHaveAttribute("type", "password");
+  });
 });
