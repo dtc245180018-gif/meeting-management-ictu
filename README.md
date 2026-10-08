@@ -200,7 +200,9 @@ dữ liệu và bắt buộc đổi ở lần đăng nhập đầu. File
 
 ## Quy ước Git
 
-- Mỗi User Story hoặc task được phát triển trên nhánh riêng.
-- Tên nhánh ví dụ: `feature/us01-create-meeting`.
-- Commit cần nêu rõ mã User Story và nội dung thay đổi.
-- Chỉ hợp nhất khi code đã review và test liên quan chạy đạt.
+- Repository áp dụng Gitflow với `main` là nhánh ổn định và `develop` là nhánh
+  tích hợp.
+- Mỗi User Story được phát triển trên nhánh `feature/USxx-ten-chuc-nang` tạo từ
+  `develop` và hợp nhất bằng Pull Request.
+- Quy trình release, hotfix, commit, Pull Request và kiểm thử bắt buộc được mô tả
+  trong [CONTRIBUTING.md](CONTRIBUTING.md).
