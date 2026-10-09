@@ -63,6 +63,14 @@ Trong Docker, frontend dùng `/api` và Nginx proxy request tới service `backe
 không cần trỏ trình duyệt trực tiếp tới hostname `backend`. Có thể đổi
 `VITE_API_URL` trong `.env` khi frontend được triển khai tách khỏi Docker Compose.
 
+Để mở bản production HTTPS trên iPhone và cài dưới dạng PWA, chạy thêm profile
+`iphone`. Hướng dẫn đầy đủ nằm tại [docs/IPHONE_PWA_SETUP.md](docs/IPHONE_PWA_SETUP.md).
+
+```powershell
+docker compose --profile iphone up -d --build
+docker compose logs cloudflared
+```
+
 ## Chạy Backend không dùng Docker
 
 ```bash
