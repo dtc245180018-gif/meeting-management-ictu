@@ -356,8 +356,15 @@ def apply_schema_migrations() -> None:
             if name not in account_columns:
                 connection.execute(text(f"ALTER TABLE user_accounts ADD COLUMN {name} {definition}"))
         # SQLAlchemy stores enum member names by default. EMPLOYEE was the
-        # Sprint 2 value and is now the ORGANIZER role.
-        connection.execute(text("UPDATE user_accounts SET role = 'ORGANIZER' WHERE role = 'EMPLOYEE'"))
+        # Sprint 2 value and is now the ORGANIZER role. Cast to text before
+        # comparing so a freshly created PostgreSQL enum (which never had the
+        # legacy value) does not reject the WHERE literal during startup.
+        connection.execute(
+            text(
+                "UPDATE user_accounts SET role = 'ORGANIZER' "
+                "WHERE CAST(role AS TEXT) = 'EMPLOYEE'"
+            )
+        )
 
         room_columns = {column["name"] for column in inspector.get_columns("rooms")}
         additions = {
