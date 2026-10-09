@@ -62,5 +62,13 @@ services:
     depends_on:
       - backend
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://frontend:80
+    profiles: ["iphone"]
+    restart: unless-stopped
+    depends_on:
+      - frontend
+
 volumes:
   postgres_data:
