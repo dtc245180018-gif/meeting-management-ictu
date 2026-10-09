@@ -194,6 +194,18 @@ python scripts/reset_demo_data.py
 python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
 ```
 
+Nếu hệ thống đang chạy bằng Docker, dùng lệnh tương đương tại thư mục gốc dự án:
+
+```powershell
+docker compose exec backend python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
+```
+
+Sau khi mới cập nhật mã nguồn có thay đổi `backend/Dockerfile`, cần build lại
+backend một lần bằng `docker compose up -d --build backend`. Chế độ `--full`
+xóa toàn bộ dữ liệu nghiệp vụ, kết nối Google Calendar đã lưu và tài khoản cũ,
+sau đó tạo lại 10 nhân viên/tài khoản mẫu với mật khẩu được truyền vào. Các bí
+mật OAuth/SMTP trong file `.env` không bị xóa.
+
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
 Kịch bản nghiệm thu đầy đủ US09–US16 nằm tại [docs/DEMO_SPRINT2.md](docs/DEMO_SPRINT2.md).
 
