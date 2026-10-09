@@ -63,6 +63,14 @@ Trong Docker, frontend dùng `/api` và Nginx proxy request tới service `backe
 không cần trỏ trình duyệt trực tiếp tới hostname `backend`. Có thể đổi
 `VITE_API_URL` trong `.env` khi frontend được triển khai tách khỏi Docker Compose.
 
+Để mở bản production HTTPS trên iPhone và cài dưới dạng PWA, chạy thêm profile
+`iphone`. Hướng dẫn đầy đủ nằm tại [docs/IPHONE_PWA_SETUP.md](docs/IPHONE_PWA_SETUP.md).
+
+```powershell
+docker compose --profile iphone up -d --build
+docker compose logs cloudflared
+```
+
 ## Chạy Backend không dùng Docker
 
 ```bash
@@ -182,7 +190,21 @@ Script có tính idempotent: không xóa dữ liệu hiện có và bỏ qua nh�
 ```powershell
 cd backend
 python scripts/reset_demo_data.py
+# Hoặc đưa toàn bộ dữ liệu và tài khoản về cùng trạng thái trước mỗi lần demo:
+python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
 ```
+
+Nếu hệ thống đang chạy bằng Docker, dùng lệnh tương đương tại thư mục gốc dự án:
+
+```powershell
+docker compose exec backend python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
+```
+
+Sau khi mới cập nhật mã nguồn có thay đổi `backend/Dockerfile`, cần build lại
+backend một lần bằng `docker compose up -d --build backend`. Chế độ `--full`
+xóa toàn bộ dữ liệu nghiệp vụ, kết nối Google Calendar đã lưu và tài khoản cũ,
+sau đó tạo lại 10 nhân viên/tài khoản mẫu với mật khẩu được truyền vào. Các bí
+mật OAuth/SMTP trong file `.env` không bị xóa.
 
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
 Kịch bản nghiệm thu đầy đủ US09–US16 nằm tại [docs/DEMO_SPRINT2.md](docs/DEMO_SPRINT2.md).
@@ -200,7 +222,9 @@ dữ liệu và bắt buộc đổi ở lần đăng nhập đầu. File
 
 ## Quy ước Git
 
-- Mỗi User Story hoặc task được phát triển trên nhánh riêng.
-- Tên nhánh ví dụ: `feature/us01-create-meeting`.
-- Commit cần nêu rõ mã User Story và nội dung thay đổi.
-- Chỉ hợp nhất khi code đã review và test liên quan chạy đạt.
+- Repository áp dụng Gitflow với `main` là nhánh ổn định và `develop` là nhánh
+  tích hợp.
+- Mỗi User Story được phát triển trên nhánh `feature/USxx-ten-chuc-nang` tạo từ
+  `develop` và hợp nhất bằng Pull Request.
+- Quy trình release, hotfix, commit, Pull Request và kiểm thử bắt buộc được mô tả
+  trong [CONTRIBUTING.md](CONTRIBUTING.md).

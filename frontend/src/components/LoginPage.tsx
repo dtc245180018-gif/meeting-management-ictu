@@ -77,8 +77,13 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
     event.preventDefault();
     setEmailError("");
     setPasswordError("");
-    if (!email.trim()) {
-      setEmailError("Vui lòng nhập tên đăng nhập.");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setEmailError("Vui lòng nhập email đăng nhập.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setEmailError("Email không đúng định dạng.");
       return;
     }
     if (!password) {
@@ -88,7 +93,7 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
     setLoading(true);
     setMessage("");
     try {
-      const result = await api.login(email, password);
+      const result = await api.login(normalizedEmail, password);
       authStorage.set(result.access_token);
       onAuthenticated(result.user);
     } catch (error) {
@@ -145,8 +150,8 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
           <h1>Đăng Nhập</h1>
           <form className="auth-login-form" noValidate onSubmit={submitLogin}>
             <div className="auth-input-field">
-              <label className="sr-only" htmlFor="login-email">Email ICTU</label>
-              <input id="login-email" type="email" autoComplete="username" className={emailError ? "input-invalid" : undefined} aria-invalid={Boolean(emailError)} aria-describedby={emailError ? "login-email-error" : undefined} value={email} onChange={(event) => { setEmail(event.target.value); setEmailError(""); }} placeholder="Tên đăng nhập" />
+              <label className="sr-only" htmlFor="login-email">Email đăng nhập</label>
+              <input id="login-email" type="email" inputMode="email" autoComplete="username" className={emailError ? "input-invalid" : undefined} aria-invalid={Boolean(emailError)} aria-describedby={emailError ? "login-email-error" : undefined} value={email} onChange={(event) => { setEmail(event.target.value); setEmailError(""); setMessage(""); }} placeholder="Email đăng nhập" />
               {emailError && <small className="auth-field-error" id="login-email-error">{emailError}</small>}
             </div>
             <PasswordField id="login-password" label="Mật khẩu" hideLabel placeholder="Mật khẩu" autoComplete="current-password" value={password} error={passwordError} onChange={(value) => { setPassword(value); setPasswordError(""); }} />

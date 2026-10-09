@@ -4,6 +4,15 @@ Tài khoản tổ chức mặc định là `dtc245180018@ictu.edu.vn`. Hai tài 
 mời để nghiệm thu là `ngocthang18092006@gmail.com` và `tn9728160@gmail.com`.
 Không commit Client Secret, refresh token hoặc mật khẩu ứng dụng lên Git.
 
+Khi chạy bằng Docker Compose, backend tự nạp lần lượt `.env` ở thư mục gốc và
+`backend/.env`. File `backend/.env` được nạp sau để Docker dùng cùng cấu hình
+OAuth/SMTP với lệnh uvicorn thủ công. Cả hai file đều bị Git bỏ qua. Sau khi
+thay đổi cấu hình tích hợp, dựng lại các dịch vụ bằng:
+
+```powershell
+docker compose --profile iphone up -d --build backend frontend cloudflared
+```
+
 ## 1. Google Calendar OAuth
 
 1. Mở Google Cloud Console, tạo/chọn project và bật **Google Calendar API**.
@@ -73,4 +82,3 @@ sẽ chuyển từ **Đang chờ gửi** sang **Đã gửi** hoặc **Gửi th�
 5. Sửa tên/giờ họp; kiểm tra sự kiện Google và email cập nhật.
 6. Hủy họp; kiểm tra phòng/thiết bị được giải phóng, sự kiện Google bị xóa và
    email hủy được gửi.
-
