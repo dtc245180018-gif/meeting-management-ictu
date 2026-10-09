@@ -30,7 +30,7 @@ describe("LoginPage", () => {
     vi.mocked(api.login).mockResolvedValue({ access_token: "signed-token", token_type: "bearer", user: account });
     const authenticated = vi.fn();
     render(<LoginPage onAuthenticated={authenticated} onPasswordChanged={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText("Email ICTU"), { target: { value: account.email } });
+    fireEvent.change(screen.getByLabelText("Email đăng nhập"), { target: { value: account.email } });
     fireEvent.change(screen.getByLabelText("Mật khẩu"), { target: { value: "ICTU123" } });
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
     await waitFor(() => expect(api.login).toHaveBeenCalledWith(account.email, "ICTU123"));
@@ -74,7 +74,17 @@ describe("LoginPage", () => {
   it("shows inline validation matching the login design", () => {
     render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
-    expect(screen.getByText("Vui lòng nhập tên đăng nhập.")).toBeInTheDocument();
+    expect(screen.getByText("Vui lòng nhập email đăng nhập.")).toBeInTheDocument();
+    expect(api.login).not.toHaveBeenCalled();
+  });
+
+  it("rejects an employee code with a readable message instead of an object", () => {
+    render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Email đăng nhập"), { target: { value: "DTCAD001" } });
+    fireEvent.change(screen.getByLabelText("Mật khẩu"), { target: { value: "ICTU123" } });
+    fireEvent.click(screen.getByRole("button", { name: "Đăng nhập" }));
+
+    expect(screen.getByText("Email không đúng định dạng.")).toBeInTheDocument();
     expect(api.login).not.toHaveBeenCalled();
   });
 });
