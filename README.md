@@ -190,6 +190,8 @@ Script có tính idempotent: không xóa dữ liệu hiện có và bỏ qua nh�
 ```powershell
 cd backend
 python scripts/reset_demo_data.py
+# Hoặc đưa toàn bộ dữ liệu và tài khoản về cùng trạng thái trước mỗi lần demo:
+python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
 ```
 
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
