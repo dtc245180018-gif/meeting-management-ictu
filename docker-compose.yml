@@ -17,35 +17,18 @@ services:
 
   backend:
     build: ./backend
+    # Reuse the same application settings as a manual backend run. The root
+    # file remains Docker-friendly, while backend/.env can supply local OAuth
+    # and SMTP secrets without committing either file to Git.
+    env_file:
+      - path: ./.env
+        required: false
+      - path: ./backend/.env
+        required: false
     environment:
+      # Docker always uses PostgreSQL even when backend/.env uses SQLite for a
+      # manual uvicorn run. Other application settings come from env_file.
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://meeting_user:meeting_password@db:5432/meeting_management}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      ADMIN_EMAILS: ${ADMIN_EMAILS:-leader@example.com}
-      LEADER_EMAIL: ${LEADER_EMAIL:-leader@example.com}
-      EMPLOYEE_ONE_EMAIL: ${EMPLOYEE_ONE_EMAIL:-employee.one@example.com}
-      EMPLOYEE_TWO_EMAIL: ${EMPLOYEE_TWO_EMAIL:-employee.two@example.com}
-      EMAIL_BACKEND: ${EMAIL_BACKEND:-console}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
-      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
-      REMINDER_MAX_ATTEMPTS: ${REMINDER_MAX_ATTEMPTS:-3}
-      NOTIFICATION_RETENTION_DAYS: ${NOTIFICATION_RETENTION_DAYS:-30}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
-      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:8000/api/integrations/google/callback}
-      GOOGLE_TOKEN_ENCRYPTION_KEY: ${GOOGLE_TOKEN_ENCRYPTION_KEY:-}
-      GOOGLE_OAUTH_STATE_SECRET: ${GOOGLE_OAUTH_STATE_SECRET:-}
-      GOOGLE_CALENDAR_ID: ${GOOGLE_CALENDAR_ID:-primary}
-      SPRINT3_SEED_ACCOUNTS: ${SPRINT3_SEED_ACCOUNTS:-true}
-      SPRINT3_CREDENTIALS_FILE: ${SPRINT3_CREDENTIALS_FILE:-sprint3_credentials.local.csv}
-      AUTH_REQUIRED: ${AUTH_REQUIRED:-true}
-      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
-      AUTH_TOKEN_MINUTES: ${AUTH_TOKEN_MINUTES:-480}
-      INITIAL_ACCOUNT_PASSWORD: ${INITIAL_ACCOUNT_PASSWORD:-ICTU123}
     ports:
       - "8000:8000"
     depends_on:

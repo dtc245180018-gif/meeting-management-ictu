@@ -24,6 +24,46 @@ import type {
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 const TOKEN_KEY = "ictu-meeting-token";
 
+type ApiErrorPayload = {
+  detail?: unknown;
+  message?: unknown;
+};
+
+type ValidationErrorItem = {
+  loc?: unknown;
+  msg?: unknown;
+};
+
+function validationErrorMessage(item: unknown): string | null {
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object") return null;
+
+  const validationItem = item as ValidationErrorItem;
+  const location = Array.isArray(validationItem.loc)
+    ? validationItem.loc.map(String)
+    : [];
+  if (location.includes("email")) return "Email không đúng định dạng.";
+  if (location.includes("password")) return "Mật khẩu không hợp lệ.";
+  return typeof validationItem.msg === "string" ? validationItem.msg : null;
+}
+
+export function apiErrorMessage(payload: unknown, fallback = "Không thể kết nối tới máy chủ"): string {
+  if (!payload || typeof payload !== "object") return fallback;
+
+  const { detail, message } = payload as ApiErrorPayload;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = [...new Set(detail.map(validationErrorMessage).filter((item): item is string => Boolean(item)))];
+    if (messages.length) return messages.join(" ");
+  }
+  if (detail && typeof detail === "object") {
+    const normalized = validationErrorMessage(detail);
+    if (normalized) return normalized;
+  }
+  if (typeof message === "string" && message.trim()) return message;
+  return fallback;
+}
+
 export const authStorage = {
   get: () => window.localStorage.getItem(TOKEN_KEY),
   set: (token: string) => window.localStorage.setItem(TOKEN_KEY, token),
@@ -46,9 +86,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new Event("ictu-auth-expired"));
     const payload = await response.json().catch(() => null);
-    throw new Error(payload?.detail ?? "Không thể kết nối tới máy chủ");
+    if (response.status === 401 && path !== "/auth/login") {
+      window.dispatchEvent(new Event("ictu-auth-expired"));
+    }
+    throw new Error(apiErrorMessage(payload));
   }
   return response.json() as Promise<T>;
 }
@@ -218,7 +260,9 @@ export async function downloadAuthenticated(url: string): Promise<void> {
   const response = await fetch(url, {
     headers: authStorage.get() ? { Authorization: `Bearer ${authStorage.get()}` } : {},
   });
-  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? "Không thể xuất báo cáo");
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(await response.json().catch(() => null), "Không thể xuất báo cáo"));
+  }
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "ictu-meeting-report";
   const link = document.createElement("a");
