@@ -30,7 +30,7 @@ def _decode(value: str) -> bytes:
     return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
 
 
-def _secret(settings: Settings) -> bytes:
+def signing_secret(settings: Settings) -> bytes:
     # Existing Sprint 2 installations already have an OAuth state signing
     # secret. It is a safe migration fallback until AUTH_SECRET_KEY is set.
     secret = (settings.auth_secret_key or settings.google_oauth_state_secret).strip()
@@ -54,7 +54,7 @@ def create_access_token(account: models.UserAccount, settings: Settings | None =
         "exp": now + current_settings.auth_token_minutes * 60,
     }
     encoded = _encode(json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8"))
-    signature = _encode(hmac.new(_secret(current_settings), encoded.encode("ascii"), hashlib.sha256).digest())
+    signature = _encode(hmac.new(signing_secret(current_settings), encoded.encode("ascii"), hashlib.sha256).digest())
     return f"{encoded}.{signature}"
 
 
@@ -62,7 +62,7 @@ def decode_access_token(token: str, settings: Settings | None = None) -> dict:
     current_settings = settings or get_settings()
     try:
         encoded, signature = token.split(".", 1)
-        expected = _encode(hmac.new(_secret(current_settings), encoded.encode("ascii"), hashlib.sha256).digest())
+        expected = _encode(hmac.new(signing_secret(current_settings), encoded.encode("ascii"), hashlib.sha256).digest())
         if not hmac.compare_digest(signature, expected):
             raise ValueError("signature")
         payload = json.loads(_decode(encoded))

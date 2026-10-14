@@ -1,0 +1,34 @@
+[
+  {
+    "external_id": "ICTU-HRM-001",
+    "full_name": "Phạm Thu Hà",
+    "email": "thuha@ictu.edu.vn",
+    "department": "Phòng Hành chính",
+    "is_active": true,
+    "role": "organizer"
+  },
+  {
+    "external_id": "ICTU-HRM-002",
+    "full_name": "Đỗ Quang Huy",
+    "email": "quanghuy@ictu.edu.vn",
+    "department": "Trung tâm CNTT",
+    "is_active": true,
+    "role": "organizer"
+  },
+  {
+    "external_id": "ICTU-HRM-003",
+    "full_name": "Vũ Mai Linh",
+    "email": "mailinh@ictu.edu.vn",
+    "department": "Khoa Hệ thống thông tin",
+    "is_active": true,
+    "role": "participant"
+  },
+  {
+    "external_id": "ICTU-HRM-004",
+    "full_name": "Nguyễn Thu Trang",
+    "email": "trangnt@ictu.edu.vn",
+    "department": "Khoa Truyền thông đa phương tiện",
+    "is_active": true,
+    "role": "participant"
+  }
+]

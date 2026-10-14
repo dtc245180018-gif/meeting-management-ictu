@@ -23,6 +23,22 @@ export interface Room {
   restriction_reason?: string;
 }
 
+export interface RoomRecommendation {
+  room: Room;
+  score: number;
+  reasons: string[];
+  capacity_surplus: number;
+}
+
+export interface RoomRecommendationPage {
+  items: RoomRecommendation[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  message?: string;
+}
+
 export type EquipmentStatus = "available" | "booked" | "maintenance" | "inactive";
 
 export interface Equipment {
@@ -61,6 +77,38 @@ export interface Booking {
   end_time: string;
   status: "active" | "cancelled";
   room: Room;
+}
+
+export interface BookingQr {
+  booking_id: number;
+  room_id: number;
+  expires_at: string;
+  qr_token: string;
+  image_data_url: string;
+}
+
+export interface BookingQrInspection {
+  booking_id: number;
+  meeting_id: number;
+  meeting_title: string;
+  room_id: number;
+  room_name: string;
+  start_time: string;
+  end_time: string;
+  meeting_status: MeetingStatus;
+  checked_in_at?: string;
+  checked_out_at?: string;
+  can_check_in: boolean;
+  can_check_out: boolean;
+}
+
+export interface BookingAttendance {
+  booking_id: number;
+  account_id: number;
+  checked_in_at?: string;
+  checked_out_at?: string;
+  already_recorded: boolean;
+  message: string;
 }
 
 export interface Meeting {
@@ -117,6 +165,58 @@ export interface MeetingInput {
   reminder_minutes?: 15 | 30 | 60 | 1440 | null;
   recurrence: "weekly" | "monthly" | null;
   recurrence_count: number;
+}
+
+export interface ChatbotBookingDraft {
+  title?: string | null;
+  description?: string | null;
+  organizer_email?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  participant_emails: string[];
+  expected_attendees?: number | null;
+  recurrence: "weekly" | "monthly" | null;
+  recurrence_count: number;
+  room_id?: number | null;
+  equipment_ids: number[];
+  reminder_minutes: 15 | 30 | 60 | 1440 | null;
+}
+
+export interface ChatbotBookingPreview {
+  ready_to_confirm: boolean;
+  prompt: string;
+  missing_fields: string[];
+  draft: ChatbotBookingDraft;
+  room_options: Room[];
+  summary?: string;
+  confirmation_token?: string;
+  expires_at?: string;
+}
+
+export interface ChatbotBookingConfirmation {
+  message: string;
+  meetings: Meeting[];
+}
+
+export interface ChatbotConversationMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface ChatbotConversationTurn {
+  reply: string;
+  draft: ChatbotBookingDraft;
+  missing_fields: string[];
+  ready_for_preview: boolean;
+  provider: "gemini";
+  model: string;
+}
+
+export interface ChatbotAiStatus {
+  configured: boolean;
+  provider: "gemini";
+  model: string;
+  privacy_notice: string;
 }
 
 export interface SuggestedTime {
@@ -197,6 +297,45 @@ export interface AccountPage {
   page: number;
   page_size: number;
   total_pages: number;
+}
+
+export interface HrmSyncIssue {
+  id: number;
+  record_key?: string;
+  error_code: string;
+  message: string;
+  created_at: string;
+}
+
+export interface HrmSyncRun {
+  id: number;
+  source: string;
+  trigger: string;
+  status: string;
+  total_count: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  failed_count: number;
+  started_at: string;
+  finished_at?: string;
+  issues: HrmSyncIssue[];
+}
+
+export interface HrmSyncPage {
+  items: HrmSyncRun[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface HrmIntegrationStatus {
+  connector: string;
+  configured: boolean;
+  running: boolean;
+  periodic_enabled: boolean;
+  detail: string;
 }
 
 export interface RoomPermission {

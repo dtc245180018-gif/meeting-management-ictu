@@ -42,6 +42,60 @@ class RoomOut(BaseModel):
     restriction_reason: str | None = None
 
 
+class RoomRecommendationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    start_time: datetime
+    end_time: datetime
+    expected_attendees: int = Field(ge=1, le=10000)
+    recurrence: Literal["weekly", "monthly"] | None = None
+    recurrence_count: int = Field(default=1, ge=1, le=24)
+    equipment_ids: list[int] = Field(default_factory=list, max_length=30)
+    required_features: list[Literal["projector", "display", "microphone", "video_conferencing"]] = Field(
+        default_factory=list,
+        max_length=4,
+    )
+    preferred_building: str | None = Field(default=None, max_length=120)
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=10, ge=1, le=50)
+
+    @field_validator("equipment_ids")
+    @classmethod
+    def recommendation_equipment_unique(cls, value: list[int]) -> list[int]:
+        if any(item < 1 for item in value) or len(value) != len(set(value)):
+            raise ValueError("Danh sách thiết bị không hợp lệ hoặc bị trùng")
+        return value
+
+    @field_validator("required_features")
+    @classmethod
+    def recommendation_features_unique(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("Không được chọn trùng tính năng phòng")
+        return value
+
+    @model_validator(mode="after")
+    def recommendation_time_range(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("Thời gian kết thúc phải sau thời gian bắt đầu")
+        return self
+
+
+class RoomRecommendationOut(BaseModel):
+    room: RoomOut
+    score: int
+    reasons: list[str]
+    capacity_surplus: int
+
+
+class RoomRecommendationPage(BaseModel):
+    items: list[RoomRecommendationOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    message: str | None = None
+
+
 class RoomAdminCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -157,6 +211,44 @@ class BookingOut(BaseModel):
     end_time: datetime
     status: BookingStatus
     room: RoomOut
+
+
+class BookingQrOut(BaseModel):
+    booking_id: int
+    room_id: int
+    expires_at: datetime
+    qr_token: str
+    image_data_url: str
+
+
+class BookingQrRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    qr_token: str = Field(min_length=20, max_length=20000)
+
+
+class BookingQrInspectionOut(BaseModel):
+    booking_id: int
+    meeting_id: int
+    meeting_title: str
+    room_id: int
+    room_name: str
+    start_time: datetime
+    end_time: datetime
+    meeting_status: MeetingStatus
+    checked_in_at: datetime | None = None
+    checked_out_at: datetime | None = None
+    can_check_in: bool
+    can_check_out: bool
+
+
+class BookingAttendanceOut(BaseModel):
+    booking_id: int
+    account_id: int
+    checked_in_at: datetime | None = None
+    checked_out_at: datetime | None = None
+    already_recorded: bool = False
+    message: str
 
 
 class GoogleCalendarEventOut(BaseModel):
@@ -285,6 +377,126 @@ class MeetingOut(BaseModel):
     booking: BookingOut | None = None
     equipment_bookings: list[EquipmentBookingOut] = Field(default_factory=list)
     google_calendar_event: GoogleCalendarEventOut | None = None
+
+
+class ChatbotBookingDraft(BaseModel):
+    """Partial meeting data collected by the Sprint 4 booking assistant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    organizer_email: EmailStr | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    participant_emails: list[EmailStr] = Field(default_factory=list, max_length=50)
+    expected_attendees: int | None = Field(default=None, ge=1, le=10000)
+    recurrence: Literal["weekly", "monthly"] | None = None
+    recurrence_count: int = Field(default=1, ge=1, le=24)
+    room_id: int | None = Field(default=None, ge=1)
+    equipment_ids: list[int] = Field(default_factory=list, max_length=30)
+    reminder_minutes: Literal[15, 30, 60, 1440] | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def normalize_optional_title(cls, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("equipment_ids")
+    @classmethod
+    def chatbot_equipment_must_be_unique(cls, value: list[int]) -> list[int]:
+        if any(item < 1 for item in value) or len(value) != len(set(value)):
+            raise ValueError("Danh sách thiết bị không hợp lệ hoặc bị trùng")
+        return value
+
+    @model_validator(mode="after")
+    def validate_partial_booking(self):
+        if (
+            self.start_time is not None
+            and self.end_time is not None
+            and self.end_time <= self.start_time
+        ):
+            raise ValueError("Thời gian kết thúc phải sau thời gian bắt đầu")
+        organizer = str(self.organizer_email).strip().lower() if self.organizer_email else ""
+        participants = {
+            str(email).strip().lower()
+            for email in self.participant_emails
+            if str(email).strip().lower() != organizer
+        }
+        if (
+            self.expected_attendees is not None
+            and self.expected_attendees < len(participants) + 1
+        ):
+            raise ValueError(
+                "Số người dự kiến phải ít nhất bằng số người được mời và người tổ chức"
+            )
+        return self
+
+
+class ChatbotBookingPreviewOut(BaseModel):
+    ready_to_confirm: bool
+    prompt: str
+    missing_fields: list[str] = Field(default_factory=list)
+    draft: ChatbotBookingDraft
+    room_options: list[RoomOut] = Field(default_factory=list)
+    summary: str | None = None
+    confirmation_token: str | None = None
+    expires_at: datetime | None = None
+
+
+class ChatbotBookingConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation_token: str = Field(min_length=20, max_length=20000)
+
+
+class ChatbotBookingConfirmOut(BaseModel):
+    message: str
+    meetings: list[MeetingOut]
+
+
+class ChatbotConversationMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ChatbotConversationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=2000)
+    draft: ChatbotBookingDraft
+    history: list[ChatbotConversationMessage] = Field(default_factory=list, max_length=12)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def normalize_chat_message(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Tin nhắn không được để trống")
+        return normalized
+
+
+class ChatbotConversationOut(BaseModel):
+    reply: str
+    draft: ChatbotBookingDraft
+    missing_fields: list[str] = Field(default_factory=list)
+    ready_for_preview: bool
+    provider: Literal["gemini"] = "gemini"
+    model: str
+
+
+class ChatbotAiStatusOut(BaseModel):
+    configured: bool
+    provider: Literal["gemini"] = "gemini"
+    model: str
+    privacy_notice: str
 
 
 class CancelRequest(BaseModel):
@@ -464,6 +676,71 @@ class AccountPage(BaseModel):
     page: int
     page_size: int
     total_pages: int
+
+
+class HRMEmployeeRecord(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    external_id: str = Field(min_length=1, max_length=120)
+    full_name: str = Field(min_length=2, max_length=160)
+    email: EmailStr
+    department: str = Field(min_length=2, max_length=160)
+    is_active: bool = True
+    role: AccountRole | None = None
+
+    @field_validator("external_id", "full_name", "department", mode="before")
+    @classmethod
+    def normalize_hrm_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+
+class HRMSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    records: list[dict[str, object]] | None = Field(default=None, max_length=1000)
+
+
+class HRMSyncIssueOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    record_key: str | None
+    error_code: str
+    message: str
+    created_at: datetime
+
+
+class HRMSyncRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source: str
+    trigger: str
+    status: str
+    total_count: int
+    created_count: int
+    updated_count: int
+    skipped_count: int
+    failed_count: int
+    started_at: datetime
+    finished_at: datetime | None
+    issues: list[HRMSyncIssueOut] = Field(default_factory=list)
+
+
+class HRMSyncPage(BaseModel):
+    items: list[HRMSyncRunOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class HRMIntegrationStatusOut(BaseModel):
+    connector: str
+    configured: bool
+    running: bool
+    periodic_enabled: bool
+    detail: str
 
 
 class RoomPermissionOut(BaseModel):
