@@ -501,7 +501,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 /* Sprint 3 authentication, reporting and mobile hardening. */
 .auth-loading { display: grid; min-height: 100vh; place-items: center; color: var(--ictu-blue); font-weight: 800; }
 .auth-global-notice { position: fixed; z-index: 30; top: 94px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 8px 22px rgba(0, 48, 92, .12); pointer-events: none; }
-.auth-page { display: grid; grid-template-rows: auto 1fr auto; width: 100%; min-height: 100vh; margin: 0; padding: 0; background: #f3f6fa; }
+.auth-page { display: grid; grid-template-rows: auto 1fr auto; width: 100%; min-height: 100vh; min-height: 100svh; margin: 0; padding: 0; background: #f3f6fa; }
 .auth-header { color: #fff; background: linear-gradient(90deg, #00509d, #075da9); box-shadow: 0 3px 9px rgba(0, 48, 92, .18); }
 .auth-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: 100%; min-height: 84px; padding: 10px 30px; }
 .auth-header-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
@@ -624,6 +624,12 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .user-item { grid-template-columns: 1fr; }
   .user-item .item-actions { grid-column: 1; }
   .bar-row { grid-template-columns: 88px minmax(80px, 1fr) 28px; }
+}
+
+@media (display-mode: standalone) {
+  .auth-header-inner { padding-top: max(9px, env(safe-area-inset-top)); }
+  .auth-footer { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+  .auth-stage { min-height: 0; }
 }
 
 /* Sprint 4 · US25 booking assistant. */

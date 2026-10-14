@@ -41,6 +41,7 @@ function PasswordField({ id, label, value, autoComplete, minLength, placeholder,
         aria-describedby={error ? `${id}-error` : undefined}
         required
         value={value}
+        enterKeyHint={id === "login-password" ? "go" : undefined}
         onChange={(event) => onChange(event.target.value)}
       />
       <button
@@ -151,7 +152,7 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
           <form className="auth-login-form" noValidate onSubmit={submitLogin}>
             <div className="auth-input-field">
               <label className="sr-only" htmlFor="login-email">Email đăng nhập</label>
-              <input id="login-email" type="email" inputMode="email" autoComplete="username" className={emailError ? "input-invalid" : undefined} aria-invalid={Boolean(emailError)} aria-describedby={emailError ? "login-email-error" : undefined} value={email} onChange={(event) => { setEmail(event.target.value); setEmailError(""); setMessage(""); }} placeholder="Email đăng nhập" />
+              <input id="login-email" type="email" inputMode="email" autoComplete="username" enterKeyHint="next" className={emailError ? "input-invalid" : undefined} aria-invalid={Boolean(emailError)} aria-describedby={emailError ? "login-email-error" : undefined} value={email} onChange={(event) => { setEmail(event.target.value); setEmailError(""); setMessage(""); }} placeholder="Email đăng nhập" />
               {emailError && <small className="auth-field-error" id="login-email-error">{emailError}</small>}
             </div>
             <PasswordField id="login-password" label="Mật khẩu" hideLabel placeholder="Mật khẩu" autoComplete="current-password" value={password} error={passwordError} onChange={(value) => { setPassword(value); setPasswordError(""); }} />

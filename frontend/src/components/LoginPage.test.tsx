@@ -65,7 +65,9 @@ describe("LoginPage", () => {
     const passwordInput = screen.getByLabelText("Mật khẩu");
 
     expect(emailInput).toHaveAttribute("autocomplete", "username");
+    expect(emailInput).toHaveAttribute("enterkeyhint", "next");
     expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
+    expect(passwordInput).toHaveAttribute("enterkeyhint", "go");
     expect(emailInput).not.toBeDisabled();
     expect(emailInput).not.toHaveAttribute("readonly");
     expect(passwordInput).not.toBeDisabled();
