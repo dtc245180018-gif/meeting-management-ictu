@@ -124,6 +124,10 @@ npm run build
 - `AUTH_TOKEN_MINUTES`: thời gian sống của phiên; mặc định 480 phút.
 - `CHATBOT_CONFIRMATION_MINUTES`: thời gian hiệu lực của mã xác nhận đặt lịch
   qua chatbot; mặc định 10 phút.
+- `GEMINI_API_KEY`: khóa Gemini API chỉ đặt trong `.env` hoặc `backend/.env`,
+  tuyệt đối không dùng biến `VITE_*` và không commit khóa thật.
+- `GEMINI_MODEL`: mô hình hội thoại; mặc định `gemini-3.8-flash`.
+- `GEMINI_TIMEOUT_SECONDS`: thời gian chờ Gemini; mặc định 20 giây.
 - `INITIAL_ACCOUNT_PASSWORD=ICTU123`: mật khẩu tạm được băm riêng từng tài khoản;
   người dùng bắt buộc đổi ở lần đăng nhập đầu.
 - `ADMIN_EMAILS` chỉ còn phục vụ migration/tương thích dữ liệu Sprint 2. Quyền
@@ -171,7 +175,7 @@ tiếp trên Google không được kéo ngược về hệ thống.
 | Tài khoản | `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}` |
 | Quyền phòng | `GET /api/admin/users/{id}/room-permissions`, `PUT /api/admin/users/{id}/room-permissions/{room_id}` |
 | Báo cáo | `GET /api/admin/reports/overview`, `GET /api/admin/reports/export?format=xlsx|pdf` |
-| Chatbot đặt lịch | `POST /api/chatbot/bookings/preview`, `POST /api/chatbot/bookings/confirm` |
+| Chatbot đặt lịch | `GET /api/chatbot/ai/status`, `POST /api/chatbot/conversation`, `POST /api/chatbot/bookings/preview`, `POST /api/chatbot/bookings/confirm` |
 
 Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 `reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,
@@ -179,13 +183,17 @@ Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 
 ## US25 - Đặt lịch qua chatbot
 
-Chatbot dùng quy trình hai bước để người dùng luôn xem lại thông tin trước khi
-ghi dữ liệu:
+Chatbot có lớp hội thoại Gemini và quy trình xác nhận tách biệt để AI không thể
+tự ghi dữ liệu:
 
-1. Gửi dữ liệu đã thu thập tới `POST /api/chatbot/bookings/preview`. API trả về
+1. Gửi câu tự nhiên và bản nháp tới `POST /api/chatbot/conversation`. Gemini chỉ
+   trả lời và đề xuất cập nhật bản nháp; backend ghi đè danh tính người tổ chức,
+   loại mã phòng/thiết bị không tồn tại và kiểm tra lại kiểu dữ liệu. Request đặt
+   `store=false` để không lưu phiên hội thoại trên Gemini.
+2. Gửi dữ liệu đã thu thập tới `POST /api/chatbot/bookings/preview`. API trả về
    trường còn thiếu, phòng phù hợp cho toàn bộ các lần lặp hoặc bản tóm tắt kèm
    mã xác nhận có thời hạn.
-2. Sau khi người dùng xác nhận, gửi mã đó tới
+3. Sau khi người dùng xác nhận, gửi mã đó tới
    `POST /api/chatbot/bookings/confirm`. Backend kiểm tra lại phòng, thiết bị,
    quyền và xung đột ngay trong transaction trước khi tạo lịch.
 
@@ -193,11 +201,13 @@ Mã xác nhận được ký, gắn với tài khoản đang đăng nhập và k
 Nếu dữ liệu bị sửa, mã hết hạn hoặc tài nguyên vừa bị người khác đặt, toàn bộ
 thao tác bị từ chối và không tạo cuộc họp một phần.
 
-Sau khi đăng nhập, người dùng mở nút **Đặt phòng nhanh** ở góc dưới bên phải.
-Trợ lý sẽ lần lượt hỏi tên, thời gian, người tham dự, quy mô, lịch lặp và thiết
-bị; sau đó cho chọn phòng, xem bản tóm tắt, xác nhận hoặc hủy thao tác. Tài khoản
+Sau khi đăng nhập, người dùng mở nút **Trợ lý AI** ở góc dưới bên phải và có thể
+nhập câu như “Đặt phòng cho 10 người sáng mai từ 9 đến 10 giờ, cần máy chiếu”.
+Gemini hỏi lại phần còn thiếu, hiểu yêu cầu sửa ở các lượt tiếp theo, rồi giao
+cho backend tìm phòng. Người dùng vẫn phải chọn phòng và bấm xác nhận. Tài khoản
 chỉ có quyền tham dự vẫn nhìn thấy trợ lý nhưng được thông báo rõ lý do không thể
-đặt phòng.
+đặt phòng. Tin nhắn người dùng được gửi tới Google Gemini để xử lý; không đưa dữ
+liệu bí mật hoặc thông tin không cần thiết vào nội dung hội thoại.
 
 ## Nạp dữ liệu demo và kịch bản trình diễn
 

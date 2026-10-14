@@ -20,6 +20,9 @@ import type {
   ChatbotBookingConfirmation,
   ChatbotBookingDraft,
   ChatbotBookingPreview,
+  ChatbotAiStatus,
+  ChatbotConversationMessage,
+  ChatbotConversationTurn,
   ReportOverview,
   RoomPermission,
 } from "../types";
@@ -115,6 +118,17 @@ export const api = {
 
   createMeeting: (payload: MeetingInput) =>
     request<Meeting[]>("/meetings", { method: "POST", body: JSON.stringify(payload) }),
+
+  chatbotAiStatus: () => request<ChatbotAiStatus>("/chatbot/ai/status"),
+
+  sendChatbotMessage: (
+    message: string,
+    draft: ChatbotBookingDraft,
+    history: ChatbotConversationMessage[],
+  ) => request<ChatbotConversationTurn>("/chatbot/conversation", {
+    method: "POST",
+    body: JSON.stringify({ message, draft, history }),
+  }),
 
   previewChatbotBooking: (payload: ChatbotBookingDraft) =>
     request<ChatbotBookingPreview>("/chatbot/bookings/preview", {

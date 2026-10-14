@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     auth_secret_key: str = ""
     auth_token_minutes: int = 480
     chatbot_confirmation_minutes: int = 10
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.8-flash"
+    gemini_timeout_seconds: float = 20.0
     initial_account_password: str = "ICTU123"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

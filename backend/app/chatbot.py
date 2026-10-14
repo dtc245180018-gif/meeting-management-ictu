@@ -27,6 +27,22 @@ _REQUIRED_FIELDS = {
 }
 
 
+def normalize_booking_draft(
+    draft: schemas.ChatbotBookingDraft,
+    account: models.UserAccount | None,
+) -> schemas.ChatbotBookingDraft:
+    organizer = (account.email if account else str(draft.organizer_email or "")).strip().lower()
+    return draft.model_copy(update={"organizer_email": organizer or None})
+
+
+def missing_booking_fields(draft: schemas.ChatbotBookingDraft) -> list[str]:
+    return [
+        field
+        for field in _REQUIRED_FIELDS
+        if getattr(draft, field) in (None, "")
+    ]
+
+
 def _encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
@@ -93,15 +109,9 @@ def preview_booking(
     account: models.UserAccount | None,
     settings: Settings | None = None,
 ) -> schemas.ChatbotBookingPreviewOut:
-    organizer = (account.email if account else str(draft.organizer_email or "")).strip().lower()
-    normalized_draft = draft.model_copy(
-        update={"organizer_email": organizer or None},
-    )
-    missing_fields = [
-        field
-        for field in _REQUIRED_FIELDS
-        if getattr(normalized_draft, field) in (None, "")
-    ]
+    normalized_draft = normalize_booking_draft(draft, account)
+    organizer = str(normalized_draft.organizer_email or "").strip().lower()
+    missing_fields = missing_booking_fields(normalized_draft)
     if missing_fields:
         labels = ", ".join(_REQUIRED_FIELDS[field] for field in missing_fields)
         return schemas.ChatbotBookingPreviewOut(

@@ -366,6 +366,47 @@ class ChatbotBookingConfirmOut(BaseModel):
     meetings: list[MeetingOut]
 
 
+class ChatbotConversationMessage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    role: Literal["user", "assistant"]
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ChatbotConversationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    message: str = Field(min_length=1, max_length=2000)
+    draft: ChatbotBookingDraft
+    history: list[ChatbotConversationMessage] = Field(default_factory=list, max_length=12)
+
+    @field_validator("message", mode="before")
+    @classmethod
+    def normalize_chat_message(cls, value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Tin nhắn không được để trống")
+        return normalized
+
+
+class ChatbotConversationOut(BaseModel):
+    reply: str
+    draft: ChatbotBookingDraft
+    missing_fields: list[str] = Field(default_factory=list)
+    ready_for_preview: bool
+    provider: Literal["gemini"] = "gemini"
+    model: str
+
+
+class ChatbotAiStatusOut(BaseModel):
+    configured: bool
+    provider: Literal["gemini"] = "gemini"
+    model: str
+    privacy_notice: str
+
+
 class CancelRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

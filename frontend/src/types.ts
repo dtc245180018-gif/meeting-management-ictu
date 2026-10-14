@@ -150,6 +150,27 @@ export interface ChatbotBookingConfirmation {
   meetings: Meeting[];
 }
 
+export interface ChatbotConversationMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
+export interface ChatbotConversationTurn {
+  reply: string;
+  draft: ChatbotBookingDraft;
+  missing_fields: string[];
+  ready_for_preview: boolean;
+  provider: "gemini";
+  model: string;
+}
+
+export interface ChatbotAiStatus {
+  configured: boolean;
+  provider: "gemini";
+  model: string;
+  privacy_notice: string;
+}
+
 export interface SuggestedTime {
   start_time: string;
   end_time: string;

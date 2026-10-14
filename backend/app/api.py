@@ -12,6 +12,7 @@ from . import (
     account_services,
     auth,
     chatbot,
+    gemini_chat,
     google_calendar,
     models,
     reminders,
@@ -96,6 +97,31 @@ def create_meeting(
     for meeting in result:
         background_tasks.add_task(google_calendar.sync_meeting_if_connected_task, meeting.id)
     return result
+
+
+@router.get(
+    "/chatbot/ai/status",
+    response_model=schemas.ChatbotAiStatusOut,
+)
+def chatbot_ai_status(
+    account: models.UserAccount | None = Depends(auth.get_current_account),
+):
+    del account
+    return gemini_chat.ai_status()
+
+
+@router.post(
+    "/chatbot/conversation",
+    response_model=schemas.ChatbotConversationOut,
+)
+def chatbot_conversation(
+    payload: schemas.ChatbotConversationRequest,
+    db: Session = Depends(get_db),
+    account: models.UserAccount | None = Depends(auth.get_current_account),
+):
+    if account is not None:
+        auth.require_role(account, {models.AccountRole.ADMIN, models.AccountRole.ORGANIZER})
+    return gemini_chat.conversation_turn(db, payload, account)
 
 
 @router.post(

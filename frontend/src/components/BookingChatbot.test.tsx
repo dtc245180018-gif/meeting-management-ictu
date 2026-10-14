@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../services/api";
-import type { ChatbotBookingConfirmation, Room } from "../types";
+import type { ChatbotBookingConfirmation, ChatbotBookingDraft, Room } from "../types";
 import { BookingChatbot } from "./BookingChatbot";
 
 const room: Room = {
@@ -15,14 +15,42 @@ const room: Room = {
   can_book: true,
 };
 
+const parsedDraft: ChatbotBookingDraft = {
+  title: "Họp Sprint 4",
+  description: "Đặt lịch qua trợ lý Gemini US25",
+  organizer_email: "leader@ictu.edu.vn",
+  start_time: "2026-10-20T02:00:00Z",
+  end_time: "2026-10-20T03:00:00Z",
+  participant_emails: [],
+  expected_attendees: 4,
+  recurrence: null,
+  recurrence_count: 1,
+  room_id: null,
+  equipment_ids: [],
+  reminder_minutes: 30,
+};
+
 describe("BookingChatbot", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    vi.spyOn(api, "listEquipment").mockResolvedValue([]);
+    vi.spyOn(api, "chatbotAiStatus").mockResolvedValue({
+      configured: true,
+      provider: "gemini",
+      model: "gemini-3.8-flash",
+      privacy_notice: "Tin nhắn được gửi tới Gemini; lịch chỉ được ghi sau khi xác nhận.",
+    });
   });
 
-  it("guides an organizer through room selection and explicit confirmation", async () => {
+  it("uses natural-language conversation before room selection and explicit confirmation", async () => {
     const onCreated = vi.fn();
+    vi.spyOn(api, "sendChatbotMessage").mockResolvedValue({
+      reply: "Tôi đã hiểu lịch họp. Bạn có thể tìm phòng phù hợp.",
+      draft: parsedDraft,
+      missing_fields: [],
+      ready_for_preview: true,
+      provider: "gemini",
+      model: "gemini-3.8-flash",
+    });
     vi.spyOn(api, "previewChatbotBooking").mockImplementation(async (draft) => {
       if (!draft.room_id) {
         return {
@@ -77,19 +105,17 @@ describe("BookingChatbot", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý đặt phòng" }));
-    fireEvent.change(screen.getByLabelText("Tên cuộc họp"), { target: { value: "Họp Sprint 4" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+    const input = await screen.findByLabelText("Nhắn cho trợ lý Gemini");
+    fireEvent.change(input, { target: { value: "Tạo lịch họp Sprint 4 cho 4 người, 9 đến 10 giờ ngày 20/10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Gửi" }));
 
-    fireEvent.change(screen.getByLabelText("Bắt đầu"), { target: { value: "2026-10-20T09:00" } });
-    fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-10-20T10:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
-
-    fireEvent.click(screen.getByRole("button", { name: "Bỏ qua" }));
-    fireEvent.change(screen.getByLabelText("Số người dự kiến"), { target: { value: "4" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
-    fireEvent.click(screen.getByRole("button", { name: "Tiếp tục" }));
+    expect(await screen.findByText(/Tôi đã hiểu lịch họp/)).toBeInTheDocument();
+    expect(api.sendChatbotMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Tạo lịch họp Sprint 4"),
+      expect.objectContaining({ organizer_email: "leader@ictu.edu.vn" }),
+      expect.any(Array),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Tìm phòng phù hợp" }));
-
     fireEvent.click(await screen.findByRole("button", { name: /Phòng A101/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Xác nhận đặt phòng" }));
 
@@ -97,6 +123,30 @@ describe("BookingChatbot", () => {
     expect(screen.getByText("Cuộc họp #321")).toBeInTheDocument();
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
     expect(api.confirmChatbotBooking).toHaveBeenCalledWith("signed-confirmation-token-for-test");
+  });
+
+  it("shows a clear setup message when Gemini is not configured", async () => {
+    vi.mocked(api.chatbotAiStatus).mockResolvedValue({
+      configured: false,
+      provider: "gemini",
+      model: "gemini-3.8-flash",
+      privacy_notice: "Tin nhắn được gửi tới Gemini.",
+    });
+
+    render(
+      <BookingChatbot
+        organizerEmail="leader@ictu.edu.vn"
+        organizerName="Nguyễn Ngọc Thắng"
+        canBook
+        onCreated={vi.fn()}
+        onViewMeetings={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý đặt phòng" }));
+
+    expect(await screen.findByText("Gemini chưa được kết nối")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nhắn cho trợ lý Gemini")).not.toBeInTheDocument();
   });
 
   it("explains the missing booking permission to participant accounts", () => {
@@ -113,6 +163,6 @@ describe("BookingChatbot", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mở trợ lý đặt phòng" }));
 
     expect(screen.getByText(/chỉ có quyền tham dự/i)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Tên cuộc họp")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Nhắn cho trợ lý Gemini")).not.toBeInTheDocument();
   });
 });
