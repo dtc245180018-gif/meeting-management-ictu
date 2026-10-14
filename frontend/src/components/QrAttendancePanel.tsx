@@ -63,30 +63,60 @@ export function QrAttendancePanel({ account, meetings }: Props) {
     if (!scanning) return;
     let active = true;
     decodedRef.current = false;
+    const scanConfig = { fps: 10, qrbox: { width: 240, height: 240 } };
+    const handleDecoded = (decodedText: string) => {
+      if (decodedRef.current) return;
+      decodedRef.current = true;
+      setToken(decodedText);
+      setMessage("Đã đọc mã QR. Hãy kiểm tra thông tin trước khi xác nhận.");
+      void stopScanner();
+      void inspectValue(decodedText);
+    };
+    const handleCameraError = (error: unknown) => {
+      if (error instanceof DOMException) {
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          return "Bạn chưa cấp quyền camera. Hãy cho phép camera trong Safari hoặc Cài đặt iPhone.";
+        }
+        if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          return "Camera đang được ứng dụng khác sử dụng. Hãy đóng ứng dụng đó rồi thử lại.";
+        }
+        if (error.name === "NotFoundError") {
+          return "Không tìm thấy camera trên thiết bị.";
+        }
+      }
+      return error instanceof Error && error.message
+        ? error.message
+        : "Không thể mở camera. Hãy cho phép quyền camera hoặc nhập mã dự phòng.";
+    };
     const start = async () => {
       try {
+        const localHostnames = new Set(["localhost", "127.0.0.1", "[::1]"]);
+        if (typeof window.isSecureContext === "boolean" && !window.isSecureContext && !localHostnames.has(window.location.hostname)) {
+          throw new Error("Camera chỉ hoạt động trên HTTPS hoặc localhost.");
+        }
         const { Html5Qrcode } = await import("html5-qrcode");
-        const scanner = new Html5Qrcode("qr-reader");
-        scannerRef.current = scanner;
-        const cameras = await Html5Qrcode.getCameras();
-        if (!active || !cameras.length) throw new Error("Không tìm thấy camera trên thiết bị.");
-        const preferred = cameras.find((camera) => /back|rear|environment/i.test(camera.label)) ?? cameras[0];
-        await scanner.start(
-          preferred.id,
-          { fps: 10, qrbox: { width: 240, height: 240 } },
-          (decodedText) => {
-            if (decodedRef.current) return;
-            decodedRef.current = true;
-            setToken(decodedText);
-            setMessage("Đã đọc mã QR. Hãy kiểm tra thông tin trước khi xác nhận.");
-            void stopScanner();
-            void inspectValue(decodedText);
-          },
-          () => undefined,
-        );
+        const initialScanner = new Html5Qrcode("qr-reader");
+        scannerRef.current = initialScanner;
+        try {
+          await initialScanner.start({ facingMode: "environment" }, scanConfig, handleDecoded, () => undefined);
+        } catch {
+          if (!active) return;
+          await stopScanner();
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras.length) throw new Error("Không tìm thấy camera trên thiết bị.");
+          const rearCamera = cameras.find((camera) => /back|rear|environment|sau/i.test(camera.label));
+          const fallbackCamera = rearCamera ?? cameras[0];
+          if (!rearCamera) {
+            setMessage("Không xác định được camera sau. Đang dùng camera khả dụng; bạn có thể dừng và thử lại.");
+          }
+          const fallbackScanner = new Html5Qrcode("qr-reader");
+          scannerRef.current = fallbackScanner;
+          await fallbackScanner.start(fallbackCamera.id, scanConfig, handleDecoded, () => undefined);
+        }
+        if (!active) await stopScanner();
       } catch (error) {
         if (active) {
-          setMessage(error instanceof Error ? error.message : "Không thể mở camera. Hãy cho phép quyền camera hoặc nhập mã dự phòng.");
+          setMessage(handleCameraError(error));
           setScanning(false);
         }
       }

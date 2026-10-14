@@ -59,6 +59,22 @@ describe("LoginPage", () => {
     expect(passwordInput).toHaveAttribute("type", "password");
   });
 
+  it("keeps iOS-friendly login input semantics and focusability", () => {
+    render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
+    const emailInput = screen.getByLabelText("Email đăng nhập");
+    const passwordInput = screen.getByLabelText("Mật khẩu");
+
+    expect(emailInput).toHaveAttribute("autocomplete", "username");
+    expect(passwordInput).toHaveAttribute("autocomplete", "current-password");
+    expect(emailInput).not.toBeDisabled();
+    expect(emailInput).not.toHaveAttribute("readonly");
+    expect(passwordInput).not.toBeDisabled();
+    emailInput.focus();
+    expect(emailInput).toHaveFocus();
+    passwordInput.focus();
+    expect(passwordInput).toHaveFocus();
+  });
+
   it("shows the new ICTU login identity and only the requested author", () => {
     render(<LoginPage onAuthenticated={vi.fn()} onPasswordChanged={vi.fn()} />);
 

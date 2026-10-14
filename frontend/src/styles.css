@@ -500,7 +500,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 
 /* Sprint 3 authentication, reporting and mobile hardening. */
 .auth-loading { display: grid; min-height: 100vh; place-items: center; color: var(--ictu-blue); font-weight: 800; }
-.auth-global-notice { position: fixed; z-index: 30; top: 94px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 8px 22px rgba(0, 48, 92, .12); }
+.auth-global-notice { position: fixed; z-index: 30; top: 94px; left: 50%; max-width: min(92vw, 680px); padding: 10px 14px; transform: translateX(-50%); border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 8px 22px rgba(0, 48, 92, .12); pointer-events: none; }
 .auth-page { display: grid; grid-template-rows: auto 1fr auto; width: 100%; min-height: 100vh; margin: 0; padding: 0; background: #f3f6fa; }
 .auth-header { color: #fff; background: linear-gradient(90deg, #00509d, #075da9); box-shadow: 0 3px 9px rgba(0, 48, 92, .18); }
 .auth-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 20px; width: 100%; min-height: 84px; padding: 10px 30px; }
@@ -523,7 +523,8 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .auth-card form { display: grid; gap: 18px; margin-top: 34px; }
 .auth-card .auth-login-form { gap: 0; margin-top: 46px; }
 .auth-card label { display: grid; gap: 7px; color: var(--ink); font-size: .8rem; font-weight: 800; }
-.auth-card input { min-height: 53px; padding-right: 20px; padding-left: 20px; border-color: #cdd7e2; border-radius: 5px; color: #35485d; background: #fff; }
+.auth-card { position: relative; z-index: 1; }
+.auth-card input { min-height: 53px; padding-right: 20px; padding-left: 20px; border-color: #cdd7e2; border-radius: 5px; color: #35485d; background: #fff; font-size: 16px; touch-action: manipulation; }
 .auth-card input::placeholder { color: #8b929b; opacity: 1; }
 .auth-input-field { display: grid; }
 .auth-input-field + .password-field { margin-top: 28px; }
@@ -544,11 +545,11 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .pwa-install-auth .pwa-install-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; border: 1px solid #b9d3ea; border-radius: 4px; color: var(--ictu-blue); background: #eef7fe; font-size: .8rem; font-weight: 800; }
 .pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
 .pwa-install-auth .pwa-install-button:disabled { cursor: default; color: #55718b; background: #eef2f6; }
-.pwa-install-notice { position: fixed; z-index: 100; right: 18px; bottom: 18px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; }
+.pwa-install-notice { position: fixed; z-index: 100; right: 18px; bottom: 18px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; pointer-events: none; }
 .password-field { display: grid; gap: 7px; }
 .password-input-wrap { position: relative; min-width: 0; }
 .password-input-wrap input { padding-right: 68px; }
-.password-toggle { position: absolute; top: 50%; right: 9px; width: 36px; height: 36px; display: grid; place-items: center; padding: 7px; transform: translateY(-50%); border: 0; border-radius: 3px; color: #738198; background: transparent; }
+.password-toggle { position: absolute; top: 50%; right: 9px; width: 36px; height: 36px; display: grid; place-items: center; padding: 7px; transform: translateY(-50%); border: 0; border-radius: 3px; color: #738198; background: transparent; touch-action: manipulation; }
 .password-toggle svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .password-toggle:hover { background: #eaf4fc; }
 .password-toggle:focus-visible { outline: 2px solid var(--ictu-blue); outline-offset: 1px; }
