@@ -70,6 +70,24 @@ describe("MeetingList calendar integration", () => {
     await screen.findByText("Tài khoản chưa kết nối Google Calendar");
   });
 
+  it("invites all employees while editing a meeting", async () => {
+    vi.mocked(api.listEmployees).mockResolvedValue([
+      { id: 1, full_name: "Người tổ chức", email: "leader@example.com", department: "Nhóm dự án ICTU", is_active: true },
+      { id: 2, full_name: "Trần Minh Anh", email: "employee.one@example.com", department: "Khoa Công nghệ thông tin", is_active: true },
+      { id: 3, full_name: "Lê Hoàng Nam", email: "employee.two@example.com", department: "Phòng Đào tạo", is_active: true },
+    ]);
+    vi.mocked(api.updateMeeting).mockResolvedValue(meeting);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
+    fireEvent.click(screen.getByRole("button", { name: `Thao tác cho ${meeting.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Chỉnh sửa" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+
+    await waitFor(() => expect(api.updateMeeting).toHaveBeenCalledWith(7, expect.objectContaining({
+      participant_emails: ["employee.one@example.com", "employee.two@example.com"],
+    })));
+  });
+
   it("opens meeting details from a dashboard join notification", () => {
     const onFocusHandled = vi.fn();
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" focusMeetingId={7} onFocusHandled={onFocusHandled} />);
