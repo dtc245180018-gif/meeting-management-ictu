@@ -186,3 +186,38 @@ def test_gemini_request_uses_backend_key_structured_output_and_no_storage(monkey
     assert captured["headers"]["x-goog-api-key"] == "private-test-key"
     assert captured["payload"]["store"] is False
     assert captured["payload"]["response_format"]["mime_type"] == "application/json"
+
+
+def test_extract_output_text_supports_interactions_steps_response():
+    output = {
+        "reply": "Bạn muốn cuộc họp bắt đầu lúc nào?",
+        "updated_fields": ["title"],
+        "draft": {
+            "title": "Họp Sprint 4",
+            "description": None,
+            "start_time": None,
+            "end_time": None,
+            "participant_emails": [],
+            "expected_attendees": None,
+            "recurrence": None,
+            "recurrence_count": 1,
+            "room_id": None,
+            "equipment_ids": [],
+            "reminder_minutes": 30,
+        },
+    }
+    payload = {
+        "status": "completed",
+        "steps": [
+            {"type": "thought", "signature": "opaque"},
+            {
+                "type": "model_output",
+                "content": [{"type": "text", "text": json.dumps(output)}],
+            },
+        ],
+    }
+
+    extracted = gemini_chat._extract_output_text(payload)
+
+    assert extracted is not None
+    assert json.loads(extracted) == output

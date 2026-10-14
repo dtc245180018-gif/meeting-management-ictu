@@ -232,7 +232,7 @@ def _extract_output_text(payload: object) -> str | None:
             node_type = str(node.get("type", ""))
             if node_type in {"output_text", "text"} and isinstance(node.get("text"), str):
                 return node["text"]
-            for key in ("content", "parts", "outputs", "output"):
+            for key in ("content", "parts", "outputs", "output", "steps"):
                 found = visit(node.get(key))
                 if found:
                     return found
@@ -243,7 +243,7 @@ def _extract_output_text(payload: object) -> str | None:
                     return found
         return None
 
-    return visit(payload.get("outputs")) or visit(payload.get("output"))
+    return visit(payload)
 
 
 def _call_gemini(prompt: str, settings: Settings) -> _GeminiTurn:

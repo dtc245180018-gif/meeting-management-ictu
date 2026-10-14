@@ -126,7 +126,7 @@ npm run build
   qua chatbot; mặc định 10 phút.
 - `GEMINI_API_KEY`: khóa Gemini API chỉ đặt trong `.env` hoặc `backend/.env`,
   tuyệt đối không dùng biến `VITE_*` và không commit khóa thật.
-- `GEMINI_MODEL`: mô hình hội thoại; mặc định `gemini-3.8-flash`.
+- `GEMINI_MODEL`: mô hình hội thoại; mặc định `gemini-3.5-flash-lite` để ưu tiên tốc độ và độ ổn định khi demo.
 - `GEMINI_TIMEOUT_SECONDS`: thời gian chờ Gemini; mặc định 20 giây.
 - `INITIAL_ACCOUNT_PASSWORD=ICTU123`: mật khẩu tạm được băm riêng từng tài khoản;
   người dùng bắt buộc đổi ở lần đăng nhập đầu.
