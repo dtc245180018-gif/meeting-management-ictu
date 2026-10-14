@@ -193,6 +193,12 @@ Mã xác nhận được ký, gắn với tài khoản đang đăng nhập và k
 Nếu dữ liệu bị sửa, mã hết hạn hoặc tài nguyên vừa bị người khác đặt, toàn bộ
 thao tác bị từ chối và không tạo cuộc họp một phần.
 
+Sau khi đăng nhập, người dùng mở nút **Đặt phòng nhanh** ở góc dưới bên phải.
+Trợ lý sẽ lần lượt hỏi tên, thời gian, người tham dự, quy mô, lịch lặp và thiết
+bị; sau đó cho chọn phòng, xem bản tóm tắt, xác nhận hoặc hủy thao tác. Tài khoản
+chỉ có quyền tham dự vẫn nhìn thấy trợ lý nhưng được thông báo rõ lý do không thể
+đặt phòng.
+
 ## Nạp dữ liệu demo và kịch bản trình diễn
 
 Để thêm các cuộc họp, lời mời, phòng, thiết bị và reminder mẫu vào cơ sở dữ liệu phát triển:

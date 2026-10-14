@@ -119,6 +119,37 @@ export interface MeetingInput {
   recurrence_count: number;
 }
 
+export interface ChatbotBookingDraft {
+  title?: string | null;
+  description?: string | null;
+  organizer_email?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  participant_emails: string[];
+  expected_attendees?: number | null;
+  recurrence: "weekly" | "monthly" | null;
+  recurrence_count: number;
+  room_id?: number | null;
+  equipment_ids: number[];
+  reminder_minutes: 15 | 30 | 60 | 1440 | null;
+}
+
+export interface ChatbotBookingPreview {
+  ready_to_confirm: boolean;
+  prompt: string;
+  missing_fields: string[];
+  draft: ChatbotBookingDraft;
+  room_options: Room[];
+  summary?: string;
+  confirmation_token?: string;
+  expires_at?: string;
+}
+
+export interface ChatbotBookingConfirmation {
+  message: string;
+  meetings: Meeting[];
+}
+
 export interface SuggestedTime {
   start_time: string;
   end_time: string;

@@ -8,6 +8,7 @@ import { NotificationCenter } from "./components/NotificationCenter";
 import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
 import { LoginPage } from "./components/LoginPage";
 import { InstallAppButton } from "./components/InstallAppButton";
+import { BookingChatbot } from "./components/BookingChatbot";
 import { api, authStorage } from "./services/api";
 import type { Account, Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
@@ -467,6 +468,13 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
 
       <footer>© 2026 Meeting Management ICTU · Phát triển bởi Nguyễn Ngọc Thắng</footer>
       </div>
+      <BookingChatbot
+        organizerEmail={activeUser.email}
+        organizerName={activeUser.label}
+        canBook={activeRole === "admin" || activeRole === "organizer"}
+        onCreated={loadMeetings}
+        onViewMeetings={() => goTo("calendar")}
+      />
     </div>
   );
 }

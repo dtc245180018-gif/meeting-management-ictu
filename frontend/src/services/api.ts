@@ -17,6 +17,9 @@ import type {
   Account,
   AccountPage,
   AccountRole,
+  ChatbotBookingConfirmation,
+  ChatbotBookingDraft,
+  ChatbotBookingPreview,
   ReportOverview,
   RoomPermission,
 } from "../types";
@@ -112,6 +115,18 @@ export const api = {
 
   createMeeting: (payload: MeetingInput) =>
     request<Meeting[]>("/meetings", { method: "POST", body: JSON.stringify(payload) }),
+
+  previewChatbotBooking: (payload: ChatbotBookingDraft) =>
+    request<ChatbotBookingPreview>("/chatbot/bookings/preview", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  confirmChatbotBooking: (confirmationToken: string) =>
+    request<ChatbotBookingConfirmation>("/chatbot/bookings/confirm", {
+      method: "POST",
+      body: JSON.stringify({ confirmation_token: confirmationToken }),
+    }),
 
   updateMeeting: (id: number, payload: Partial<MeetingInput> & { requester_email: string }) =>
     request<Meeting>(`/meetings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
