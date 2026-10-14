@@ -1,8 +1,8 @@
 # Meeting Management ICTU
 
-Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Sprint 3
-mở rộng Sprint 1–2 bằng đăng nhập thật, phân quyền, chính sách phòng, báo cáo và
-trải nghiệm mobile/PWA mà không làm mất dữ liệu cũ.
+Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Sprint 4
+mở rộng ba Sprint trước bằng trợ lý đặt lịch, gợi ý phòng thông minh, check-in/
+check-out bằng QR và bộ kết nối đồng bộ nhân sự HRM/ERP có kiểm soát.
 
 ## Phạm vi Sprint 1
 
@@ -39,6 +39,16 @@ trải nghiệm mobile/PWA mà không làm mất dữ liệu cũ.
 
 Chi tiết cấu hình, API và kiểm thử xem [hướng dẫn Sprint 3](docs/SPRINT3_GUIDE.md).
 Kịch bản nghiệm thu thủ công US17–US24 nằm tại [docs/DEMO_SPRINT3.md](docs/DEMO_SPRINT3.md).
+
+## Phạm vi Sprint 4
+
+- US25: Trợ lý Gemini thu thập thông tin, cho chọn phòng, xác nhận và tạo lịch/đặt phòng trong một transaction.
+- US26: Xếp hạng phòng còn trống theo quyền, sức chứa, khu vực và thiết bị; trả điểm cùng lý do đề xuất.
+- US27: QR ký số theo lượt đặt, kiểm tra quyền và thời gian, check-in/check-out idempotent và lưu audit.
+- US28: Đồng bộ nhân viên từ HRM/ERP qua adapter mock/manual, chống tạo trùng, cô lập bản ghi lỗi và lưu lịch sử.
+
+Hướng dẫn vận hành nằm tại [docs/SPRINT4_GUIDE.md](docs/SPRINT4_GUIDE.md); kịch bản
+nghiệm thu US25–US28 nằm tại [docs/DEMO_SPRINT4.md](docs/DEMO_SPRINT4.md).
 
 ## Công nghệ
 
@@ -176,6 +186,9 @@ tiếp trên Google không được kéo ngược về hệ thống.
 | Quyền phòng | `GET /api/admin/users/{id}/room-permissions`, `PUT /api/admin/users/{id}/room-permissions/{room_id}` |
 | Báo cáo | `GET /api/admin/reports/overview`, `GET /api/admin/reports/export?format=xlsx|pdf` |
 | Chatbot đặt lịch | `GET /api/chatbot/ai/status`, `POST /api/chatbot/conversation`, `POST /api/chatbot/bookings/preview`, `POST /api/chatbot/bookings/confirm` |
+| Gợi ý phòng | `POST /api/rooms/recommendations` |
+| QR tham dự | `GET /api/bookings/{id}/qr`, `POST /api/bookings/qr/inspect`, `POST /api/bookings/qr/check-in`, `POST /api/bookings/qr/check-out` |
+| Đồng bộ HRM/ERP | `GET /api/admin/integrations/hrm/status`, `POST /api/admin/integrations/hrm/sync`, `GET /api/admin/integrations/hrm/history` |
 
 Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 `reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,
@@ -208,6 +221,19 @@ cho backend tìm phòng. Người dùng vẫn phải chọn phòng và bấm xá
 chỉ có quyền tham dự vẫn nhìn thấy trợ lý nhưng được thông báo rõ lý do không thể
 đặt phòng. Tin nhắn người dùng được gửi tới Google Gemini để xử lý; không đưa dữ
 liệu bí mật hoặc thông tin không cần thiết vào nội dung hội thoại.
+
+## US26–US28
+
+- Tại **Tạo lịch họp**, nút **Gợi ý phòng thông minh** chỉ trả các phòng mà tài
+  khoản được phép đặt và còn trống trong toàn bộ lịch lặp. Mỗi kết quả có điểm và
+  lý do; thay đổi thời gian, số người, người tham dự hoặc thiết bị sẽ xóa lựa chọn cũ.
+- Tại **Check-in QR**, người tổ chức/Admin tạo mã cho lượt đặt. Người thuộc cuộc
+  họp quét bằng camera hoặc dán mã để kiểm tra rồi check-in/check-out. Mã bị sửa,
+  sai phòng, quá thời gian, người ngoài hoặc cuộc họp đã hủy đều bị từ chối và ghi audit.
+- Tại **Quản trị → Đồng bộ HRM/ERP**, Admin có thể chạy connector mock hoặc nhập
+  JSON từ hệ thống nguồn, xem số bản ghi tạo/cập nhật/bỏ qua/lỗi và lịch sử chạy.
+  Repository không chứa thông tin truy cập HRM/ERP thật; adapter mock là môi trường
+  nghiệm thu an toàn và là điểm thay thế connector doanh nghiệp sau này.
 
 ## Nạp dữ liệu demo và kịch bản trình diễn
 

@@ -9,6 +9,7 @@ import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
 import { LoginPage } from "./components/LoginPage";
 import { InstallAppButton } from "./components/InstallAppButton";
 import { BookingChatbot } from "./components/BookingChatbot";
+import { QrAttendancePanel } from "./components/QrAttendancePanel";
 import { api, authStorage } from "./services/api";
 import type { Account, Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
@@ -16,7 +17,7 @@ import { loadAllHistory } from "./utils/historyPagination";
 import { formatIctuDateTime } from "./utils/dateTime";
 import { countPendingInvitations, scopeDashboardMeetings } from "./utils/dashboard";
 
-type Page = "overview" | "create" | "calendar" | "notifications" | "rooms" | "equipment" | "admin";
+type Page = "overview" | "create" | "calendar" | "notifications" | "rooms" | "equipment" | "qr" | "admin";
 
 const TEST_ACCOUNT: Account = {
   id: 1,
@@ -371,6 +372,7 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
           <button className={page === "notifications" ? "active" : ""} title="Thông báo" aria-current={page === "notifications" ? "page" : undefined} onClick={() => goTo("notifications")}><span className="nav-icon nav-icon-indicator">♢{unreadNotificationCount > 0 && <span className="nav-dot" aria-label="Có thông báo mới" />}</span><span className="nav-label">Thông báo</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
           <button className={page === "equipment" ? "active" : ""} title="Thiết bị" aria-current={page === "equipment" ? "page" : undefined} onClick={() => goTo("equipment")}><span className="nav-icon">⚙</span><span className="nav-label">Thiết bị</span></button>
+          <button className={page === "qr" ? "active" : ""} title="Check-in QR" aria-current={page === "qr" ? "page" : undefined} onClick={() => goTo("qr")}><span className="nav-icon">▦</span><span className="nav-label">Check-in QR</span></button>
           {activeRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
         </nav>
         <div className="sidebar-footer-actions">
@@ -404,7 +406,7 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
         {page === "overview" && (
         <section className="hero">
           <div>
-              <span className="eyebrow light">ICTU MEETING · SPRINT 3</span>
+              <span className="eyebrow light">ICTU MEETING · SPRINT 4</span>
             <h1>Lịch họp rõ ràng,<br />phối hợp hiệu quả.</h1>
             <p>Quản lý lịch, thành viên và phòng họp trong một không gian thống nhất dành cho ICTU.</p>
           </div>
@@ -462,6 +464,7 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
           {page === "notifications" && <NotificationCenter email={activeUser.email} onOpenMeeting={openMeetingFromNotification} onUnreadCountChange={setUnreadNotificationCount} />}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
           {page === "equipment" && <EquipmentDirectory />}
+          {page === "qr" && <QrAttendancePanel account={account} meetings={meetings} />}
           {page === "admin" && activeRole === "admin" && <AdminPanel adminEmail={activeUser.email} />}
         </div>
       </main>

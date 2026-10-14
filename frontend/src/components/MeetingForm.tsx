@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { Employee, Equipment, MeetingInput, Room, SuggestedTime } from "../types";
+import type { Employee, Equipment, MeetingInput, Room, RoomRecommendation, SuggestedTime } from "../types";
 import { api } from "../services/api";
 import { formatIctuDateTime, formatIctuTime, ictuInputToIso, toIctuDateTimeInput } from "../utils/dateTime";
 
@@ -53,7 +53,9 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [roomOptions, setRoomOptions] = useState<Room[]>([]);
+  const [roomOptions, setRoomOptions] = useState<RoomRecommendation[]>([]);
+  const [roomPage, setRoomPage] = useState(1);
+  const [roomTotalPages, setRoomTotalPages] = useState(1);
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [roomLoading, setRoomLoading] = useState(false);
   const [equipmentOptions, setEquipmentOptions] = useState<Equipment[]>([]);
@@ -63,6 +65,8 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
   const clearRoomSelection = () => {
     setSelectedRoom(null);
     setRoomOptions([]);
+    setRoomPage(1);
+    setRoomTotalPages(1);
   };
 
   const clearResourceSelection = () => {
@@ -256,7 +260,7 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
     setSuggestions([]);
   };
 
-  const openRoomFinder = () => {
+  const openRoomFinder = (page = 1) => {
     const start = new Date(form.start_time);
     const end = new Date(form.end_time);
     if (!form.start_time || !form.end_time || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
@@ -271,15 +275,22 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
     }
     setRoomLoading(true);
     setMessage("");
-    void api.availableRooms(
-      toIsoDateTime(form.start_time),
-      toIsoDateTime(form.end_time),
-      Math.max(form.expected_attendees, currentParticipants.length + 1),
-    )
-      .then((rooms) => {
-        setRoomOptions(rooms);
-        setSelectedRoom(null);
-        setMessage(rooms.length ? `Đã tìm thấy ${rooms.length} phòng phù hợp. Chọn một phòng rồi bấm Tạo lịch họp.` : "Không có phòng phù hợp trong khung giờ và quy mô này.");
+    void api.recommendRooms({
+      start_time: toIsoDateTime(form.start_time),
+      end_time: toIsoDateTime(form.end_time),
+      expected_attendees: Math.max(form.expected_attendees, currentParticipants.length + 1),
+      recurrence: form.recurrence,
+      recurrence_count: form.recurrence_count,
+      equipment_ids: selectedEquipment.map((item) => item.id),
+      page,
+      page_size: 5,
+    })
+      .then((result) => {
+        setRoomOptions(result.items);
+        setRoomPage(result.page);
+        setRoomTotalPages(result.total_pages);
+        if (page === 1) setSelectedRoom(null);
+        setMessage(result.items.length ? `Đã xếp hạng ${result.total} phòng phù hợp. Chọn một phòng rồi bấm Tạo lịch họp.` : result.message ?? "Không có phòng phù hợp trong khung giờ và quy mô này.");
       })
       .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Không thể tìm phòng phù hợp"))
       .finally(() => setRoomLoading(false));
@@ -292,6 +303,7 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
       setMessage("Hãy chọn thời gian hợp lệ trước khi tìm thiết bị.");
       return;
     }
+    clearRoomSelection();
     setEquipmentLoading(true);
     setMessage("");
     void api.availableEquipment(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time))
@@ -305,6 +317,7 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
   };
 
   const toggleEquipment = (equipment: Equipment) => {
+    clearRoomSelection();
     setSelectedEquipment((current) => current.some((item) => item.id === equipment.id)
       ? current.filter((item) => item.id !== equipment.id)
       : [...current, equipment]);
@@ -317,7 +330,7 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
           <span className="eyebrow">US01 · US03 · US04 · US05 · US12 · US16</span>
           <h2>Tạo lịch họp</h2>
         </div>
-        <span className="badge">Sprint 3</span>
+        <span className="badge">Sprint 4</span>
       </div>
       <form onSubmit={submit} className="form-grid">
         <label className="full">Tên cuộc họp
@@ -431,20 +444,26 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
         </div>
         <div className="full action-row">
           <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading}>Gợi ý giờ trống</button>
-          <button className="button secondary" type="button" onClick={openRoomFinder} disabled={roomLoading}>{roomLoading ? "Đang tìm phòng..." : "Tìm phòng phù hợp"}</button>
+          <button className="button secondary" type="button" onClick={() => openRoomFinder()} disabled={roomLoading}>{roomLoading ? "Đang xếp hạng phòng..." : "Gợi ý phòng thông minh"}</button>
           <button className="button secondary" type="button" onClick={openEquipmentFinder} disabled={equipmentLoading}>{equipmentLoading ? "Đang tìm thiết bị..." : "Tìm thiết bị"}</button>
           <button className="button primary" type="submit" disabled={loading}>{loading ? "Đang xử lý..." : "Tạo lịch họp"}</button>
         </div>
       </form>
       {roomOptions.length > 0 && (
         <div className="room-options" aria-label="Phòng phù hợp cho cuộc họp">
-          <strong>Chọn phòng để đặt cùng lúc tạo lịch</strong>
-          {roomOptions.map((room) => (
-            <button className={selectedRoom?.id === room.id ? "selected" : ""} key={room.id} type="button" onClick={() => setSelectedRoom(room)}>
-              <strong>{room.name}{selectedRoom?.id === room.id ? " · Đã chọn" : ""}</strong>
-              <span>{room.capacity} chỗ · {room.location} · {room.room_type}</span>
+          <strong>US26 · Phòng được xếp hạng theo độ phù hợp</strong>
+          {roomOptions.map((recommendation) => (
+            <button className={selectedRoom?.id === recommendation.room.id ? "selected" : ""} key={recommendation.room.id} type="button" onClick={() => setSelectedRoom(recommendation.room)}>
+              <strong>{recommendation.room.name}{selectedRoom?.id === recommendation.room.id ? " · Đã chọn" : ""}</strong>
+              <span>{recommendation.room.capacity} chỗ · {recommendation.room.location} · {recommendation.room.room_type} · Điểm {recommendation.score}</span>
+              <small>{recommendation.reasons.join(" · ")}</small>
             </button>
           ))}
+          {roomTotalPages > 1 && <div className="pagination" aria-label="Phân trang gợi ý phòng">
+            <button type="button" disabled={roomPage <= 1 || roomLoading} onClick={() => openRoomFinder(roomPage - 1)}>Trước</button>
+            <span>Trang {roomPage} / {roomTotalPages}</span>
+            <button type="button" disabled={roomPage >= roomTotalPages || roomLoading} onClick={() => openRoomFinder(roomPage + 1)}>Sau</button>
+          </div>}
         </div>
       )}
       {equipmentOptions.length > 0 && (

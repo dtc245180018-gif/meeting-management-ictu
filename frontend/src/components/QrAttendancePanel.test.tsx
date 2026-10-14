@@ -1,0 +1,68 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { QrAttendancePanel } from "./QrAttendancePanel";
+import { api } from "../services/api";
+
+vi.mock("html5-qrcode", () => ({
+  Html5Qrcode: class {
+    static getCameras = vi.fn().mockResolvedValue([]);
+    isScanning = false;
+    start = vi.fn();
+    stop = vi.fn();
+    clear = vi.fn();
+  },
+}));
+
+vi.mock("../services/api", () => ({
+  api: {
+    bookingQr: vi.fn(),
+    inspectBookingQr: vi.fn(),
+    checkInBooking: vi.fn(),
+    checkOutBooking: vi.fn(),
+  },
+}));
+
+const account = {
+  id: 1, employee_id: 1, email: "owner@ictu.edu.vn", full_name: "Owner", department: "ICTU",
+  role: "organizer" as const, must_change_password: false, is_active: true, created_at: "2026-10-14T00:00:00Z",
+};
+
+const meeting = {
+  id: 9,
+  title: "Sprint 4 QR",
+  organizer_email: account.email,
+  start_time: "2026-10-14T09:00:00Z",
+  end_time: "2026-10-14T10:00:00Z",
+  status: "scheduled" as const,
+  participants: [],
+  booking: {
+    id: 3, room_id: 2, meeting_id: 9, start_time: "2026-10-14T09:00:00Z", end_time: "2026-10-14T10:00:00Z", status: "active" as const,
+    room: { id: 2, name: "A203", capacity: 12, location: "Khu A" },
+  },
+};
+
+describe("QrAttendancePanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(api.bookingQr).mockResolvedValue({ booking_id: 3, room_id: 2, expires_at: "2026-10-14T11:00:00Z", qr_token: "signed-token", image_data_url: "data:image/svg+xml;base64,AAA" });
+    vi.mocked(api.inspectBookingQr).mockResolvedValue({ booking_id: 3, meeting_id: 9, meeting_title: "Sprint 4 QR", room_id: 2, room_name: "A203", start_time: meeting.start_time, end_time: meeting.end_time, meeting_status: "scheduled", can_check_in: true, can_check_out: false });
+    vi.mocked(api.checkInBooking).mockResolvedValue({ booking_id: 3, account_id: 1, checked_in_at: "2026-10-14T09:01:00Z", already_recorded: false, message: "Check-in thành công." });
+  });
+
+  it("generates a signed QR for a meeting managed by the current user", async () => {
+    render(<QrAttendancePanel account={account} meetings={[meeting]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Tạo QR" }));
+    expect(await screen.findByAltText("QR cho lượt đặt phòng 3")).toBeInTheDocument();
+    expect(api.bookingQr).toHaveBeenCalledWith(3);
+  });
+
+  it("supports the manual fallback and records check-in once", async () => {
+    render(<QrAttendancePanel account={account} meetings={[meeting]} />);
+    fireEvent.change(screen.getByLabelText("Mã dự phòng"), { target: { value: "signed-token" } });
+    fireEvent.click(screen.getByRole("button", { name: "Kiểm tra mã" }));
+    expect(await screen.findByText("Sprint 4 QR")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Check-in" }));
+    await waitFor(() => expect(api.checkInBooking).toHaveBeenCalledWith("signed-token"));
+    expect(await screen.findByText("Check-in thành công.")).toBeInTheDocument();
+  });
+});

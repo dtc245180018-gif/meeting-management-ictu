@@ -41,6 +41,8 @@ def reset_demo_database(*, full: bool = False, shared_demo_password: str | None 
     with SessionLocal() as db:
         db.execute(delete(models.GoogleCalendarEvent))
         db.execute(delete(models.Reminder))
+        db.execute(delete(models.BookingUsageAudit))
+        db.execute(delete(models.BookingAttendance))
         db.execute(delete(models.EquipmentBooking))
         db.execute(delete(models.RoomBooking))
         db.execute(delete(models.Participant))
@@ -48,6 +50,8 @@ def reset_demo_database(*, full: bool = False, shared_demo_password: str | None 
         db.execute(delete(models.RoomAccessPolicy))
         db.execute(delete(models.Room))
         db.execute(delete(models.Equipment))
+        db.execute(delete(models.HRMSyncIssue))
+        db.execute(delete(models.HRMSyncRun))
         if full:
             db.execute(delete(models.AccountAuditLog))
             db.execute(delete(models.GoogleCalendarConnection))

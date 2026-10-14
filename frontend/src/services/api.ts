@@ -12,6 +12,7 @@ import type {
   MeetingInput,
   Notification,
   Room,
+  RoomRecommendationPage,
   RoomAdminInput,
   SuggestedTime,
   Account,
@@ -25,6 +26,12 @@ import type {
   ChatbotConversationTurn,
   ReportOverview,
   RoomPermission,
+  BookingQr,
+  BookingQrInspection,
+  BookingAttendance,
+  HrmIntegrationStatus,
+  HrmSyncPage,
+  HrmSyncRun,
 } from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
@@ -182,6 +189,22 @@ export const api = {
     return request<Room[]>(`/rooms/available?${params.toString()}`);
   },
 
+  recommendRooms: (payload: {
+    start_time: string;
+    end_time: string;
+    expected_attendees: number;
+    recurrence?: "weekly" | "monthly" | null;
+    recurrence_count?: number;
+    equipment_ids?: number[];
+    required_features?: Array<"projector" | "display" | "microphone" | "video_conferencing">;
+    preferred_building?: string;
+    page?: number;
+    page_size?: number;
+  }) => request<RoomRecommendationPage>("/rooms/recommendations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+
   listRooms: () => request<Room[]>("/rooms"),
 
   listEmployees: () => request<Employee[]>("/employees"),
@@ -191,6 +214,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ room_id: roomId, meeting_id: meetingId, requester_email: requesterEmail }),
     }),
+
+  bookingQr: (bookingId: number) => request<BookingQr>(`/bookings/${bookingId}/qr`),
+  inspectBookingQr: (qrToken: string) => request<BookingQrInspection>("/bookings/qr/inspect", {
+    method: "POST",
+    body: JSON.stringify({ qr_token: qrToken }),
+  }),
+  checkInBooking: (qrToken: string) => request<BookingAttendance>("/bookings/qr/check-in", {
+    method: "POST",
+    body: JSON.stringify({ qr_token: qrToken }),
+  }),
+  checkOutBooking: (qrToken: string) => request<BookingAttendance>("/bookings/qr/check-out", {
+    method: "POST",
+    body: JSON.stringify({ qr_token: qrToken }),
+  }),
 
   listEquipment: (options: { startTime?: string; endTime?: string; category?: string; status?: EquipmentStatus } = {}) => {
     const params = new URLSearchParams();
@@ -276,6 +313,16 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ can_book: canBook, reason }),
     }),
+  hrmStatus: () => request<HrmIntegrationStatus>("/admin/integrations/hrm/status"),
+  runHrmSync: (records?: Array<Record<string, unknown>>) => request<HrmSyncRun>("/admin/integrations/hrm/sync", {
+    method: "POST",
+    body: JSON.stringify(records ? { records } : {}),
+  }),
+  hrmHistory: (page = 1, pageSize = 10, status?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (status) params.set("status", status);
+    return request<HrmSyncPage>(`/admin/integrations/hrm/history?${params.toString()}`);
+  },
   reportOverview: (params: URLSearchParams) =>
     request<ReportOverview>(`/admin/reports/overview?${params.toString()}`),
   reportExportUrl: (format: "xlsx" | "pdf", params: URLSearchParams) => {

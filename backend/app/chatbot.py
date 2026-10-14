@@ -13,7 +13,7 @@ from fastapi import HTTPException, status
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from . import auth, models, schemas, services
+from . import auth, models, room_recommendations, schemas, services
 from .config import Settings, get_settings
 
 
@@ -131,20 +131,42 @@ def preview_booking(
     )
 
     if plan.room is None:
-        rooms = services.available_rooms_for_occurrences(
-            db,
-            plan.occurrences,
-            max(payload.expected_attendees, len(plan.participant_emails) + 1),
-            account.id if account else None,
-        )
-        room_options = [
-            services.room_to_out(db, room, account.id if account else None)
-            for room in rooms[:10]
-        ]
+        if account is not None:
+            recommendations = room_recommendations.recommend_rooms(
+                db,
+                schemas.RoomRecommendationRequest(
+                    start_time=payload.start_time,
+                    end_time=payload.end_time,
+                    expected_attendees=max(
+                        payload.expected_attendees, len(plan.participant_emails) + 1
+                    ),
+                    recurrence=payload.recurrence,
+                    recurrence_count=payload.recurrence_count,
+                    equipment_ids=payload.equipment_ids,
+                    page=1,
+                    page_size=10,
+                ),
+                account,
+            )
+            room_options = [item.room for item in recommendations.items]
+            room_count = recommendations.total
+            empty_message = recommendations.message
+        else:
+            # Preserve the legacy service path for unauthenticated compatibility tests.
+            rooms = services.available_rooms_for_occurrences(
+                db,
+                plan.occurrences,
+                max(payload.expected_attendees, len(plan.participant_emails) + 1),
+                None,
+            )
+            room_options = [services.room_to_out(db, room, None) for room in rooms[:10]]
+            room_count = len(rooms)
+            empty_message = None
         prompt = (
-            f"Đã tìm thấy {len(rooms)} phòng phù hợp. Hãy chọn một phòng để xác nhận."
-            if rooms
-            else "Không có phòng phù hợp trong toàn bộ khung thời gian đã chọn."
+            f"Đã xếp hạng {room_count} phòng phù hợp. Hãy chọn một phòng để xác nhận."
+            if room_options
+            else empty_message
+            or "Không có phòng phù hợp trong toàn bộ khung thời gian đã chọn."
         )
         return schemas.ChatbotBookingPreviewOut(
             ready_to_confirm=False,

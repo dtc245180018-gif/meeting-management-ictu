@@ -14,9 +14,12 @@ from . import (
     chatbot,
     gemini_chat,
     google_calendar,
+    hrm_sync,
     models,
+    qr_attendance,
     reminders,
     report_services,
+    room_recommendations,
     schemas,
     services,
 )
@@ -323,6 +326,15 @@ def list_available_rooms(
     return [services.room_to_out(db, room, account.id if account else None) for room in rooms]
 
 
+@router.post("/rooms/recommendations", response_model=schemas.RoomRecommendationPage)
+def recommended_rooms(
+    payload: schemas.RoomRecommendationRequest,
+    db: Session = Depends(get_db),
+    account: models.UserAccount = Depends(auth.require_account),
+):
+    return room_recommendations.recommend_rooms(db, payload, account)
+
+
 @router.post("/rooms/bookings", response_model=schemas.BookingOut, status_code=status.HTTP_201_CREATED)
 def book_room(
     payload: schemas.BookingCreate,
@@ -338,6 +350,42 @@ def book_room(
         account_id=account.id if account else None,
         requester_email=requester_email,
     )
+
+
+@router.get("/bookings/{booking_id}/qr", response_model=schemas.BookingQrOut)
+def booking_qr(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    account: models.UserAccount = Depends(auth.require_account),
+):
+    return qr_attendance.generate_qr(db, booking_id, account)
+
+
+@router.post("/bookings/qr/inspect", response_model=schemas.BookingQrInspectionOut)
+def inspect_booking_qr(
+    payload: schemas.BookingQrRequest,
+    db: Session = Depends(get_db),
+    account: models.UserAccount = Depends(auth.require_account),
+):
+    return qr_attendance.inspect_qr(db, payload.qr_token, account)
+
+
+@router.post("/bookings/qr/check-in", response_model=schemas.BookingAttendanceOut)
+def booking_check_in(
+    payload: schemas.BookingQrRequest,
+    db: Session = Depends(get_db),
+    account: models.UserAccount = Depends(auth.require_account),
+):
+    return qr_attendance.check_in(db, payload.qr_token, account)
+
+
+@router.post("/bookings/qr/check-out", response_model=schemas.BookingAttendanceOut)
+def booking_check_out(
+    payload: schemas.BookingQrRequest,
+    db: Session = Depends(get_db),
+    account: models.UserAccount = Depends(auth.require_account),
+):
+    return qr_attendance.check_out(db, payload.qr_token, account)
 
 
 @router.get("/admin/rooms", response_model=list[schemas.RoomOut])
@@ -640,6 +688,39 @@ def admin_update_room_permission(
     db: Session = Depends(get_db),
 ):
     return account_services.update_room_permission(db, admin, account_id, room_id, payload)
+
+
+@router.get("/admin/integrations/hrm/status", response_model=schemas.HRMIntegrationStatusOut)
+def admin_hrm_status(
+    _admin: models.UserAccount = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    return hrm_sync.integration_status(db)
+
+
+@router.post("/admin/integrations/hrm/sync", response_model=schemas.HRMSyncRunOut)
+def admin_hrm_sync(
+    payload: schemas.HRMSyncRequest,
+    admin: models.UserAccount = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    return hrm_sync.run_sync(db, admin, payload)
+
+
+@router.get("/admin/integrations/hrm/history", response_model=schemas.HRMSyncPage)
+def admin_hrm_history(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    status_filter: str | None = Query(default=None, alias="status"),
+    _admin: models.UserAccount = Depends(auth.require_admin),
+    db: Session = Depends(get_db),
+):
+    return hrm_sync.history(
+        db,
+        page=page,
+        page_size=page_size,
+        status_filter=status_filter,
+    )
 
 
 def _report(
