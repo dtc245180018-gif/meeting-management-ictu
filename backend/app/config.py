@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     auth_required: bool = True
     auth_secret_key: str = ""
     auth_token_minutes: int = 480
+    chatbot_confirmation_minutes: int = 10
     initial_account_password: str = "ICTU123"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

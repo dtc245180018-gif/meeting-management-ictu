@@ -8,7 +8,17 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import account_services, auth, google_calendar, models, reminders, report_services, schemas, services
+from . import (
+    account_services,
+    auth,
+    chatbot,
+    google_calendar,
+    models,
+    reminders,
+    report_services,
+    schemas,
+    services,
+)
 from .calendar_integration import calendar_provider
 from .config import get_settings
 from .database import get_db
@@ -86,6 +96,55 @@ def create_meeting(
     for meeting in result:
         background_tasks.add_task(google_calendar.sync_meeting_if_connected_task, meeting.id)
     return result
+
+
+@router.post(
+    "/chatbot/bookings/preview",
+    response_model=schemas.ChatbotBookingPreviewOut,
+)
+def preview_chatbot_booking(
+    payload: schemas.ChatbotBookingDraft,
+    db: Session = Depends(get_db),
+    account: models.UserAccount | None = Depends(auth.get_current_account),
+):
+    if account is not None:
+        auth.require_role(account, {models.AccountRole.ADMIN, models.AccountRole.ORGANIZER})
+    return chatbot.preview_booking(db, payload, account)
+
+
+@router.post(
+    "/chatbot/bookings/confirm",
+    response_model=schemas.ChatbotBookingConfirmOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def confirm_chatbot_booking(
+    payload: schemas.ChatbotBookingConfirmRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    account: models.UserAccount | None = Depends(auth.get_current_account),
+):
+    if account is not None:
+        auth.require_role(account, {models.AccountRole.ADMIN, models.AccountRole.ORGANIZER})
+    meeting_payload = chatbot.meeting_from_confirmation(
+        payload.confirmation_token,
+        account,
+    )
+    meetings = services.create_meetings(
+        db,
+        meeting_payload,
+        account_id=account.id if account else None,
+        organizer_email=account.email if account else None,
+    )
+    background_tasks.add_task(reminders.process_due_reminders_task)
+    for meeting in meetings:
+        background_tasks.add_task(
+            google_calendar.sync_meeting_if_connected_task,
+            meeting.id,
+        )
+    return schemas.ChatbotBookingConfirmOut(
+        message=f"Đã tạo {len(meetings)} lịch họp và đặt phòng thành công.",
+        meetings=meetings,
+    )
 
 
 @router.get("/meetings", response_model=list[schemas.MeetingOut])

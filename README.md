@@ -122,6 +122,8 @@ npm run build
 - `AUTH_REQUIRED=true`: bật xác thực Bearer cho API nghiệp vụ.
 - `AUTH_SECRET_KEY`: khóa ký phiên bí mật, tối thiểu 32 ký tự, không đưa lên Git.
 - `AUTH_TOKEN_MINUTES`: thời gian sống của phiên; mặc định 480 phút.
+- `CHATBOT_CONFIRMATION_MINUTES`: thời gian hiệu lực của mã xác nhận đặt lịch
+  qua chatbot; mặc định 10 phút.
 - `INITIAL_ACCOUNT_PASSWORD=ICTU123`: mật khẩu tạm được băm riêng từng tài khoản;
   người dùng bắt buộc đổi ở lần đăng nhập đầu.
 - `ADMIN_EMAILS` chỉ còn phục vụ migration/tương thích dữ liệu Sprint 2. Quyền
@@ -169,10 +171,27 @@ tiếp trên Google không được kéo ngược về hệ thống.
 | Tài khoản | `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}` |
 | Quyền phòng | `GET /api/admin/users/{id}/room-permissions`, `PUT /api/admin/users/{id}/room-permissions/{room_id}` |
 | Báo cáo | `GET /api/admin/reports/overview`, `GET /api/admin/reports/export?format=xlsx|pdf` |
+| Chatbot đặt lịch | `POST /api/chatbot/bookings/preview`, `POST /api/chatbot/bookings/confirm` |
 
 Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 `reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,
 đặt thiết bị và tạo reminder dùng chung một transaction.
+
+## US25 - Đặt lịch qua chatbot
+
+Chatbot dùng quy trình hai bước để người dùng luôn xem lại thông tin trước khi
+ghi dữ liệu:
+
+1. Gửi dữ liệu đã thu thập tới `POST /api/chatbot/bookings/preview`. API trả về
+   trường còn thiếu, phòng phù hợp cho toàn bộ các lần lặp hoặc bản tóm tắt kèm
+   mã xác nhận có thời hạn.
+2. Sau khi người dùng xác nhận, gửi mã đó tới
+   `POST /api/chatbot/bookings/confirm`. Backend kiểm tra lại phòng, thiết bị,
+   quyền và xung đột ngay trong transaction trước khi tạo lịch.
+
+Mã xác nhận được ký, gắn với tài khoản đang đăng nhập và không chứa mật khẩu.
+Nếu dữ liệu bị sửa, mã hết hạn hoặc tài nguyên vừa bị người khác đặt, toàn bộ
+thao tác bị từ chối và không tạo cuộc họp một phần.
 
 ## Nạp dữ liệu demo và kịch bản trình diễn
 

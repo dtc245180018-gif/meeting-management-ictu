@@ -287,6 +287,85 @@ class MeetingOut(BaseModel):
     google_calendar_event: GoogleCalendarEventOut | None = None
 
 
+class ChatbotBookingDraft(BaseModel):
+    """Partial meeting data collected by the Sprint 4 booking assistant."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    organizer_email: EmailStr | None = None
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    participant_emails: list[EmailStr] = Field(default_factory=list, max_length=50)
+    expected_attendees: int | None = Field(default=None, ge=1, le=10000)
+    recurrence: Literal["weekly", "monthly"] | None = None
+    recurrence_count: int = Field(default=1, ge=1, le=24)
+    room_id: int | None = Field(default=None, ge=1)
+    equipment_ids: list[int] = Field(default_factory=list, max_length=30)
+    reminder_minutes: Literal[15, 30, 60, 1440] | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def normalize_optional_title(cls, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return value
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("equipment_ids")
+    @classmethod
+    def chatbot_equipment_must_be_unique(cls, value: list[int]) -> list[int]:
+        if any(item < 1 for item in value) or len(value) != len(set(value)):
+            raise ValueError("Danh sách thiết bị không hợp lệ hoặc bị trùng")
+        return value
+
+    @model_validator(mode="after")
+    def validate_partial_booking(self):
+        if (
+            self.start_time is not None
+            and self.end_time is not None
+            and self.end_time <= self.start_time
+        ):
+            raise ValueError("Thời gian kết thúc phải sau thời gian bắt đầu")
+        organizer = str(self.organizer_email).strip().lower() if self.organizer_email else ""
+        participants = {
+            str(email).strip().lower()
+            for email in self.participant_emails
+            if str(email).strip().lower() != organizer
+        }
+        if (
+            self.expected_attendees is not None
+            and self.expected_attendees < len(participants) + 1
+        ):
+            raise ValueError(
+                "Số người dự kiến phải ít nhất bằng số người được mời và người tổ chức"
+            )
+        return self
+
+
+class ChatbotBookingPreviewOut(BaseModel):
+    ready_to_confirm: bool
+    prompt: str
+    missing_fields: list[str] = Field(default_factory=list)
+    draft: ChatbotBookingDraft
+    room_options: list[RoomOut] = Field(default_factory=list)
+    summary: str | None = None
+    confirmation_token: str | None = None
+    expires_at: datetime | None = None
+
+
+class ChatbotBookingConfirmRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirmation_token: str = Field(min_length=20, max_length=20000)
+
+
+class ChatbotBookingConfirmOut(BaseModel):
+    message: str
+    meetings: list[MeetingOut]
+
+
 class CancelRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
