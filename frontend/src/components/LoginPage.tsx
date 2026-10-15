@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, TouchEvent, useState } from "react";
 import { api, authStorage } from "../services/api";
 import type { Account } from "../types";
 import { InstallAppButton } from "./InstallAppButton";
@@ -24,6 +24,14 @@ interface PasswordFieldProps {
 }
 
 
+function focusTouchedInput(event: TouchEvent<HTMLInputElement>) {
+  // iOS standalone PWAs occasionally fail to promote a controlled input to
+  // the first responder. Focusing synchronously inside the user gesture keeps
+  // the action eligible to open the software keyboard.
+  event.currentTarget.focus();
+}
+
+
 function PasswordField({ id, label, value, autoComplete, minLength, placeholder, hideLabel = false, error, onChange }: PasswordFieldProps) {
   const [visible, setVisible] = useState(false);
 
@@ -32,6 +40,7 @@ function PasswordField({ id, label, value, autoComplete, minLength, placeholder,
     <div className="password-input-wrap">
       <input
         id={id}
+        name={id}
         type={visible ? "text" : "password"}
         autoComplete={autoComplete}
         minLength={minLength}
@@ -42,6 +51,7 @@ function PasswordField({ id, label, value, autoComplete, minLength, placeholder,
         required
         value={value}
         enterKeyHint={id === "login-password" ? "go" : undefined}
+        onTouchEnd={focusTouchedInput}
         onChange={(event) => onChange(event.target.value)}
       />
       <button
@@ -152,7 +162,7 @@ export function LoginPage({ account, onAuthenticated, onPasswordChanged }: Props
           <form className="auth-login-form" noValidate onSubmit={submitLogin}>
             <div className="auth-input-field">
               <label className="sr-only" htmlFor="login-email">Email đăng nhập</label>
-              <input id="login-email" type="email" inputMode="email" autoComplete="username" enterKeyHint="next" className={emailError ? "input-invalid" : undefined} aria-invalid={Boolean(emailError)} aria-describedby={emailError ? "login-email-error" : undefined} value={email} onChange={(event) => { setEmail(event.target.value); setEmailError(""); setMessage(""); }} placeholder="Email đăng nhập" />
+              <input id="login-email" name="email" type="email" inputMode="email" autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} enterKeyHint="next" className={emailError ? "input-invalid" : undefined} aria-invalid={Boolean(emailError)} aria-describedby={emailError ? "login-email-error" : undefined} value={email} onTouchEnd={focusTouchedInput} onChange={(event) => { setEmail(event.target.value); setEmailError(""); setMessage(""); }} placeholder="Email đăng nhập" />
               {emailError && <small className="auth-field-error" id="login-email-error">{emailError}</small>}
             </div>
             <PasswordField id="login-password" label="Mật khẩu" hideLabel placeholder="Mật khẩu" autoComplete="current-password" value={password} error={passwordError} onChange={(value) => { setPassword(value); setPasswordError(""); }} />

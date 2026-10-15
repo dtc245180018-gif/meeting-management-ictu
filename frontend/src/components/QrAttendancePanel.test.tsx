@@ -84,7 +84,7 @@ describe("QrAttendancePanel", () => {
     expect(scannerMocks.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Quét mã QR" }));
     await waitFor(() => expect(scannerMocks.start).toHaveBeenCalledWith(
-      { facingMode: "environment" },
+      { facingMode: { exact: "environment" } },
       expect.anything(),
       expect.any(Function),
       expect.any(Function),
@@ -105,20 +105,23 @@ describe("QrAttendancePanel", () => {
       expect.any(Function),
       expect.any(Function),
     ));
+    expect(scannerMocks.instances[0].stop).toHaveBeenCalled();
+    expect(scannerMocks.instances[0].clear).toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Dừng camera" })).toBeInTheDocument();
     const successCallback = scannerMocks.start.mock.calls[1][2] as (value: string) => void;
     successCallback("signed-token");
     await waitFor(() => expect(scannerMocks.instances[1].stop).toHaveBeenCalled());
   });
 
-  it("falls back to the first camera with a clear notice when no rear label exists", async () => {
+  it("falls back to the last mobile camera with a clear notice when no rear label exists", async () => {
     scannerMocks.start
       .mockRejectedValueOnce(new Error("environment unavailable"))
       .mockResolvedValueOnce(null);
     scannerMocks.cameras = [{ id: "front", label: "FaceTime Camera" }, { id: "other", label: "Camera 2" }];
     render(<QrAttendancePanel account={account} meetings={[]} />);
     fireEvent.click(screen.getByRole("button", { name: "Quét mã QR" }));
-    expect(await screen.findByText(/Không xác định được camera sau/)).toBeInTheDocument();
-    expect(scannerMocks.start).toHaveBeenNthCalledWith(2, "front", expect.anything(), expect.any(Function), expect.any(Function));
+    expect(await screen.findByText(/Không đọc được nhãn camera sau/)).toBeInTheDocument();
+    expect(scannerMocks.start).toHaveBeenNthCalledWith(2, "other", expect.anything(), expect.any(Function), expect.any(Function));
   });
 
   it("stops the scanner when the panel unmounts", async () => {

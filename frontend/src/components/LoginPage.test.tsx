@@ -73,8 +73,13 @@ describe("LoginPage", () => {
     expect(passwordInput).not.toBeDisabled();
     emailInput.focus();
     expect(emailInput).toHaveFocus();
+    emailInput.blur();
+    fireEvent.touchEnd(emailInput);
+    expect(emailInput).toHaveFocus();
     passwordInput.focus();
     expect(passwordInput).toHaveFocus();
+    expect(emailInput).toHaveAttribute("name", "email");
+    expect(passwordInput).toHaveAttribute("name", "login-password");
   });
 
   it("shows the new ICTU login identity and only the requested author", () => {

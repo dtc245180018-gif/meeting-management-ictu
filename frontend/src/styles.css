@@ -524,9 +524,9 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .auth-card .auth-login-form { gap: 0; margin-top: 46px; }
 .auth-card label { display: grid; gap: 7px; color: var(--ink); font-size: .8rem; font-weight: 800; }
 .auth-card { position: relative; z-index: 1; }
-.auth-card input { min-height: 53px; padding-right: 20px; padding-left: 20px; border-color: #cdd7e2; border-radius: 5px; color: #35485d; background: #fff; font-size: 16px; touch-action: manipulation; }
+.auth-card input { position: relative; z-index: 2; width: 100%; min-height: 53px; padding-right: 20px; padding-left: 20px; border-color: #cdd7e2; border-radius: 5px; color: #35485d; background: #fff; font-size: 16px; -webkit-appearance: none; appearance: none; -webkit-user-select: text; user-select: text; touch-action: auto; pointer-events: auto; }
 .auth-card input::placeholder { color: #8b929b; opacity: 1; }
-.auth-input-field { display: grid; }
+.auth-input-field { position: relative; display: grid; pointer-events: auto; }
 .auth-input-field + .password-field { margin-top: 28px; }
 .auth-card input.input-invalid { border-color: #ff3038; box-shadow: none; }
 .auth-field-error { display: block; margin: 7px 5px 0; color: #ff3038; font-size: .76rem; }
@@ -546,10 +546,10 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
 .pwa-install-auth .pwa-install-button:disabled { cursor: default; color: #55718b; background: #eef2f6; }
 .pwa-install-notice { position: fixed; z-index: 100; right: 18px; bottom: 18px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; pointer-events: none; }
-.password-field { display: grid; gap: 7px; }
-.password-input-wrap { position: relative; min-width: 0; }
+.password-field { position: relative; display: grid; gap: 7px; pointer-events: auto; }
+.password-input-wrap { position: relative; min-width: 0; pointer-events: auto; }
 .password-input-wrap input { padding-right: 68px; }
-.password-toggle { position: absolute; top: 50%; right: 9px; width: 36px; height: 36px; display: grid; place-items: center; padding: 7px; transform: translateY(-50%); border: 0; border-radius: 3px; color: #738198; background: transparent; touch-action: manipulation; }
+.password-toggle { position: absolute; z-index: 3; top: 50%; right: 9px; width: 36px; height: 36px; display: grid; place-items: center; padding: 7px; transform: translateY(-50%); border: 0; border-radius: 3px; color: #738198; background: transparent; touch-action: manipulation; }
 .password-toggle svg { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 1.8; }
 .password-toggle:hover { background: #eaf4fc; }
 .password-toggle:focus-visible { outline: 2px solid var(--ictu-blue); outline-offset: 1px; }
@@ -630,6 +630,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
   .auth-header-inner { padding-top: max(9px, env(safe-area-inset-top)); }
   .auth-footer { padding-bottom: max(24px, env(safe-area-inset-bottom)); }
   .auth-stage { min-height: 0; }
+  .auth-card, .auth-card form, .auth-input-field, .password-field, .password-input-wrap { pointer-events: auto; }
 }
 
 /* Sprint 4 · US25 booking assistant. */
