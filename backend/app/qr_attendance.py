@@ -76,6 +76,47 @@ def _authorized(account: models.UserAccount, meeting: models.Meeting) -> bool:
     return any(participant.email == account.email for participant in meeting.participants)
 
 
+def _notify_organizer_attendance(
+    db: Session,
+    booking: models.RoomBooking,
+    account: models.UserAccount,
+    *,
+    checked_in: bool,
+    occurred_at: datetime,
+) -> None:
+    meeting = booking.meeting
+    if account.email == meeting.organizer_email:
+        return
+    action_key = "check-in" if checked_in else "check-out"
+    event_key = f"attendance:{action_key}:booking:{booking.id}:account:{account.id}"
+    if db.scalar(select(models.Reminder.id).where(models.Reminder.event_key == event_key)):
+        return
+    action_text = "đã check-in" if checked_in else "đã check-out"
+    person_name = account.employee.full_name
+    db.add(
+        models.Reminder(
+            meeting_id=meeting.id,
+            recipient_email=meeting.organizer_email,
+            channel="in_app",
+            kind=(
+                models.NotificationKind.ATTENDANCE_CHECKED_IN
+                if checked_in
+                else models.NotificationKind.ATTENDANCE_CHECKED_OUT
+            ),
+            subject=f"{person_name} {action_text}",
+            body=(
+                f"{person_name} ({account.email}) {action_text} cuộc họp “{meeting.title}” "
+                f"tại phòng {booking.room.name}."
+            ),
+            event_key=event_key,
+            remind_at=occurred_at,
+            status=models.NotificationStatus.SENT,
+            attempts=1,
+            sent_at=occurred_at,
+        )
+    )
+
+
 def _token_payload(token: str) -> dict:
     settings = get_settings()
     try:
@@ -234,6 +275,13 @@ def check_in(
         db.add(attendance)
     if attendance.checked_in_at is None:
         attendance.checked_in_at = datetime.now(timezone.utc)
+        _notify_organizer_attendance(
+            db,
+            booking,
+            account,
+            checked_in=True,
+            occurred_at=attendance.checked_in_at,
+        )
     _audit(db, account, "attendance.check_in", "idempotent" if already_recorded else "success", booking.id)
     db.commit()
     db.refresh(attendance)
@@ -258,6 +306,13 @@ def check_out(
     already_recorded = attendance.checked_out_at is not None
     if attendance.checked_out_at is None:
         attendance.checked_out_at = datetime.now(timezone.utc)
+        _notify_organizer_attendance(
+            db,
+            booking,
+            account,
+            checked_in=False,
+            occurred_at=attendance.checked_out_at,
+        )
     _audit(db, account, "attendance.check_out", "idempotent" if already_recorded else "success", booking.id)
     db.commit()
     db.refresh(attendance)

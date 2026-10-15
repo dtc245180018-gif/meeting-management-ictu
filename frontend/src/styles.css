@@ -267,6 +267,11 @@ input:disabled { background: #eef2f6; }
 .participant { width: fit-content; padding: 4px 7px; border-radius: 3px; background: #fff6e6; }
 .participant.accepted { background: #e3f6eb; color: #15734a; }
 .participant.declined { background: #fbe7e7; color: #9c3c3c; }
+.attendance-history { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.attendance-entry { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid #d9e6ef; border-radius: 4px; background: #f8fbfd; }
+.attendance-entry span { overflow-wrap: anywhere; color: var(--ictu-navy); }
+.attendance-entry small { color: var(--muted); }
+.auth-login-hint { display: block; margin-top: 5px; color: var(--muted); font-size: .7rem; }
 .participant-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .participant-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border: 1px solid #bfd9ea; border-radius: 999px; color: var(--ictu-navy); background: #eef8fe; font-size: .72rem; }
 .participant-chip button { padding: 0 2px; border: 0; color: #7b3f3f; background: transparent; cursor: pointer; font-size: 1rem; line-height: 1; }
@@ -335,6 +340,13 @@ input:disabled { background: #eef2f6; }
 .admin-item span { color: var(--muted); font-size: .75rem; }
 .admin-item b { align-self: start; color: var(--ictu-blue); font-size: .7rem; }
 .admin-item .item-actions { grid-column: 1 / -1; margin-top: 2px; }
+.inventory-directory { display: grid; gap: 12px; min-width: 0; }
+.inventory-directory > h3, .inventory-summary h3 { margin: 0; color: var(--ictu-navy); }
+.inventory-summary { display: grid; gap: 9px; padding: 13px; border: 1px solid #c8dce9; border-radius: 6px; background: #f5faff; }
+.inventory-group-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.inventory-group-grid article { display: grid; gap: 4px; padding: 10px; border: 1px solid #d5e3ec; border-radius: 4px; background: #fff; }
+.inventory-group-grid strong { color: var(--ictu-navy); font-size: .78rem; }
+.inventory-group-grid span, .inventory-group-grid small { color: var(--muted); font-size: .7rem; }
 .notification-list { display: grid; gap: 8px; min-width: 0; }
 .notification-day-group { display: grid; gap: 8px; }
 .notification-day-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 5px; padding: 7px 10px; border-bottom: 1px solid #d9e4ec; color: var(--ictu-navy); background: #f5f9fc; font-size: .74rem; text-transform: capitalize; }

@@ -303,13 +303,13 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
       setMessage("Hãy chọn thời gian hợp lệ trước khi tìm thiết bị.");
       return;
     }
-    clearRoomSelection();
     setEquipmentLoading(true);
     setMessage("");
     void api.availableEquipment(toIsoDateTime(form.start_time), toIsoDateTime(form.end_time))
       .then((items) => {
         setEquipmentOptions(items);
-        setSelectedEquipment([]);
+        const availableIds = new Set(items.map((item) => item.id));
+        setSelectedEquipment((current) => current.filter((item) => availableIds.has(item.id)));
         setMessage(items.length ? `Đã tìm thấy ${items.length} thiết bị có thể đặt.` : "Không có thiết bị phù hợp trong khung giờ này.");
       })
       .catch((error: unknown) => setMessage(error instanceof Error ? error.message : "Không thể tìm thiết bị"))
@@ -317,7 +317,6 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
   };
 
   const toggleEquipment = (equipment: Equipment) => {
-    clearRoomSelection();
     setSelectedEquipment((current) => current.some((item) => item.id === equipment.id)
       ? current.filter((item) => item.id !== equipment.id)
       : [...current, equipment]);

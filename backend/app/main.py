@@ -362,6 +362,12 @@ def apply_schema_migrations() -> None:
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
             connection.execute(text("ALTER TYPE accountrole ADD VALUE IF NOT EXISTS 'ORGANIZER'"))
             connection.execute(text("ALTER TYPE accountrole ADD VALUE IF NOT EXISTS 'PARTICIPANT'"))
+            connection.execute(
+                text("ALTER TYPE notificationkind ADD VALUE IF NOT EXISTS 'ATTENDANCE_CHECKED_IN'")
+            )
+            connection.execute(
+                text("ALTER TYPE notificationkind ADD VALUE IF NOT EXISTS 'ATTENDANCE_CHECKED_OUT'")
+            )
     inspector = inspect(engine)
     with engine.begin() as connection:
         meeting_columns = {column["name"] for column in inspector.get_columns("meetings")}

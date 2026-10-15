@@ -477,6 +477,22 @@ def admin_create_equipment(
     return services.create_admin_equipment(db, payload)
 
 
+@router.post(
+    "/admin/equipment/bulk",
+    response_model=schemas.EquipmentAdminBulkOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def admin_create_equipment_bulk(
+    payload: schemas.EquipmentAdminBulkCreate,
+    db: Session = Depends(get_db),
+    account: models.UserAccount | None = Depends(auth.get_current_account),
+):
+    if account is not None:
+        auth.require_role(account, {models.AccountRole.ADMIN})
+        payload = payload.model_copy(update={"requester_email": account.email})
+    return services.create_admin_equipment_bulk(db, payload)
+
+
 @router.patch("/admin/equipment/{equipment_id}", response_model=schemas.EquipmentOut)
 def admin_update_equipment(
     equipment_id: int,

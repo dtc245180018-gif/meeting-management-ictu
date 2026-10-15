@@ -326,6 +326,19 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAl
               {details.participants.length === 0 && <span>Không có người tham dự.</span>}
               {details.participants.map((participant) => <span className={`participant ${participant.status}`} key={participant.id}>{participant.email} · {participant.status}</span>)}
             </div>
+            <div className="participants attendance-history">
+              <strong>Thời gian check-in / check-out ({details.booking?.attendances?.length ?? 0})</strong>
+              {!details.booking?.attendances?.length && <span>Chưa có ai check-in.</span>}
+              {details.booking?.attendances?.map((attendance) => (
+                <div className="attendance-entry" key={attendance.id}>
+                  <span><strong>{attendance.full_name}</strong> · {attendance.email}</span>
+                  <small>
+                    Check-in: {attendance.checked_in_at ? formatIctuDateTime(attendance.checked_in_at) : "Chưa check-in"}
+                    {" · "}Check-out: {attendance.checked_out_at ? formatIctuDateTime(attendance.checked_out_at) : "Chưa check-out"}
+                  </small>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

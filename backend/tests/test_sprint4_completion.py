@@ -223,6 +223,26 @@ def test_us27_signed_qr_is_authorized_idempotent_and_audited(client):
     assert checked_out.status_code == repeated_checkout.status_code == 200
     assert repeated_checkout.json()["already_recorded"] is True
 
+    organizer_notifications = client.get(
+        "/api/notifications", headers=organizer_headers, params={"email": organizer}
+    )
+    assert organizer_notifications.status_code == 200, organizer_notifications.text
+    attendance_notifications = [
+        item for item in organizer_notifications.json()
+        if item["kind"] in {"attendance_checked_in", "attendance_checked_out"}
+    ]
+    assert {item["kind"] for item in attendance_notifications} == {
+        "attendance_checked_in", "attendance_checked_out",
+    }
+    assert all(participant in (item["body"] or "") for item in attendance_notifications)
+
+    meeting_detail = client.get(f"/api/meetings/{meeting['id']}", headers=organizer_headers)
+    assert meeting_detail.status_code == 200, meeting_detail.text
+    attendance = meeting_detail.json()["booking"]["attendances"][0]
+    assert attendance["email"] == participant
+    assert attendance["checked_in_at"] is not None
+    assert attendance["checked_out_at"] is not None
+
     tampered = client.post(
         "/api/bookings/qr/inspect",
         headers=participant_headers,

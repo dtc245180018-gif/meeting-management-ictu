@@ -163,6 +163,21 @@ describe("MeetingForm room-aware creation", () => {
     })));
   });
 
+  it("keeps smart room recommendations visible while finding and selecting equipment", async () => {
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý phòng thông minh" }));
+    await screen.findByRole("button", { name: /Phòng A101/ });
+    fireEvent.click(screen.getByRole("button", { name: /Phòng A101/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Tìm thiết bị" }));
+    await screen.findByRole("button", { name: /TB-MC-01/ });
+    expect(screen.getByRole("button", { name: /Phòng A101.*Đã chọn/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /TB-MC-01/ }));
+    expect(screen.getByRole("button", { name: /Phòng A101.*Đã chọn/ })).toBeInTheDocument();
+  });
+
   it("preserves an expected size larger than the named invitation list", async () => {
     render(<MeetingForm onCreated={vi.fn()} />);
     fillRequiredFields();

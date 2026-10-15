@@ -151,6 +151,27 @@ def test_admin_user_management_and_last_admin_guard(client):
     ).status_code == 409
 
 
+def test_admin_can_create_an_external_email_account_that_can_log_in(client):
+    create_account("admin@ictu.edu.vn", models.AccountRole.ADMIN, "Quản trị viên")
+    headers, _ = login(client, "admin@ictu.edu.vn")
+    external_email = "external.user@gmail.com"
+
+    created = client.post(
+        "/api/admin/users",
+        headers=headers,
+        json={
+            "full_name": "Người dùng email ngoài",
+            "email": external_email,
+            "department": "Đối tác dự án",
+            "role": "participant",
+        },
+    )
+    assert created.status_code == 201, created.text
+    _, user = login(client, external_email)
+    assert user["email"] == external_email
+    assert user["role"] == "participant"
+
+
 def test_room_permission_cannot_be_bypassed_by_search_or_create(client):
     admin_id = create_account("admin@ictu.edu.vn", models.AccountRole.ADMIN, "Quản trị viên")
     organizer_id = create_account("organizer@ictu.edu.vn", models.AccountRole.ORGANIZER, "Người tổ chức")
