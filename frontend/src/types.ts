@@ -77,6 +77,16 @@ export interface Booking {
   end_time: string;
   status: "active" | "cancelled";
   room: Room;
+  attendances?: BookingAttendanceDetail[];
+}
+
+export interface BookingAttendanceDetail {
+  id: number;
+  account_id: number;
+  email: string;
+  full_name: string;
+  checked_in_at?: string;
+  checked_out_at?: string;
 }
 
 export interface BookingQr {
@@ -234,7 +244,7 @@ export interface Notification {
   meeting_id: number;
   recipient_email: string;
   channel: string;
-  kind: "reminder" | "meeting_starting" | "invitation" | "meeting_updated" | "meeting_cancelled" | "invitation_response";
+  kind: "reminder" | "meeting_starting" | "invitation" | "meeting_updated" | "meeting_cancelled" | "invitation_response" | "attendance_checked_in" | "attendance_checked_out";
   subject?: string;
   body?: string;
   remind_at: string;
@@ -274,6 +284,22 @@ export interface EquipmentAdminInput {
   location: string;
   status?: "available" | "maintenance" | "inactive";
   is_active?: boolean;
+}
+
+export interface EquipmentBulkAdminInput {
+  requester_email: string;
+  code_prefix: string;
+  start_number: number;
+  quantity: number;
+  name: string;
+  category: string;
+  location: string;
+  status?: "available" | "maintenance" | "inactive";
+}
+
+export interface EquipmentBulkAdminResult {
+  created_count: number;
+  items: Equipment[];
 }
 
 export type AccountRole = "admin" | "organizer" | "participant";

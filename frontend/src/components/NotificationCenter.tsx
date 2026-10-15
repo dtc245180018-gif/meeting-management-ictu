@@ -25,6 +25,8 @@ const kindLabels: Record<Notification["kind"], string> = {
   meeting_updated: "Lịch đã cập nhật",
   meeting_cancelled: "Lịch đã hủy",
   invitation_response: "Phản hồi lời mời",
+  attendance_checked_in: "Đã check-in",
+  attendance_checked_out: "Đã check-out",
 };
 
 

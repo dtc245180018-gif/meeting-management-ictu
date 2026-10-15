@@ -71,6 +71,8 @@ class NotificationKind(StrEnum):
     MEETING_UPDATED = "meeting_updated"
     MEETING_CANCELLED = "meeting_cancelled"
     INVITATION_RESPONSE = "invitation_response"
+    ATTENDANCE_CHECKED_IN = "attendance_checked_in"
+    ATTENDANCE_CHECKED_OUT = "attendance_checked_out"
 
 
 class GoogleSyncStatus(StrEnum):
@@ -312,6 +314,14 @@ class BookingAttendance(Base):
 
     booking: Mapped[RoomBooking] = relationship(back_populates="attendances")
     account: Mapped[UserAccount] = relationship(back_populates="booking_attendances")
+
+    @property
+    def email(self) -> str:
+        return self.account.email
+
+    @property
+    def full_name(self) -> str:
+        return self.account.employee.full_name
 
 
 class BookingUsageAudit(Base):

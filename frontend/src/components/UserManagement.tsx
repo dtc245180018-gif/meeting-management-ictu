@@ -78,9 +78,10 @@ export function UserManagement() {
 
   return <div className="admin-users">
     <form className="admin-form compact-form" onSubmit={create}>
-      <h3>Tạo tài khoản nhân viên</h3>
+      <h3>Tạo tài khoản người dùng</h3>
       <label>Họ tên<input required value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></label>
       <label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+      <small className="field-hint">Chấp nhận cả email ICTU và email ngoài (Gmail, Outlook...) do quản trị viên cấp tài khoản.</small>
       <label>Đơn vị<input required value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} /></label>
       <label>Vai trò<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as AccountRole })}><option value="participant">Người tham dự</option><option value="organizer">Người tổ chức</option><option value="admin">Quản trị viên</option></select></label>
       <button className="primary-action">Tạo tài khoản</button>

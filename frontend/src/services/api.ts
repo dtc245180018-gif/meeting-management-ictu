@@ -5,6 +5,8 @@ import type {
   EmailIntegrationStatus,
   Equipment,
   EquipmentAdminInput,
+  EquipmentBulkAdminInput,
+  EquipmentBulkAdminResult,
   EquipmentStatus,
   GoogleCalendarEvent,
   GoogleConnectionStatus,
@@ -258,6 +260,8 @@ export const api = {
     request<Equipment[]>(`/admin/equipment?${new URLSearchParams({ requester_email: requesterEmail })}`),
   createEquipment: (payload: EquipmentAdminInput) =>
     request<Equipment>("/admin/equipment", { method: "POST", body: JSON.stringify(payload) }),
+  createEquipmentBulk: (payload: EquipmentBulkAdminInput) =>
+    request<EquipmentBulkAdminResult>("/admin/equipment/bulk", { method: "POST", body: JSON.stringify(payload) }),
   updateEquipment: (id: number, payload: Partial<EquipmentAdminInput> & { requester_email: string }) =>
     request<Equipment>(`/admin/equipment/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deactivateEquipment: (id: number, requesterEmail: string) =>

@@ -10,6 +10,24 @@ interface Props {
 }
 
 
+type QrScanner = import("html5-qrcode").Html5Qrcode;
+
+
+async function releaseScanner(scanner: QrScanner | null) {
+  if (!scanner) return;
+  try {
+    if (scanner.isScanning) await scanner.stop();
+  } catch {
+    // The browser can release a camera track before the library observes it.
+  }
+  try {
+    scanner.clear();
+  } catch {
+    // The scanner element may already have been removed during navigation.
+  }
+}
+
+
 export function QrAttendancePanel({ account, meetings }: Props) {
   const [qr, setQr] = useState<BookingQr | null>(null);
   const [token, setToken] = useState("");
@@ -17,7 +35,8 @@ export function QrAttendancePanel({ account, meetings }: Props) {
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const scannerRef = useRef<import("html5-qrcode").Html5Qrcode | null>(null);
+  const scannerRef = useRef<QrScanner | null>(null);
+  const scanSessionRef = useRef(0);
   const decodedRef = useRef(false);
 
   const managedMeetings = useMemo(() => meetings
@@ -27,16 +46,10 @@ export function QrAttendancePanel({ account, meetings }: Props) {
   [account.email, account.role, meetings]);
 
   const stopScanner = useCallback(async () => {
+    scanSessionRef.current += 1;
     const scanner = scannerRef.current;
     scannerRef.current = null;
-    if (scanner) {
-      try {
-        if (scanner.isScanning) await scanner.stop();
-        scanner.clear();
-      } catch {
-        // Camera may already have been released by the browser.
-      }
-    }
+    await releaseScanner(scanner);
     setScanning(false);
   }, []);
 
@@ -61,32 +74,87 @@ export function QrAttendancePanel({ account, meetings }: Props) {
 
   useEffect(() => {
     if (!scanning) return;
+    const session = scanSessionRef.current + 1;
+    scanSessionRef.current = session;
     let active = true;
+    const isActive = () => active && scanSessionRef.current === session;
     decodedRef.current = false;
+    const scanConfig = { fps: 10, qrbox: { width: 240, height: 240 } };
+    const handleDecoded = (decodedText: string) => {
+      if (decodedRef.current) return;
+      decodedRef.current = true;
+      setToken(decodedText);
+      setMessage("Đã đọc mã QR. Hãy kiểm tra thông tin trước khi xác nhận.");
+      void stopScanner();
+      void inspectValue(decodedText);
+    };
+    const handleCameraError = (error: unknown) => {
+      if (error instanceof DOMException) {
+        if (error.name === "NotAllowedError" || error.name === "PermissionDeniedError") {
+          return "Bạn chưa cấp quyền camera. Hãy cho phép camera trong Safari hoặc Cài đặt iPhone.";
+        }
+        if (error.name === "NotReadableError" || error.name === "TrackStartError") {
+          return "Camera đang được ứng dụng khác sử dụng. Hãy đóng ứng dụng đó rồi thử lại.";
+        }
+        if (error.name === "NotFoundError") {
+          return "Không tìm thấy camera trên thiết bị.";
+        }
+      }
+      return error instanceof Error && error.message
+        ? error.message
+        : "Không thể mở camera. Hãy cho phép quyền camera hoặc nhập mã dự phòng.";
+    };
     const start = async () => {
       try {
+        const localHostnames = new Set(["localhost", "127.0.0.1", "[::1]"]);
+        if (typeof window.isSecureContext === "boolean" && !window.isSecureContext && !localHostnames.has(window.location.hostname)) {
+          throw new Error("Camera chỉ hoạt động trên HTTPS hoặc localhost.");
+        }
         const { Html5Qrcode } = await import("html5-qrcode");
-        const scanner = new Html5Qrcode("qr-reader");
-        scannerRef.current = scanner;
-        const cameras = await Html5Qrcode.getCameras();
-        if (!active || !cameras.length) throw new Error("Không tìm thấy camera trên thiết bị.");
-        const preferred = cameras.find((camera) => /back|rear|environment/i.test(camera.label)) ?? cameras[0];
-        await scanner.start(
-          preferred.id,
-          { fps: 10, qrbox: { width: 240, height: 240 } },
-          (decodedText) => {
-            if (decodedRef.current) return;
-            decodedRef.current = true;
-            setToken(decodedText);
-            setMessage("Đã đọc mã QR. Hãy kiểm tra thông tin trước khi xác nhận.");
-            void stopScanner();
-            void inspectValue(decodedText);
-          },
-          () => undefined,
-        );
+        if (!isActive()) return;
+        const initialScanner = new Html5Qrcode("qr-reader");
+        scannerRef.current = initialScanner;
+        try {
+          await initialScanner.start({ facingMode: { exact: "environment" } }, scanConfig, handleDecoded, () => undefined);
+        } catch (initialError) {
+          if (!isActive()) {
+            await releaseScanner(initialScanner);
+            return;
+          }
+          if (scannerRef.current === initialScanner) scannerRef.current = null;
+          await releaseScanner(initialScanner);
+          if (!isActive()) return;
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras.length) throw new Error("Không tìm thấy camera trên thiết bị.", { cause: initialError });
+          const rearCamera = cameras.find((camera) => /back|rear|environment|sau/i.test(camera.label));
+          // Mobile browsers usually enumerate the selfie camera first and the
+          // rear camera last. Labels may be blank/localized on iOS, so the last
+          // device is a safer fallback than selecting the first camera.
+          const fallbackCamera = rearCamera ?? cameras[cameras.length - 1];
+          if (!rearCamera) {
+            setMessage("Không đọc được nhãn camera sau. Hệ thống đang thử camera cuối cùng của điện thoại.");
+          }
+          if (!isActive()) return;
+          const fallbackScanner = new Html5Qrcode("qr-reader");
+          scannerRef.current = fallbackScanner;
+          try {
+            await fallbackScanner.start(fallbackCamera.id, scanConfig, handleDecoded, () => undefined);
+          } catch (fallbackError) {
+            if (fallbackError instanceof Error || fallbackError instanceof DOMException) throw fallbackError;
+            throw new Error("Không thể mở camera sau trên thiết bị.", { cause: fallbackError });
+          }
+        }
+        if (!isActive()) {
+          const scanner = scannerRef.current;
+          scannerRef.current = null;
+          await releaseScanner(scanner);
+        }
       } catch (error) {
-        if (active) {
-          setMessage(error instanceof Error ? error.message : "Không thể mở camera. Hãy cho phép quyền camera hoặc nhập mã dự phòng.");
+        if (isActive()) {
+          const scanner = scannerRef.current;
+          scannerRef.current = null;
+          await releaseScanner(scanner);
+          setMessage(handleCameraError(error));
           setScanning(false);
         }
       }
@@ -94,7 +162,10 @@ export function QrAttendancePanel({ account, meetings }: Props) {
     void start();
     return () => {
       active = false;
-      void stopScanner();
+      if (scanSessionRef.current === session) scanSessionRef.current += 1;
+      const scanner = scannerRef.current;
+      scannerRef.current = null;
+      void releaseScanner(scanner);
     };
   }, [inspectValue, scanning, stopScanner]);
 

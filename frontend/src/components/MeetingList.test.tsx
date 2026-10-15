@@ -41,6 +41,26 @@ describe("MeetingList calendar integration", () => {
     expect(screen.getByText("TB-MC-01 · Máy chiếu")).toBeInTheDocument();
   });
 
+  it("shows check-in and check-out timestamps in meeting details", () => {
+    const attendedMeeting = {
+      ...meeting,
+      booking: {
+        id: 17, room_id: 1, meeting_id: 7, start_time: meeting.start_time, end_time: meeting.end_time,
+        status: "active" as const,
+        room: { id: 1, name: "A101", capacity: 10, location: "Khu A" },
+        attendances: [{
+          id: 5, account_id: 9, email: "employee.one@gmail.com", full_name: "Nguyễn Văn A",
+          checked_in_at: "2026-10-01T02:05:00Z", checked_out_at: "2026-10-01T03:01:00Z",
+        }],
+      },
+    };
+    render(<MeetingList meetings={[attendedMeeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
+    fireEvent.click(screen.getByRole("button", { name: "Xem chi tiết" }));
+    expect(screen.getByText(/Nguyễn Văn A/)).toBeInTheDocument();
+    expect(screen.getByText(/Check-in:/)).toBeInTheDocument();
+    expect(screen.getByText(/Check-out:/)).toBeInTheDocument();
+  });
+
   it("does not let another demo user manage the organizer's meeting", () => {
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" />);
     expect(screen.queryByRole("button", { name: `Thao tác cho ${meeting.title}` })).not.toBeInTheDocument();

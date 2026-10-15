@@ -179,6 +179,34 @@ class EquipmentAdminCreate(BaseModel):
         return value.upper()
 
 
+class EquipmentAdminBulkCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requester_email: EmailStr
+    code_prefix: str = Field(min_length=2, max_length=70)
+    start_number: int = Field(default=1, ge=1, le=99999)
+    quantity: int = Field(ge=1, le=100)
+    name: str = Field(min_length=2, max_length=160)
+    category: str = Field(min_length=2, max_length=80)
+    location: str = Field(min_length=2, max_length=255)
+    status: EquipmentStatus = EquipmentStatus.AVAILABLE
+
+    @field_validator("code_prefix", "name", "category", "location", mode="before")
+    @classmethod
+    def normalize_bulk_equipment_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("code_prefix")
+    @classmethod
+    def uppercase_code_prefix(cls, value: str) -> str:
+        return value.upper().rstrip("-")
+
+
+class EquipmentAdminBulkOut(BaseModel):
+    created_count: int
+    items: list[EquipmentOut]
+
+
 class EquipmentAdminUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -201,6 +229,17 @@ class EmployeeOut(BaseModel):
     is_active: bool
 
 
+class BookingAttendanceDetailOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    account_id: int
+    email: EmailStr
+    full_name: str
+    checked_in_at: datetime | None = None
+    checked_out_at: datetime | None = None
+
+
 class BookingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -211,6 +250,7 @@ class BookingOut(BaseModel):
     end_time: datetime
     status: BookingStatus
     room: RoomOut
+    attendances: list[BookingAttendanceDetailOut] = Field(default_factory=list)
 
 
 class BookingQrOut(BaseModel):

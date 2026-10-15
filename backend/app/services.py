@@ -37,6 +37,10 @@ def meeting_query():
     return select(models.Meeting).options(
         selectinload(models.Meeting.participants),
         selectinload(models.Meeting.booking).selectinload(models.RoomBooking.room),
+        selectinload(models.Meeting.booking)
+        .selectinload(models.RoomBooking.attendances)
+        .selectinload(models.BookingAttendance.account)
+        .selectinload(models.UserAccount.employee),
         selectinload(models.Meeting.equipment_bookings).selectinload(models.EquipmentBooking.equipment),
         selectinload(models.Meeting.reminders),
         selectinload(models.Meeting.google_calendar_event),
@@ -929,6 +933,50 @@ def create_admin_equipment(db: Session, payload: schemas.EquipmentAdminCreate) -
     db.commit()
     db.refresh(equipment)
     return equipment_to_out(db, equipment)
+
+
+def create_admin_equipment_bulk(
+    db: Session,
+    payload: schemas.EquipmentAdminBulkCreate,
+) -> schemas.EquipmentAdminBulkOut:
+    require_admin(str(payload.requester_email), db)
+    last_number = payload.start_number + payload.quantity - 1
+    width = max(2, len(str(last_number)))
+    codes = [
+        f"{payload.code_prefix}-{number:0{width}d}"
+        for number in range(payload.start_number, last_number + 1)
+    ]
+    existing_codes = set(
+        db.scalars(
+            select(models.Equipment.code).where(func.lower(models.Equipment.code).in_([code.lower() for code in codes]))
+        ).all()
+    )
+    if existing_codes:
+        conflicts = ", ".join(sorted(existing_codes))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Mã thiết bị đã tồn tại: {conflicts}",
+        )
+
+    items = [
+        models.Equipment(
+            code=code,
+            name=payload.name,
+            category=payload.category,
+            location=payload.location,
+            status=payload.status,
+            is_active=payload.status != models.EquipmentStatus.INACTIVE,
+        )
+        for code in codes
+    ]
+    db.add_all(items)
+    db.commit()
+    for item in items:
+        db.refresh(item)
+    return schemas.EquipmentAdminBulkOut(
+        created_count=len(items),
+        items=[equipment_to_out(db, item) for item in items],
+    )
 
 
 def update_admin_equipment(
