@@ -15,7 +15,7 @@ interface Props {
 type QrScanner = import("html5-qrcode").Html5Qrcode;
 
 
-function useRearCamera() {
+function shouldUseRearCamera() {
   if (typeof navigator === "undefined") return false;
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
     || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
@@ -132,7 +132,7 @@ export function QrAttendancePanel({ account, meetings, autoStartScan = false, on
         const initialScanner = new Html5Qrcode("qr-reader");
         scannerRef.current = initialScanner;
         try {
-          const cameraMode: MediaTrackConstraints = useRearCamera()
+          const cameraMode: MediaTrackConstraints = shouldUseRearCamera()
             ? { facingMode: { exact: "environment" } }
             : { facingMode: "user" };
           await initialScanner.start(cameraMode, scanConfig, handleDecoded, () => undefined);
@@ -147,7 +147,7 @@ export function QrAttendancePanel({ account, meetings, autoStartScan = false, on
           const cameras = await Html5Qrcode.getCameras();
           if (!cameras.length) throw new Error("Không tìm thấy camera trên thiết bị.", { cause: initialError });
           const rearCamera = cameras.find((camera) => /back|rear|environment|sau/i.test(camera.label));
-          const mobile = useRearCamera();
+          const mobile = shouldUseRearCamera();
           // Điện thoại ưu tiên camera sau; trình duyệt máy tính dùng webcam mặc định.
           const fallbackCamera = mobile ? rearCamera ?? cameras[cameras.length - 1] : cameras[0];
           if (mobile && !rearCamera) {
