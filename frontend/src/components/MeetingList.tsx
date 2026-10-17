@@ -177,14 +177,13 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAl
     <section className="card wide-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">US02 · US06 · US07 · US08</span>
           <h2>Quản lý và đặt phòng</h2>
         </div>
         <span className="counter">{meetings.length} lịch</span>
       </div>
       {message && <p className="notice">{message}</p>}
       <div className="meeting-list">
-        {meetings.length === 0 && <div className="empty">Chưa có lịch họp. Hãy tạo lịch đầu tiên.</div>}
+        {meetings.length === 0 && <div className="empty">Không có cuộc họp trong ngày hoặc phạm vi đã chọn.</div>}
         {meetings.map((meeting) => (
           <article className={`meeting-item ${meeting.status}`} key={meeting.id}>
             <div className="meeting-date">

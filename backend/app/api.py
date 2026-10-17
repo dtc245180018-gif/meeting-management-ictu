@@ -62,6 +62,15 @@ def current_user(account: models.UserAccount = Depends(auth.require_account)):
     return account_services.account_to_out(account)
 
 
+@router.patch("/auth/profile", response_model=schemas.AccountOut)
+def update_profile(
+    payload: schemas.ProfileUpdate,
+    account: models.UserAccount = Depends(auth.require_account),
+    db: Session = Depends(get_db),
+):
+    return account_services.account_to_out(account_services.update_profile(db, account, payload))
+
+
 @router.post("/auth/logout", response_model=schemas.MessageOut)
 def logout(
     account: models.UserAccount = Depends(auth.require_account),
@@ -625,6 +634,16 @@ def notifications(
     account: models.UserAccount | None = Depends(auth.get_current_account),
 ):
     return services.list_notifications(db, _identity(account, email))
+
+
+@router.post("/notifications/read-all", response_model=schemas.MessageOut)
+def read_all_notifications(
+    payload: schemas.NotificationReadRequest,
+    db: Session = Depends(get_db),
+    account: models.UserAccount | None = Depends(auth.get_current_account),
+):
+    count = services.mark_all_notifications_read(db, _identity(account, str(payload.email)))
+    return schemas.MessageOut(message=f"Đã đánh dấu {count} thông báo là đã đọc")
 
 
 @router.post("/notifications/{notification_id}/read", response_model=schemas.NotificationOut)

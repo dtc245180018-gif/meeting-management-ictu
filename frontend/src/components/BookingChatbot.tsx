@@ -26,14 +26,14 @@ interface Props {
 
 const starterSuggestions = [
   "Đặt phòng cho 8 người vào 9 giờ sáng mai, họp trong 1 tiếng",
-  "Tạo lịch họp Sprint 4 chiều thứ Sáu và cần máy chiếu",
+  "Tạo lịch họp tổng kết chiều thứ Sáu và cần máy chiếu",
   "Tôi muốn đặt một cuộc họp lặp hằng tuần",
 ];
 
 function emptyDraft(organizerEmail: string): ChatbotBookingDraft {
   return {
     title: null,
-    description: "Đặt lịch qua trợ lý Gemini US25",
+    description: "Đặt lịch qua trợ lý Gemini",
     organizer_email: organizerEmail,
     start_time: null,
     end_time: null,
@@ -247,7 +247,7 @@ export function BookingChatbot({
           <header className="chatbot-header">
             <div className="chatbot-avatar" aria-hidden="true">✦</div>
             <div>
-              <span>US25 · GEMINI AI</span>
+              <span>GEMINI AI</span>
               <strong id="chatbot-title">Trợ lý đặt phòng</strong>
             </div>
             <div className="chatbot-header-actions">

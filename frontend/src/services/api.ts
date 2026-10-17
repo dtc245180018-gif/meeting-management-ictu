@@ -117,6 +117,8 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   me: () => request<Account>("/auth/me"),
+  updateProfile: (payload: { full_name: string; department: string }) =>
+    request<Account>("/auth/profile", { method: "PATCH", body: JSON.stringify(payload) }),
   logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ message: string }>("/auth/change-password", {
@@ -293,6 +295,8 @@ export const api = {
 
   notifications: (email: string) =>
     request<Notification[]>(`/notifications?${new URLSearchParams({ email })}`),
+  markAllNotificationsRead: (email: string) =>
+    request<{ message: string }>("/notifications/read-all", { method: "POST", body: JSON.stringify({ email }) }),
   markNotificationRead: (id: number, email: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: "POST", body: JSON.stringify({ email }) }),
 

@@ -159,12 +159,26 @@ export function AdminPanel({ adminEmail }: Props) {
     return [...groups.values()].sort((a, b) => `${a.category}${a.name}`.localeCompare(`${b.category}${b.name}`, "vi"));
   }, [equipment]);
 
-  return <section className="card wide-card admin-panel">
-    <div className="section-heading">
-      <div><span className="eyebrow">US18–US24 · US28</span><h2>Quản trị hệ thống</h2></div>
-      <span className="badge">{adminEmail}</span>
-    </div>
-    <p className="notice">Mọi thao tác quản trị được kiểm tra bằng vai trò từ phiên đăng nhập và được ghi nhật ký.</p>
+  const tabContext = {
+    users: ["Tài khoản và phân quyền", "Tạo người dùng, phân vai trò và giới hạn quyền đặt từng phòng."],
+    rooms: ["Danh mục phòng họp", "Cập nhật sức chứa, vị trí, tiện ích và trạng thái vận hành."],
+    equipment: ["Kho thiết bị", "Theo dõi từng mã tài sản, số lượng sẵn sàng và tình trạng bảo trì."],
+    reports: ["Báo cáo vận hành", "Phân tích mức sử dụng phòng, lịch hủy và xuất dữ liệu phục vụ quản lý."],
+    hrm: ["Đồng bộ nhân sự", "Kiểm tra connector, chạy đồng bộ và xem lịch sử xử lý dữ liệu."],
+  }[tab];
+
+  return <div className="module-page admin-page">
+    <header className="module-page-heading">
+      <div><span>Vận hành hệ thống</span><h1>Quản trị</h1><p>Quản lý tài khoản, tài nguyên, báo cáo và các kết nối dữ liệu tập trung.</p></div>
+      <div className="module-heading-identity"><span>Quản trị viên</span><strong>{adminEmail}</strong></div>
+    </header>
+    <section className="module-summary-grid admin-summary-grid" aria-label="Tổng quan quản trị">
+      <article><span>Phòng họp</span><strong>{rooms.length}</strong><small>{rooms.filter((room) => room.is_active !== false).length} phòng hoạt động</small></article>
+      <article><span>Thiết bị</span><strong>{equipment.length}</strong><small>{equipment.filter((item) => item.status === "available").length} thiết bị sẵn sàng</small></article>
+      <article><span>Khu vực quản lý</span><strong>5</strong><small>Tài khoản, phòng, thiết bị, báo cáo, HRM</small></article>
+    </section>
+    <section className="module-surface admin-panel">
+    <p className="admin-security-note"><span aria-hidden="true">✓</span>Mọi thao tác quản trị được kiểm tra theo vai trò đăng nhập và ghi vào nhật ký hệ thống.</p>
     <div className="admin-tabs">
       <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Tài khoản & phân quyền</button>
       <button className={tab === "rooms" ? "active" : ""} onClick={() => setTab("rooms")}>Quản lý phòng</button>
@@ -172,6 +186,7 @@ export function AdminPanel({ adminEmail }: Props) {
       <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Báo cáo & xuất file</button>
       <button className={tab === "hrm" ? "active" : ""} onClick={() => setTab("hrm")}>Đồng bộ HRM/ERP</button>
     </div>
+    <div className="admin-context-heading"><div><span>Đang quản lý</span><h2>{tabContext[0]}</h2></div><p>{tabContext[1]}</p></div>
     {message && <p className="notice" role="status">{message}</p>}
     {loading && (tab === "rooms" || tab === "equipment") && <p className="empty">Đang tải dữ liệu quản trị...</p>}
     {tab === "users" && <UserManagement />}
@@ -219,5 +234,6 @@ export function AdminPanel({ adminEmail }: Props) {
     </div>}
     {tab === "reports" && <ReportsPanel />}
     {tab === "hrm" && <HrmSyncPanel />}
-  </section>;
+    </section>
+  </div>;
 }

@@ -108,7 +108,7 @@ export function UserManagement() {
       <div className="pagination"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Trước</button><span>Trang {page}/{totalPages}</span><button disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Sau</button></div>
     </div>
     {selected && <section className="permission-panel">
-      <div className="section-heading"><div><span className="eyebrow">US21</span><h3>Quyền đặt phòng · {selected.full_name}</h3></div><button onClick={() => setSelected(null)}>Đóng</button></div>
+      <div className="section-heading"><div><h3>Quyền đặt phòng · {selected.full_name}</h3></div><button onClick={() => setSelected(null)}>Đóng</button></div>
       <p className="subtle">Phòng bị hạn chế sẽ không xuất hiện trong kết quả tìm phòng và API cũng từ chối mọi yêu cầu đặt trực tiếp.</p>
       <div className="permission-grid">{permissions.map((permission) => <button className={permission.can_book ? "permission-allowed" : "permission-denied"} key={permission.room_id} onClick={() => void togglePermission(permission)}><strong>{permission.room_name}</strong><span>{permission.can_book ? "Được đặt" : `Không được đặt${permission.reason ? ` · ${permission.reason}` : ""}`}</span></button>)}</div>
     </section>}

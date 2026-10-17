@@ -691,6 +691,18 @@ class ChangePasswordRequest(BaseModel):
         return self
 
 
+class ProfileUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    full_name: str = Field(min_length=2, max_length=160)
+    department: str = Field(min_length=2, max_length=160)
+
+    @field_validator("full_name", "department", mode="before")
+    @classmethod
+    def normalize_profile_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+
 class AccountCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
