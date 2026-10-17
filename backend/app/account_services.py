@@ -62,6 +62,18 @@ def change_password(
     return account
 
 
+def update_profile(
+    db: Session,
+    account: models.UserAccount,
+    payload: schemas.ProfileUpdate,
+) -> models.UserAccount:
+    account.employee.full_name = payload.full_name
+    account.employee.department = payload.department
+    _audit(db, account, "profile.updated", account, "full_name,department")
+    db.commit()
+    return db.scalar(account_query().where(models.UserAccount.id == account.id))
+
+
 def revoke_tokens(db: Session, account: models.UserAccount) -> None:
     account.token_version += 1
     db.commit()

@@ -322,22 +322,35 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
       : [...current, equipment]);
   };
 
+  const scheduleReady = Boolean(form.start_time && form.end_time && new Date(form.end_time) > new Date(form.start_time));
+
   return (
-    <section className="card">
-      <div className="section-heading">
-        <div>
-          <span className="eyebrow">US01 · US03 · US04 · US05 · US12 · US16</span>
-          <h2>Tạo lịch họp</h2>
-        </div>
-        <span className="badge">Sprint 4</span>
+    <div className="module-page meeting-form-page">
+      <header className="module-page-heading">
+        <div><span>Lập lịch ICTU</span><h1>Tạo lịch họp</h1><p>Thiết lập thời gian, người tham dự và tài nguyên trong một quy trình duy nhất.</p></div>
+        <div className="module-heading-status"><strong>{participants.length + 1}</strong><span>người hiện tại</span></div>
+      </header>
+      <section className="module-surface meeting-form-shell">
+      <div className="form-intro-strip">
+        <div><b>1</b><span><strong>Thông tin cuộc họp</strong><small>Tên, nội dung và thành phần</small></span></div>
+        <div><b>2</b><span><strong>Thời gian &amp; nhắc lịch</strong><small>Chọn lịch phù hợp</small></span></div>
+        <div><b>3</b><span><strong>Phòng &amp; thiết bị</strong><small>Hệ thống kiểm tra tự động</small></span></div>
       </div>
       <form onSubmit={submit} className="form-grid">
+        <fieldset className="form-section full">
+          <legend><b>Thông tin chính</b><span>Những nội dung người tham dự sẽ nhìn thấy</span></legend>
+          <div className="form-section-grid">
         <label className="full">Tên cuộc họp
-          <input required minLength={3} value={form.title} onChange={(e) => updateForm({ title: e.target.value })} placeholder="Ví dụ: Daily Meeting Sprint 1" />
+            <input required minLength={3} value={form.title} onChange={(e) => updateForm({ title: e.target.value })} placeholder="Ví dụ: Họp kế hoạch tuần" />
         </label>
         <label className="full">Mô tả
           <textarea value={form.description} onChange={(e) => updateForm({ description: e.target.value })} placeholder="Nội dung và mục tiêu cuộc họp" />
         </label>
+          </div>
+        </fieldset>
+        <fieldset className="form-section full">
+          <legend><b>Người tham gia</b><span>Người tổ chức được tính trong quy mô cuộc họp</span></legend>
+          <div className="form-section-grid">
         <label>Người tổ chức
           <input aria-label="Người tổ chức" required list="ictu-employees" type="email" readOnly={Boolean(organizerEmail)} value={form.organizer_email} onChange={(e) => updateForm({ organizer_email: e.target.value }, true)} placeholder="Chọn hoặc nhập email nhân viên ICTU" />
           {!organizerEmail && organizerSuggestions.length > 0 && (
@@ -401,6 +414,11 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
           )}
           {participantError && <small className="field-error">{participantError}</small>}
         </div>
+          </div>
+        </fieldset>
+        <fieldset className="form-section full">
+          <legend><b>Thời gian</b><span>Chọn thời gian trước khi tìm phòng và thiết bị</span></legend>
+          <div className="form-section-grid">
         <label>Bắt đầu
           <input required type="datetime-local" value={form.start_time} onChange={(e) => updateForm({ start_time: e.target.value }, true)} />
         </label>
@@ -418,39 +436,52 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
           />
           <small className="field-hint">Tối thiểu {participants.length + 1} người, gồm người tổ chức.</small>
         </label>
-        <label>Lặp lại
-          <select value={form.recurrence ?? ""} onChange={(e) => updateForm({ recurrence: (e.target.value || null) as MeetingInput["recurrence"] }, true)}>
-            <option value="">Không lặp</option>
-            <option value="weekly">Hằng tuần</option>
-            <option value="monthly">Hằng tháng</option>
-          </select>
-        </label>
-        <label>Số lần
-          <input type="number" min={1} max={24} disabled={!form.recurrence} value={form.recurrence_count} onChange={(e) => updateForm({ recurrence_count: Number(e.target.value) }, true)} />
-        </label>
-        <label>Nhắc lịch
-          <select aria-label="Thời gian nhắc" value={form.reminder_minutes ?? ""} onChange={(event) => updateForm({ reminder_minutes: event.target.value ? Number(event.target.value) as 15 | 30 | 60 | 1440 : null })}>
-            <option value="">Không nhắc</option>
-            <option value="15">Trước 15 phút</option>
-            <option value="30">Trước 30 phút</option>
-            <option value="60">Trước 60 phút</option>
-            <option value="1440">Trước 1 ngày</option>
-          </select>
-        </label>
+          </div>
+          <details className="form-advanced">
+            <summary>Tùy chọn nâng cao: lịch lặp và nhắc lịch</summary>
+            <div className="form-section-grid advanced-grid">
+              <label>Lặp lại
+                <select value={form.recurrence ?? ""} onChange={(e) => updateForm({ recurrence: (e.target.value || null) as MeetingInput["recurrence"] }, true)}>
+                  <option value="">Không lặp</option>
+                  <option value="weekly">Hằng tuần</option>
+                  <option value="monthly">Hằng tháng</option>
+                </select>
+              </label>
+              <label>Số lần
+                <input type="number" min={1} max={24} disabled={!form.recurrence} value={form.recurrence_count} onChange={(e) => updateForm({ recurrence_count: Number(e.target.value) }, true)} />
+              </label>
+              <label>Nhắc lịch
+                <select aria-label="Thời gian nhắc" value={form.reminder_minutes ?? ""} onChange={(event) => updateForm({ reminder_minutes: event.target.value ? Number(event.target.value) as 15 | 30 | 60 | 1440 : null })}>
+                  <option value="">Không nhắc</option>
+                  <option value="15">Trước 15 phút</option>
+                  <option value="30">Trước 30 phút</option>
+                  <option value="60">Trước 60 phút</option>
+                  <option value="1440">Trước 1 ngày</option>
+                </select>
+              </label>
+            </div>
+          </details>
+        </fieldset>
+        <section className="resource-picker full" aria-labelledby="resource-picker-title">
+          <div className="resource-picker-heading"><div><b id="resource-picker-title">Phòng và thiết bị</b><span>{scheduleReady ? "Thời gian hợp lệ, bạn có thể tìm tài nguyên." : "Hãy chọn thời gian hợp lệ trước khi tìm tài nguyên."}</span></div>{selectedRoom && <strong>{selectedRoom.name}</strong>}</div>
         <div className="resource-summary">
-          <span>Thiết bị đã chọn</span>
-          <strong>{selectedEquipment.length} thiết bị</strong>
+          <span>{selectedRoom ? `Phòng: ${selectedRoom.name}` : "Chưa chọn phòng"}</span>
+          <strong>{selectedEquipment.length} thiết bị đã chọn</strong>
         </div>
+          <div className="resource-actions">
+            <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading || !scheduleReady}>Gợi ý giờ trống</button>
+            <button className="button secondary" type="button" onClick={() => openRoomFinder()} disabled={roomLoading || !scheduleReady}>{roomLoading ? "Đang xếp hạng phòng..." : "Gợi ý phòng thông minh"}</button>
+            <button className="button secondary" type="button" onClick={openEquipmentFinder} disabled={equipmentLoading || !scheduleReady}>{equipmentLoading ? "Đang tìm thiết bị..." : "Tìm thiết bị"}</button>
+          </div>
+        </section>
         <div className="full action-row">
-          <button className="button secondary" type="button" onClick={findSuggestions} disabled={loading}>Gợi ý giờ trống</button>
-          <button className="button secondary" type="button" onClick={() => openRoomFinder()} disabled={roomLoading}>{roomLoading ? "Đang xếp hạng phòng..." : "Gợi ý phòng thông minh"}</button>
-          <button className="button secondary" type="button" onClick={openEquipmentFinder} disabled={equipmentLoading}>{equipmentLoading ? "Đang tìm thiết bị..." : "Tìm thiết bị"}</button>
+          <span>Hệ thống sẽ kiểm tra xung đột trước khi tạo lịch.</span>
           <button className="button primary" type="submit" disabled={loading}>{loading ? "Đang xử lý..." : "Tạo lịch họp"}</button>
         </div>
       </form>
       {roomOptions.length > 0 && (
         <div className="room-options" aria-label="Phòng phù hợp cho cuộc họp">
-          <strong>US26 · Phòng được xếp hạng theo độ phù hợp</strong>
+          <strong>Phòng được xếp hạng theo độ phù hợp</strong>
           {roomOptions.map((recommendation) => (
             <button className={selectedRoom?.id === recommendation.room.id ? "selected" : ""} key={recommendation.room.id} type="button" onClick={() => setSelectedRoom(recommendation.room)}>
               <strong>{recommendation.room.name}{selectedRoom?.id === recommendation.room.id ? " · Đã chọn" : ""}</strong>
@@ -492,6 +523,7 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
         </div>
       )}
       {message && <p className="notice">{message}</p>}
-    </section>
+      </section>
+    </div>
   );
 }

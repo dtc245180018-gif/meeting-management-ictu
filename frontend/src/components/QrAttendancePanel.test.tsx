@@ -52,6 +52,7 @@ const meeting = {
 
 describe("QrAttendancePanel", () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
     scannerMocks.instances.length = 0;
     scannerMocks.cameras = [];
@@ -64,6 +65,7 @@ describe("QrAttendancePanel", () => {
 
   it("generates a signed QR for a meeting managed by the current user", async () => {
     render(<QrAttendancePanel account={account} meetings={[meeting]} />);
+    fireEvent.click(screen.getByRole("button", { name: /Tôi tổ chức/ }));
     fireEvent.click(screen.getByRole("button", { name: "Tạo QR" }));
     expect(await screen.findByAltText("QR cho lượt đặt phòng 3")).toBeInTheDocument();
     expect(api.bookingQr).toHaveBeenCalledWith(3);
@@ -79,12 +81,12 @@ describe("QrAttendancePanel", () => {
     expect(await screen.findByText("Check-in thành công.")).toBeInTheDocument();
   });
 
-  it("starts only after the scan button and prefers the rear-facing constraint", async () => {
+  it("starts only after the scan button and uses the default webcam on desktop", async () => {
     render(<QrAttendancePanel account={account} meetings={[]} />);
     expect(scannerMocks.start).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Quét mã QR" }));
     await waitFor(() => expect(scannerMocks.start).toHaveBeenCalledWith(
-      { facingMode: { exact: "environment" } },
+      { facingMode: "user" },
       expect.anything(),
       expect.any(Function),
       expect.any(Function),
@@ -92,6 +94,7 @@ describe("QrAttendancePanel", () => {
   });
 
   it("falls back to the rear camera id and stops after decoding", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("iPhone");
     scannerMocks.start
       .mockRejectedValueOnce(new Error("environment unavailable"))
       .mockResolvedValueOnce(null);
@@ -114,6 +117,7 @@ describe("QrAttendancePanel", () => {
   });
 
   it("falls back to the last mobile camera with a clear notice when no rear label exists", async () => {
+    vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue("iPhone");
     scannerMocks.start
       .mockRejectedValueOnce(new Error("environment unavailable"))
       .mockResolvedValueOnce(null);

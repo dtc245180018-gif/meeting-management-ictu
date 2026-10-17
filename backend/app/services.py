@@ -1095,6 +1095,22 @@ def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]
     return [notification_to_out(item, now) for item in items]
 
 
+def mark_all_notifications_read(db: Session, email: str) -> int:
+    normalized = email.strip().lower()
+    items = list(
+        db.scalars(
+            select(models.Reminder).where(
+                models.Reminder.recipient_email == normalized,
+                models.Reminder.is_read.is_(False),
+            )
+        ).all()
+    )
+    for item in items:
+        item.is_read = True
+    db.commit()
+    return len(items)
+
+
 def mark_notification_read(db: Session, notification_id: int, email: str) -> schemas.NotificationOut:
     item = db.scalar(
         select(models.Reminder)

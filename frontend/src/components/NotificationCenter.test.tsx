@@ -24,10 +24,11 @@ describe("NotificationCenter", () => {
     render(<NotificationCenter email="leader@example.com" />);
     fireEvent.click(await screen.findByRole("button", { name: /Họp Sprint 2/ }));
     await waitFor(() => expect(api.markNotificationRead).toHaveBeenCalledWith(5, "leader@example.com"));
-    expect(screen.getByText("0 chưa đọc")).toBeInTheDocument();
+    expect(screen.getByText("0")).toBeInTheDocument();
+    expect(screen.getByText("chưa đọc")).toBeInTheDocument();
     expect(screen.getByText("Email đang ở chế độ mô phỏng")).toBeInTheDocument();
     expect(screen.getByText("1 thông báo")).toBeInTheDocument();
-    expect(screen.getByText("01-10")).toBeInTheDocument();
+    expect(screen.getByText(/01\/10\/2026/)).toBeInTheDocument();
   });
 
   it("shows a join action for an employee when a meeting-start alert is due", async () => {
@@ -48,7 +49,7 @@ describe("NotificationCenter", () => {
 
     await waitFor(() => expect(api.markNotificationRead).toHaveBeenCalledWith(8, "employee.one@example.com"));
     expect(onOpenMeeting).toHaveBeenCalledWith(9);
-    expect(screen.getByText(/A2-301/)).toBeInTheDocument();
+    expect(screen.getAllByText(/A2-301/).length).toBeGreaterThan(0);
   });
 
   it("does not offer joining after the meeting has been cancelled", async () => {

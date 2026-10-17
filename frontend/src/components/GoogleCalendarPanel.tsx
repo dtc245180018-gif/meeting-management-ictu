@@ -51,7 +51,7 @@ export function GoogleCalendarPanel({ email }: Props) {
 
   return <section className="card google-calendar-panel" aria-labelledby="google-calendar-title">
     <div className="section-heading">
-      <div><span className="eyebrow">US15 · Google Calendar API</span><h2 id="google-calendar-title">Lịch Google của bạn</h2></div>
+      <div><h2 id="google-calendar-title">Lịch Google của bạn</h2></div>
       {status?.connected && <span className="integration-state connected">Đã kết nối</span>}
     </div>
     {loading && <p className="empty">Đang kiểm tra kết nối...</p>}

@@ -7,10 +7,19 @@ import { formatIctuDateTime } from "../utils/dateTime";
 interface Props {
   account: Account;
   meetings: Meeting[];
+  autoStartScan?: boolean;
+  onAutoStartConsumed?: () => void;
 }
 
 
 type QrScanner = import("html5-qrcode").Html5Qrcode;
+
+
+function shouldUseRearCamera() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
 
 
 async function releaseScanner(scanner: QrScanner | null) {
@@ -28,10 +37,11 @@ async function releaseScanner(scanner: QrScanner | null) {
 }
 
 
-export function QrAttendancePanel({ account, meetings }: Props) {
+export function QrAttendancePanel({ account, meetings, autoStartScan = false, onAutoStartConsumed }: Props) {
   const [qr, setQr] = useState<BookingQr | null>(null);
   const [token, setToken] = useState("");
   const [inspection, setInspection] = useState<BookingQrInspection | null>(null);
+  const [mode, setMode] = useState<"scan" | "organize">("scan");
   const [scanning, setScanning] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -71,6 +81,13 @@ export function QrAttendancePanel({ account, meetings }: Props) {
   }, []);
 
   useEffect(() => () => { void stopScanner(); }, [stopScanner]);
+
+  useEffect(() => {
+    if (!autoStartScan) return;
+    setMode("scan");
+    setScanning(true);
+    onAutoStartConsumed?.();
+  }, [autoStartScan, onAutoStartConsumed]);
 
   useEffect(() => {
     if (!scanning) return;
@@ -115,7 +132,10 @@ export function QrAttendancePanel({ account, meetings }: Props) {
         const initialScanner = new Html5Qrcode("qr-reader");
         scannerRef.current = initialScanner;
         try {
-          await initialScanner.start({ facingMode: { exact: "environment" } }, scanConfig, handleDecoded, () => undefined);
+          const cameraMode: MediaTrackConstraints = shouldUseRearCamera()
+            ? { facingMode: { exact: "environment" } }
+            : { facingMode: "user" };
+          await initialScanner.start(cameraMode, scanConfig, handleDecoded, () => undefined);
         } catch (initialError) {
           if (!isActive()) {
             await releaseScanner(initialScanner);
@@ -127,11 +147,10 @@ export function QrAttendancePanel({ account, meetings }: Props) {
           const cameras = await Html5Qrcode.getCameras();
           if (!cameras.length) throw new Error("Không tìm thấy camera trên thiết bị.", { cause: initialError });
           const rearCamera = cameras.find((camera) => /back|rear|environment|sau/i.test(camera.label));
-          // Mobile browsers usually enumerate the selfie camera first and the
-          // rear camera last. Labels may be blank/localized on iOS, so the last
-          // device is a safer fallback than selecting the first camera.
-          const fallbackCamera = rearCamera ?? cameras[cameras.length - 1];
-          if (!rearCamera) {
+          const mobile = shouldUseRearCamera();
+          // Điện thoại ưu tiên camera sau; trình duyệt máy tính dùng webcam mặc định.
+          const fallbackCamera = mobile ? rearCamera ?? cameras[cameras.length - 1] : cameras[0];
+          if (mobile && !rearCamera) {
             setMessage("Không đọc được nhãn camera sau. Hệ thống đang thử camera cuối cùng của điện thoại.");
           }
           if (!isActive()) return;
@@ -198,14 +217,24 @@ export function QrAttendancePanel({ account, meetings }: Props) {
     }
   };
 
-  return <section className="card wide-card qr-panel">
-    <div className="section-heading">
-      <div><span className="eyebrow">US27 · QR ATTENDANCE</span><h2>Check-in / check-out phòng họp</h2></div>
-      <span className="badge">PWA & Mobile</span>
+  return <div className="module-page qr-attendance-page">
+    <header className="module-page-heading">
+      <div><span>Điểm danh cuộc họp</span><h1>Check-in bằng QR</h1><p>Quét mã tại phòng họp để ghi nhận thời gian đến và rời cuộc họp.</p></div>
+      <div className="module-heading-status"><strong>{managedMeetings.length}</strong><span>lịch bạn quản lý</span></div>
+    </header>
+    <section className="module-summary-grid qr-summary-grid" aria-label="Hướng dẫn điểm danh">
+      <article><span>Bước 1</span><strong>Mở camera</strong><small>Cho phép trình duyệt truy cập camera</small></article>
+      <article><span>Bước 2</span><strong>Quét mã</strong><small>Đưa QR của phòng vào khung hình</small></article>
+      <article><span>Bước 3</span><strong>Xác nhận</strong><small>Chọn check-in hoặc check-out</small></article>
+    </section>
+    <section className="module-surface qr-panel">
+    <div className="module-section-heading"><div><span>Quét nhanh</span><h2>Điểm danh cuộc họp</h2></div><p>Hỗ trợ PWA trên điện thoại và trình duyệt máy tính.</p></div>
+    <div className="qr-mode-switch" role="tablist" aria-label="Chế độ QR">
+      <button className={mode === "scan" ? "active" : ""} type="button" onClick={() => setMode("scan")}><strong>Tôi tham dự</strong><span>Quét QR để điểm danh</span></button>
+      <button className={mode === "organize" ? "active" : ""} type="button" onClick={() => { setMode("organize"); void stopScanner(); }}><strong>Tôi tổ chức</strong><span>Tạo QR cho cuộc họp</span></button>
     </div>
-    <p className="subtle">Quét mã bằng camera trên HTTPS/localhost hoặc nhập mã dự phòng. Hệ thống xác minh người dùng, phòng và thời gian trước khi ghi nhận.</p>
 
-    {managedMeetings.length > 0 && <div className="qr-organizer-list">
+    {mode === "organize" && managedMeetings.length > 0 && <div className="qr-organizer-list">
       <h3>Mã QR cho cuộc họp bạn quản lý</h3>
       {managedMeetings.map((meeting) => <article key={meeting.id}>
         <div><strong>{meeting.title}</strong><span>{formatIctuDateTime(meeting.start_time)} · {meeting.booking?.room.name}</span></div>
@@ -213,11 +242,15 @@ export function QrAttendancePanel({ account, meetings }: Props) {
       </article>)}
     </div>}
 
-    {qr && <div className="qr-generated" aria-label="Mã QR đã tạo">
+    {mode === "organize" && qr && <div className="qr-generated" aria-label="Mã QR đã tạo">
       <img src={qr.image_data_url} alt={`QR cho lượt đặt phòng ${qr.booking_id}`} />
       <div><strong>QR lượt đặt #{qr.booking_id}</strong><span>Hết hạn: {formatIctuDateTime(qr.expires_at)}</span><small>Không đăng mã này công khai. Người quét vẫn phải đăng nhập và thuộc cuộc họp.</small></div>
     </div>}
 
+    {mode === "organize" && managedMeetings.length === 0 && <p className="empty">Bạn chưa có cuộc họp đã đặt phòng để tạo mã QR.</p>}
+
+    {mode === "scan" && <div className="qr-scan-zone">
+    <div className="qr-scan-zone-heading"><strong>Quét bằng camera</strong><span>Nếu camera không khả dụng, bạn có thể dùng mã dự phòng bên dưới.</span></div>
     <div className="qr-actions">
       <button type="button" className="button primary" onClick={() => setScanning(true)} disabled={scanning || loading}>{scanning ? "Đang mở camera..." : "Quét mã QR"}</button>
       {scanning && <button type="button" className="button secondary" onClick={() => void stopScanner()}>Dừng camera</button>}
@@ -228,8 +261,9 @@ export function QrAttendancePanel({ account, meetings }: Props) {
       <textarea value={token} onChange={(event) => { setToken(event.target.value); setInspection(null); }} placeholder="Dán chuỗi mã QR tại đây khi không dùng được camera" />
     </label>
       <button type="button" className="button secondary" disabled={loading} onClick={() => void inspectValue(token)}>{loading ? "Đang kiểm tra..." : "Kiểm tra mã"}</button>
+    </div>}
 
-    {inspection && <div className="qr-inspection">
+    {mode === "scan" && inspection && <div className="qr-inspection">
       <strong>{inspection.meeting_title}</strong>
       <span>{inspection.room_name}</span>
       <span>{formatIctuDateTime(inspection.start_time)} – {formatIctuDateTime(inspection.end_time)}</span>
@@ -241,5 +275,6 @@ export function QrAttendancePanel({ account, meetings }: Props) {
       </div>
     </div>}
     {message && <p className="notice" role="status">{message}</p>}
-  </section>;
+    </section>
+  </div>;
 }
