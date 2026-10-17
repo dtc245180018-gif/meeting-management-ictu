@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     google_token_encryption_key: str = ""
     google_oauth_state_secret: str = ""
     google_calendar_id: str = "primary"
+    google_allowed_domain: str = "ictu.edu.vn"
     sprint3_seed_accounts: bool = True
     sprint3_credentials_file: str = "sprint3_credentials.local.csv"
     auth_required: bool = True
