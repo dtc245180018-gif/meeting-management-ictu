@@ -150,8 +150,8 @@ export interface GoogleConnectionStatus {
   configured: boolean;
   connected: boolean;
   user_email: string;
-  google_email?: string;
-  connected_at?: string;
+  google_email?: string | null;
+  connected_at?: string | null;
   missing_settings: string[];
 }
 

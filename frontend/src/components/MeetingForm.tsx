@@ -229,25 +229,50 @@ export function MeetingForm({ onCreated, organizerEmail }: Props) {
   };
 
   const findSuggestions = async () => {
-    const validationError = validateForm({ ...form, title: form.title || "Tìm giờ họp" }, participants);
-    if (validationError === "Tên cuộc họp phải có ít nhất 3 ký tự.") {
-      setMessage("Hãy nhập người tổ chức, người tham dự và khoảng thời gian tìm kiếm.");
+    const currentParticipants = submittedParticipants();
+    const organizerEmail = form.organizer_email.trim().toLowerCase();
+    const pendingInvalid = currentParticipants.find((email) => !emailPattern.test(email));
+    if (!emailPattern.test(organizerEmail)) {
+      setMessage("Email người tổ chức không hợp lệ.");
       return;
     }
-    if (validationError) {
-      setMessage(validationError);
+    if (pendingInvalid) {
+      setParticipantError(`Email không hợp lệ: ${pendingInvalid}`);
       return;
     }
+    setParticipantError("");
+    if (!form.start_time || !form.end_time) {
+      setMessage("Hãy chọn thời gian bắt đầu và kết thúc để tìm giờ trống.");
+      return;
+    }
+
+    const selectedStart = new Date(toIsoDateTime(form.start_time));
+    const selectedEnd = new Date(toIsoDateTime(form.end_time));
+    if (Number.isNaN(selectedStart.getTime()) || Number.isNaN(selectedEnd.getTime()) || selectedEnd <= selectedStart) {
+      setMessage("Thời gian kết thúc phải sau thời gian bắt đầu.");
+      return;
+    }
+
+    const durationMinutes = Math.round((selectedEnd.getTime() - selectedStart.getTime()) / 60_000);
+    if (durationMinutes < 15 || durationMinutes > 480) {
+      setMessage("Gợi ý giờ trống hỗ trợ cuộc họp từ 15 phút đến 8 giờ.");
+      return;
+    }
+
+    const searchUntil = new Date(selectedStart);
+    searchUntil.setDate(searchUntil.getDate() + 7);
     setLoading(true);
     setMessage("");
+    setSuggestions([]);
     try {
       const result = await api.suggestTimes(
-        [form.organizer_email, ...participants].filter(Boolean),
-        toIsoDateTime(form.start_time),
-        toIsoDateTime(form.end_time),
+        [organizerEmail, ...currentParticipants],
+        selectedStart.toISOString(),
+        searchUntil.toISOString(),
+        durationMinutes,
       );
       setSuggestions(result);
-      if (!result.length) setMessage("Không tìm thấy khung giờ chung phù hợp.");
+      if (!result.length) setMessage("Không tìm thấy khung giờ chung phù hợp trong 7 ngày tiếp theo.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể gợi ý thời gian");
     } finally {
