@@ -14,6 +14,13 @@ function isStandaloneMode() {
 }
 
 
+function isIosDevice() {
+  const appleMobileUserAgent = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const ipadUsingDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+  return appleMobileUserAgent || ipadUsingDesktopMode;
+}
+
+
 export function InstallAppButton({ location = "auth" }: { location?: "auth" | "sidebar" | "header" }) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(isStandaloneMode);
@@ -42,7 +49,9 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
   const install = async () => {
     if (installed) return;
     if (!installPrompt) {
-      setMessage("Trong Chrome, bấm biểu tượng cài đặt bên trái ngôi sao hoặc chọn ⋮ → Truyền, lưu và chia sẻ → Cài đặt trang dưới dạng ứng dụng.");
+      setMessage(isIosDevice()
+        ? "Trên iPhone/iPad: mở trang bằng Safari, chạm Chia sẻ, chọn Thêm vào Màn hình chính rồi xác nhận Thêm."
+        : "Trong Chrome, bấm biểu tượng cài đặt bên trái ngôi sao hoặc chọn ⋮ → Truyền, lưu và chia sẻ → Cài đặt trang dưới dạng ứng dụng.");
       return;
     }
 

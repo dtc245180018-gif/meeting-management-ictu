@@ -1,8 +1,8 @@
 # Meeting Management ICTU
 
-Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Sprint 3
-mở rộng Sprint 1–2 bằng đăng nhập thật, phân quyền, chính sách phòng, báo cáo và
-trải nghiệm mobile/PWA mà không làm mất dữ liệu cũ.
+Hệ thống quản lý lịch họp nội bộ ICTU được phát triển theo Agile Scrum. Sprint 4
+mở rộng ba Sprint trước bằng trợ lý đặt lịch, gợi ý phòng thông minh, check-in/
+check-out bằng QR và bộ kết nối đồng bộ nhân sự HRM/ERP có kiểm soát.
 
 ## Phạm vi Sprint 1
 
@@ -40,6 +40,16 @@ trải nghiệm mobile/PWA mà không làm mất dữ liệu cũ.
 Chi tiết cấu hình, API và kiểm thử xem [hướng dẫn Sprint 3](docs/SPRINT3_GUIDE.md).
 Kịch bản nghiệm thu thủ công US17–US24 nằm tại [docs/DEMO_SPRINT3.md](docs/DEMO_SPRINT3.md).
 
+## Phạm vi Sprint 4
+
+- US25: Trợ lý Gemini thu thập thông tin, cho chọn phòng, xác nhận và tạo lịch/đặt phòng trong một transaction.
+- US26: Xếp hạng phòng còn trống theo quyền, sức chứa, khu vực và thiết bị; trả điểm cùng lý do đề xuất.
+- US27: QR ký số theo lượt đặt, kiểm tra quyền và thời gian, check-in/check-out idempotent và lưu audit.
+- US28: Đồng bộ nhân viên từ HRM/ERP qua adapter mock/manual, chống tạo trùng, cô lập bản ghi lỗi và lưu lịch sử.
+
+Hướng dẫn vận hành nằm tại [docs/SPRINT4_GUIDE.md](docs/SPRINT4_GUIDE.md); kịch bản
+nghiệm thu US25–US28 nằm tại [docs/DEMO_SPRINT4.md](docs/DEMO_SPRINT4.md).
+
 ## Công nghệ
 
 - Frontend: React, TypeScript, Vite.
@@ -62,6 +72,14 @@ docker compose up --build
 Trong Docker, frontend dùng `/api` và Nginx proxy request tới service `backend`;
 không cần trỏ trình duyệt trực tiếp tới hostname `backend`. Có thể đổi
 `VITE_API_URL` trong `.env` khi frontend được triển khai tách khỏi Docker Compose.
+
+Để mở bản production HTTPS trên iPhone và cài dưới dạng PWA, chạy thêm profile
+`iphone`. Hướng dẫn đầy đủ nằm tại [docs/IPHONE_PWA_SETUP.md](docs/IPHONE_PWA_SETUP.md).
+
+```powershell
+docker compose --profile iphone up -d --build
+docker compose logs cloudflared
+```
 
 ## Chạy Backend không dùng Docker
 
@@ -114,6 +132,12 @@ npm run build
 - `AUTH_REQUIRED=true`: bật xác thực Bearer cho API nghiệp vụ.
 - `AUTH_SECRET_KEY`: khóa ký phiên bí mật, tối thiểu 32 ký tự, không đưa lên Git.
 - `AUTH_TOKEN_MINUTES`: thời gian sống của phiên; mặc định 480 phút.
+- `CHATBOT_CONFIRMATION_MINUTES`: thời gian hiệu lực của mã xác nhận đặt lịch
+  qua chatbot; mặc định 10 phút.
+- `GEMINI_API_KEY`: khóa Gemini API chỉ đặt trong `.env` hoặc `backend/.env`,
+  tuyệt đối không dùng biến `VITE_*` và không commit khóa thật.
+- `GEMINI_MODEL`: mô hình hội thoại; mặc định `gemini-3.5-flash-lite` để ưu tiên tốc độ và độ ổn định khi demo.
+- `GEMINI_TIMEOUT_SECONDS`: thời gian chờ Gemini; mặc định 20 giây.
 - `INITIAL_ACCOUNT_PASSWORD=ICTU123`: mật khẩu tạm được băm riêng từng tài khoản;
   người dùng bắt buộc đổi ở lần đăng nhập đầu.
 - `ADMIN_EMAILS` chỉ còn phục vụ migration/tương thích dữ liệu Sprint 2. Quyền
@@ -161,10 +185,55 @@ tiếp trên Google không được kéo ngược về hệ thống.
 | Tài khoản | `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}` |
 | Quyền phòng | `GET /api/admin/users/{id}/room-permissions`, `PUT /api/admin/users/{id}/room-permissions/{room_id}` |
 | Báo cáo | `GET /api/admin/reports/overview`, `GET /api/admin/reports/export?format=xlsx|pdf` |
+| Chatbot đặt lịch | `GET /api/chatbot/ai/status`, `POST /api/chatbot/conversation`, `POST /api/chatbot/bookings/preview`, `POST /api/chatbot/bookings/confirm` |
+| Gợi ý phòng | `POST /api/rooms/recommendations` |
+| QR tham dự | `GET /api/bookings/{id}/qr`, `POST /api/bookings/qr/inspect`, `POST /api/bookings/qr/check-in`, `POST /api/bookings/qr/check-out` |
+| Đồng bộ HRM/ERP | `GET /api/admin/integrations/hrm/status`, `POST /api/admin/integrations/hrm/sync`, `GET /api/admin/integrations/hrm/history` |
 
 Khi tạo cuộc họp, request có thể gửi thêm `equipment_ids` và
 `reminder_minutes` (`15`, `30`, `60` hoặc `1440`). Tạo cuộc họp, đặt phòng,
 đặt thiết bị và tạo reminder dùng chung một transaction.
+
+## US25 - Đặt lịch qua chatbot
+
+Chatbot có lớp hội thoại Gemini và quy trình xác nhận tách biệt để AI không thể
+tự ghi dữ liệu:
+
+1. Gửi câu tự nhiên và bản nháp tới `POST /api/chatbot/conversation`. Gemini chỉ
+   trả lời và đề xuất cập nhật bản nháp; backend ghi đè danh tính người tổ chức,
+   loại mã phòng/thiết bị không tồn tại và kiểm tra lại kiểu dữ liệu. Request đặt
+   `store=false` để không lưu phiên hội thoại trên Gemini.
+2. Gửi dữ liệu đã thu thập tới `POST /api/chatbot/bookings/preview`. API trả về
+   trường còn thiếu, phòng phù hợp cho toàn bộ các lần lặp hoặc bản tóm tắt kèm
+   mã xác nhận có thời hạn.
+3. Sau khi người dùng xác nhận, gửi mã đó tới
+   `POST /api/chatbot/bookings/confirm`. Backend kiểm tra lại phòng, thiết bị,
+   quyền và xung đột ngay trong transaction trước khi tạo lịch.
+
+Mã xác nhận được ký, gắn với tài khoản đang đăng nhập và không chứa mật khẩu.
+Nếu dữ liệu bị sửa, mã hết hạn hoặc tài nguyên vừa bị người khác đặt, toàn bộ
+thao tác bị từ chối và không tạo cuộc họp một phần.
+
+Sau khi đăng nhập, người dùng mở nút **Trợ lý AI** ở góc dưới bên phải và có thể
+nhập câu như “Đặt phòng cho 10 người sáng mai từ 9 đến 10 giờ, cần máy chiếu”.
+Gemini hỏi lại phần còn thiếu, hiểu yêu cầu sửa ở các lượt tiếp theo, rồi giao
+cho backend tìm phòng. Người dùng vẫn phải chọn phòng và bấm xác nhận. Tài khoản
+chỉ có quyền tham dự vẫn nhìn thấy trợ lý nhưng được thông báo rõ lý do không thể
+đặt phòng. Tin nhắn người dùng được gửi tới Google Gemini để xử lý; không đưa dữ
+liệu bí mật hoặc thông tin không cần thiết vào nội dung hội thoại.
+
+## US26–US28
+
+- Tại **Tạo lịch họp**, nút **Gợi ý phòng thông minh** chỉ trả các phòng mà tài
+  khoản được phép đặt và còn trống trong toàn bộ lịch lặp. Mỗi kết quả có điểm và
+  lý do; thay đổi thời gian, số người, người tham dự hoặc thiết bị sẽ xóa lựa chọn cũ.
+- Tại **Check-in QR**, người tổ chức/Admin tạo mã cho lượt đặt. Người thuộc cuộc
+  họp quét bằng camera hoặc dán mã để kiểm tra rồi check-in/check-out. Mã bị sửa,
+  sai phòng, quá thời gian, người ngoài hoặc cuộc họp đã hủy đều bị từ chối và ghi audit.
+- Tại **Quản trị → Đồng bộ HRM/ERP**, Admin có thể chạy connector mock hoặc nhập
+  JSON từ hệ thống nguồn, xem số bản ghi tạo/cập nhật/bỏ qua/lỗi và lịch sử chạy.
+  Repository không chứa thông tin truy cập HRM/ERP thật; adapter mock là môi trường
+  nghiệm thu an toàn và là điểm thay thế connector doanh nghiệp sau này.
 
 ## Nạp dữ liệu demo và kịch bản trình diễn
 
@@ -182,7 +251,21 @@ Script có tính idempotent: không xóa dữ liệu hiện có và bỏ qua nh�
 ```powershell
 cd backend
 python scripts/reset_demo_data.py
+# Hoặc đưa toàn bộ dữ liệu và tài khoản về cùng trạng thái trước mỗi lần demo:
+python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
 ```
+
+Nếu hệ thống đang chạy bằng Docker, dùng lệnh tương đương tại thư mục gốc dự án:
+
+```powershell
+docker compose exec backend python scripts/reset_demo_data.py --full --shared-demo-password ICTU123
+```
+
+Sau khi mới cập nhật mã nguồn có thay đổi `backend/Dockerfile`, cần build lại
+backend một lần bằng `docker compose up -d --build backend`. Chế độ `--full`
+xóa toàn bộ dữ liệu nghiệp vụ, kết nối Google Calendar đã lưu và tài khoản cũ,
+sau đó tạo lại 10 nhân viên/tài khoản mẫu với mật khẩu được truyền vào. Các bí
+mật OAuth/SMTP trong file `.env` không bị xóa.
 
 Kịch bản demo thủ công theo từng thao tác nằm tại [docs/DEMO_MANUAL_SCRIPT.md](docs/DEMO_MANUAL_SCRIPT.md).
 Kịch bản nghiệm thu đầy đủ US09–US16 nằm tại [docs/DEMO_SPRINT2.md](docs/DEMO_SPRINT2.md).
@@ -200,7 +283,9 @@ dữ liệu và bắt buộc đổi ở lần đăng nhập đầu. File
 
 ## Quy ước Git
 
-- Mỗi User Story hoặc task được phát triển trên nhánh riêng.
-- Tên nhánh ví dụ: `feature/us01-create-meeting`.
-- Commit cần nêu rõ mã User Story và nội dung thay đổi.
-- Chỉ hợp nhất khi code đã review và test liên quan chạy đạt.
+- Repository áp dụng Gitflow với `main` là nhánh ổn định và `develop` là nhánh
+  tích hợp.
+- Mỗi User Story được phát triển trên nhánh `feature/USxx-ten-chuc-nang` tạo từ
+  `develop` và hợp nhất bằng Pull Request.
+- Quy trình release, hotfix, commit, Pull Request và kiểm thử bắt buộc được mô tả
+  trong [CONTRIBUTING.md](CONTRIBUTING.md).

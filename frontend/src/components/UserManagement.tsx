@@ -78,9 +78,10 @@ export function UserManagement() {
 
   return <div className="admin-users">
     <form className="admin-form compact-form" onSubmit={create}>
-      <h3>Tạo tài khoản nhân viên</h3>
+      <h3>Tạo tài khoản người dùng</h3>
       <label>Họ tên<input required value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /></label>
       <label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+      <small className="field-hint">Chấp nhận cả email ICTU và email ngoài (Gmail, Outlook...) do quản trị viên cấp tài khoản.</small>
       <label>Đơn vị<input required value={form.department} onChange={(event) => setForm({ ...form, department: event.target.value })} /></label>
       <label>Vai trò<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as AccountRole })}><option value="participant">Người tham dự</option><option value="organizer">Người tổ chức</option><option value="admin">Quản trị viên</option></select></label>
       <button className="primary-action">Tạo tài khoản</button>
@@ -107,7 +108,7 @@ export function UserManagement() {
       <div className="pagination"><button disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Trước</button><span>Trang {page}/{totalPages}</span><button disabled={page >= totalPages} onClick={() => setPage((value) => value + 1)}>Sau</button></div>
     </div>
     {selected && <section className="permission-panel">
-      <div className="section-heading"><div><span className="eyebrow">US21</span><h3>Quyền đặt phòng · {selected.full_name}</h3></div><button onClick={() => setSelected(null)}>Đóng</button></div>
+      <div className="section-heading"><div><h3>Quyền đặt phòng · {selected.full_name}</h3></div><button onClick={() => setSelected(null)}>Đóng</button></div>
       <p className="subtle">Phòng bị hạn chế sẽ không xuất hiện trong kết quả tìm phòng và API cũng từ chối mọi yêu cầu đặt trực tiếp.</p>
       <div className="permission-grid">{permissions.map((permission) => <button className={permission.can_book ? "permission-allowed" : "permission-denied"} key={permission.room_id} onClick={() => void togglePermission(permission)}><strong>{permission.room_name}</strong><span>{permission.can_book ? "Được đặt" : `Không được đặt${permission.reason ? ` · ${permission.reason}` : ""}`}</span></button>)}</div>
     </section>}

@@ -45,8 +45,6 @@ describe("RoomDirectory filters", () => {
 
   it("filters the catalog by equipment", async () => {
     render(<RoomDirectory meetings={[]} />);
-    expect(screen.queryByText("A101")).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Xem danh sách phòng" }));
     await screen.findByText("A101");
     fireEvent.change(screen.getByLabelText("Thiết bị"), { target: { value: "video_conferencing" } });
     await waitFor(() => {
@@ -55,21 +53,22 @@ describe("RoomDirectory filters", () => {
     });
   });
 
-  it("shows building and floor choices only after loading the catalog", async () => {
+  it("shows building and floor choices after loading the catalog", async () => {
     render(<RoomDirectory meetings={[]} />);
-    await screen.findByRole("button", { name: "Xem danh sách phòng" });
+    await screen.findByText("A101");
     expect(screen.getByLabelText("Tòa nhà/khu vực")).toHaveTextContent("Khu D");
     expect(screen.getByLabelText("Tầng")).toHaveTextContent("2");
     expect(screen.getByLabelText("Tầng")).toHaveTextContent("3");
   });
 
-  it("can clear all room filters and hide the catalog again", async () => {
+  it("can clear all room filters and hide the catalog", async () => {
     render(<RoomDirectory meetings={[]} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Xem danh sách phòng" }));
     await screen.findByText("A101");
     fireEvent.change(screen.getByLabelText("Tầng"), { target: { value: "2" } });
     expect(screen.queryByText("A101")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Xóa bộ lọc" }));
+    expect(screen.getByText("A101")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ẩn danh sách phòng" }));
     expect(screen.queryByText("A101")).not.toBeInTheDocument();
     expect(screen.getByText(/Danh sách phòng đang được ẩn/)).toBeInTheDocument();
   });
@@ -88,6 +87,7 @@ describe("RoomDirectory filters", () => {
 
   it("filters rooms by minimum capacity through the availability API", async () => {
     render(<RoomDirectory meetings={[]} />);
+    fireEvent.click(screen.getByRole("button", { name: /Tìm phòng trống/ }));
     fireEvent.change(screen.getByLabelText("Từ lúc"), { target: { value: "2026-10-01T09:00" } });
     fireEvent.change(screen.getByLabelText("Đến lúc"), { target: { value: "2026-10-01T10:00" } });
     fireEvent.change(screen.getByLabelText("Sức chứa tối thiểu"), { target: { value: "20" } });
@@ -99,10 +99,12 @@ describe("RoomDirectory filters", () => {
 
   it("can show rooms booked in an exact window instead of discarding them", async () => {
     render(<RoomDirectory meetings={meetingsWithBooking} />);
+    fireEvent.click(screen.getByRole("button", { name: /Tìm phòng trống/ }));
     fireEvent.change(screen.getByLabelText("Từ lúc"), { target: { value: "2026-10-01T09:00" } });
     fireEvent.change(screen.getByLabelText("Đến lúc"), { target: { value: "2026-10-01T10:00" } });
     fireEvent.click(screen.getByRole("button", { name: "Xem phòng đang trống" }));
     await screen.findByText(/Có 1 phòng phù hợp/);
+    fireEvent.click(screen.getByRole("button", { name: /Khám phá phòng/ }));
     fireEvent.change(screen.getByLabelText("Danh sách phòng"), { target: { value: "booked" } });
     expect(screen.getByText("A101")).toBeInTheDocument();
     expect(screen.getAllByText("Đã có lịch trong khung giờ").length).toBeGreaterThan(0);

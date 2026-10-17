@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import inspect, select, text
 
-from . import models, reminders
+from . import hrm_sync, models, reminders, schemas
 from .api import router
 from .config import get_settings
 from .database import Base, SessionLocal, engine
@@ -329,6 +329,31 @@ async def reminder_worker() -> None:
         await asyncio.sleep(30)
 
 
+def _scheduled_hrm_sync_task() -> None:
+    """Create and close the SQLAlchemy session in the worker thread itself."""
+    with SessionLocal() as db:
+        hrm_sync.run_sync(
+            db,
+            None,
+            schemas.HRMSyncRequest(),
+            trigger="scheduled",
+        )
+
+
+async def hrm_sync_worker() -> None:
+    interval = get_settings().hrm_sync_interval_minutes
+    if interval <= 0:
+        return
+    while True:
+        await asyncio.sleep(interval * 60)
+        try:
+            await asyncio.to_thread(_scheduled_hrm_sync_task)
+        except Exception:
+            # A scheduled connector failure is recorded by the next successful
+            # run/status check and must never stop the API process.
+            continue
+
+
 def apply_schema_migrations() -> None:
     """Apply small forward-only migrations without deleting existing data."""
     if engine.dialect.name == "postgresql":
@@ -337,6 +362,12 @@ def apply_schema_migrations() -> None:
         with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as connection:
             connection.execute(text("ALTER TYPE accountrole ADD VALUE IF NOT EXISTS 'ORGANIZER'"))
             connection.execute(text("ALTER TYPE accountrole ADD VALUE IF NOT EXISTS 'PARTICIPANT'"))
+            connection.execute(
+                text("ALTER TYPE notificationkind ADD VALUE IF NOT EXISTS 'ATTENDANCE_CHECKED_IN'")
+            )
+            connection.execute(
+                text("ALTER TYPE notificationkind ADD VALUE IF NOT EXISTS 'ATTENDANCE_CHECKED_OUT'")
+            )
     inspector = inspect(engine)
     with engine.begin() as connection:
         meeting_columns = {column["name"] for column in inspector.get_columns("meetings")}
@@ -356,8 +387,25 @@ def apply_schema_migrations() -> None:
             if name not in account_columns:
                 connection.execute(text(f"ALTER TABLE user_accounts ADD COLUMN {name} {definition}"))
         # SQLAlchemy stores enum member names by default. EMPLOYEE was the
-        # Sprint 2 value and is now the ORGANIZER role.
-        connection.execute(text("UPDATE user_accounts SET role = 'ORGANIZER' WHERE role = 'EMPLOYEE'"))
+        # Sprint 2 value and is now the ORGANIZER role. Cast to text before
+        # comparing so a freshly created PostgreSQL enum (which never had the
+        # legacy value) does not reject the WHERE literal during startup.
+        connection.execute(
+            text(
+                "UPDATE user_accounts SET role = 'ORGANIZER' "
+                "WHERE CAST(role AS TEXT) = 'EMPLOYEE'"
+            )
+        )
+
+        employee_columns = {column["name"] for column in inspector.get_columns("employees")}
+        if "external_employee_id" not in employee_columns:
+            connection.execute(text("ALTER TABLE employees ADD COLUMN external_employee_id VARCHAR(120)"))
+        connection.execute(
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS ix_employees_external_employee_id "
+                "ON employees (external_employee_id)"
+            )
+        )
 
         room_columns = {column["name"] for column in inspector.get_columns("rooms")}
         additions = {
@@ -398,13 +446,17 @@ async def lifespan(_: FastAPI):
     seed_user_accounts()
     seed_equipment()
     reminders.backfill_meeting_starting_notifications()
-    worker = asyncio.create_task(reminder_worker())
+    workers = [asyncio.create_task(reminder_worker())]
+    if get_settings().hrm_sync_interval_minutes > 0:
+        workers.append(asyncio.create_task(hrm_sync_worker()))
     try:
         yield
     finally:
-        worker.cancel()
-        with suppress(asyncio.CancelledError):
-            await worker
+        for worker in workers:
+            worker.cancel()
+        for worker in workers:
+            with suppress(asyncio.CancelledError):
+                await worker
 
 
 settings = get_settings()

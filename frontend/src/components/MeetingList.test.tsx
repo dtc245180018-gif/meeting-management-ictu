@@ -41,6 +41,26 @@ describe("MeetingList calendar integration", () => {
     expect(screen.getByText("TB-MC-01 · Máy chiếu")).toBeInTheDocument();
   });
 
+  it("shows check-in and check-out timestamps in meeting details", () => {
+    const attendedMeeting = {
+      ...meeting,
+      booking: {
+        id: 17, room_id: 1, meeting_id: 7, start_time: meeting.start_time, end_time: meeting.end_time,
+        status: "active" as const,
+        room: { id: 1, name: "A101", capacity: 10, location: "Khu A" },
+        attendances: [{
+          id: 5, account_id: 9, email: "employee.one@gmail.com", full_name: "Nguyễn Văn A",
+          checked_in_at: "2026-10-01T02:05:00Z", checked_out_at: "2026-10-01T03:01:00Z",
+        }],
+      },
+    };
+    render(<MeetingList meetings={[attendedMeeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
+    fireEvent.click(screen.getByRole("button", { name: "Xem chi tiết" }));
+    expect(screen.getByText(/Nguyễn Văn A/)).toBeInTheDocument();
+    expect(screen.getByText(/Check-in:/)).toBeInTheDocument();
+    expect(screen.getByText(/Check-out:/)).toBeInTheDocument();
+  });
+
   it("does not let another demo user manage the organizer's meeting", () => {
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="employee.one@example.com" />);
     expect(screen.queryByRole("button", { name: `Thao tác cho ${meeting.title}` })).not.toBeInTheDocument();
@@ -68,6 +88,24 @@ describe("MeetingList calendar integration", () => {
     render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
     fireEvent.click(screen.getByRole("button", { name: "Đồng bộ Google Calendar" }));
     await screen.findByText("Tài khoản chưa kết nối Google Calendar");
+  });
+
+  it("invites all employees while editing a meeting", async () => {
+    vi.mocked(api.listEmployees).mockResolvedValue([
+      { id: 1, full_name: "Người tổ chức", email: "leader@example.com", department: "Nhóm dự án ICTU", is_active: true },
+      { id: 2, full_name: "Trần Minh Anh", email: "employee.one@example.com", department: "Khoa Công nghệ thông tin", is_active: true },
+      { id: 3, full_name: "Lê Hoàng Nam", email: "employee.two@example.com", department: "Phòng Đào tạo", is_active: true },
+    ]);
+    vi.mocked(api.updateMeeting).mockResolvedValue(meeting);
+    render(<MeetingList meetings={[meeting]} onChanged={vi.fn()} currentUserEmail="leader@example.com" />);
+    fireEvent.click(screen.getByRole("button", { name: `Thao tác cho ${meeting.title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Chỉnh sửa" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
+    fireEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+
+    await waitFor(() => expect(api.updateMeeting).toHaveBeenCalledWith(7, expect.objectContaining({
+      participant_emails: ["employee.one@example.com", "employee.two@example.com"],
+    })));
   });
 
   it("opens meeting details from a dashboard join notification", () => {

@@ -71,6 +71,8 @@ class NotificationKind(StrEnum):
     MEETING_UPDATED = "meeting_updated"
     MEETING_CANCELLED = "meeting_cancelled"
     INVITATION_RESPONSE = "invitation_response"
+    ATTENDANCE_CHECKED_IN = "attendance_checked_in"
+    ATTENDANCE_CHECKED_OUT = "attendance_checked_out"
 
 
 class GoogleSyncStatus(StrEnum):
@@ -141,6 +143,7 @@ class Employee(Base):
     __table_args__ = (UniqueConstraint("email", name="uq_employee_email"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    external_employee_id: Mapped[str | None] = mapped_column(String(120), unique=True, index=True)
     full_name: Mapped[str] = mapped_column(String(160), nullable=False)
     email: Mapped[str] = mapped_column(String(255), index=True, nullable=False)
     department: Mapped[str] = mapped_column(String(160), nullable=False)
@@ -186,6 +189,9 @@ class UserAccount(Base):
 
     employee: Mapped[Employee] = relationship(back_populates="account")
     room_policies: Mapped[list[RoomAccessPolicy]] = relationship(
+        back_populates="account", cascade="all, delete-orphan"
+    )
+    booking_attendances: Mapped[list[BookingAttendance]] = relationship(
         back_populates="account", cascade="all, delete-orphan"
     )
 
@@ -274,6 +280,112 @@ class RoomBooking(Base):
 
     room: Mapped[Room] = relationship(back_populates="bookings")
     meeting: Mapped[Meeting] = relationship(back_populates="booking")
+    attendances: Mapped[list[BookingAttendance]] = relationship(
+        back_populates="booking", cascade="all, delete-orphan"
+    )
+
+
+class BookingAttendance(Base):
+    """One participant's idempotent check-in/check-out state for a booking."""
+
+    __tablename__ = "booking_attendances"
+    __table_args__ = (
+        UniqueConstraint("booking_id", "account_id", name="uq_booking_attendance_account"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int] = mapped_column(
+        ForeignKey("room_bookings.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    account_id: Mapped[int] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    checked_in_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    checked_out_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    booking: Mapped[RoomBooking] = relationship(back_populates="attendances")
+    account: Mapped[UserAccount] = relationship(back_populates="booking_attendances")
+
+    @property
+    def email(self) -> str:
+        return self.account.email
+
+    @property
+    def full_name(self) -> str:
+        return self.account.employee.full_name
+
+
+class BookingUsageAudit(Base):
+    """Append-only security audit for QR inspection and attendance actions."""
+
+    __tablename__ = "booking_usage_audits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    booking_id: Mapped[int | None] = mapped_column(
+        ForeignKey("room_bookings.id", ondelete="SET NULL"), index=True
+    )
+    actor_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="SET NULL"), index=True
+    )
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    outcome: Mapped[str] = mapped_column(String(40), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+
+class HRMSyncRun(Base):
+    """Auditable result of one manual or scheduled HRM/ERP synchronization."""
+
+    __tablename__ = "hrm_sync_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(80), default="mock", nullable=False)
+    trigger: Mapped[str] = mapped_column(String(30), default="manual", nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="running", index=True, nullable=False)
+    actor_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("user_accounts.id", ondelete="SET NULL"), index=True
+    )
+    total_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    updated_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    skipped_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    failed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime())
+
+    issues: Mapped[list[HRMSyncIssue]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class HRMSyncIssue(Base):
+    __tablename__ = "hrm_sync_issues"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(
+        ForeignKey("hrm_sync_runs.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    record_key: Mapped[str | None] = mapped_column(String(160))
+    error_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    run: Mapped[HRMSyncRun] = relationship(back_populates="issues")
 
 
 class Equipment(Base):

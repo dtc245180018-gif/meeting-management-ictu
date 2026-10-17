@@ -32,7 +32,18 @@ class Settings(BaseSettings):
     auth_required: bool = True
     auth_secret_key: str = ""
     auth_token_minutes: int = 480
+    chatbot_confirmation_minutes: int = 10
+    qr_token_minutes: int = 720
+    qr_checkin_early_minutes: int = 30
+    qr_checkout_grace_minutes: int = 60
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_timeout_seconds: float = 20.0
     initial_account_password: str = "ICTU123"
+    hrm_connector: str = "mock"
+    hrm_mock_data_file: str = "data/hrm_mock.json"
+    hrm_default_role: str = "participant"
+    hrm_sync_interval_minutes: int = 0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

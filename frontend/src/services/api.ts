@@ -5,6 +5,8 @@ import type {
   EmailIntegrationStatus,
   Equipment,
   EquipmentAdminInput,
+  EquipmentBulkAdminInput,
+  EquipmentBulkAdminResult,
   EquipmentStatus,
   GoogleCalendarEvent,
   GoogleConnectionStatus,
@@ -12,17 +14,70 @@ import type {
   MeetingInput,
   Notification,
   Room,
+  RoomRecommendationPage,
   RoomAdminInput,
   SuggestedTime,
   Account,
   AccountPage,
   AccountRole,
+  ChatbotBookingConfirmation,
+  ChatbotBookingDraft,
+  ChatbotBookingPreview,
+  ChatbotAiStatus,
+  ChatbotConversationMessage,
+  ChatbotConversationTurn,
   ReportOverview,
   RoomPermission,
+  BookingQr,
+  BookingQrInspection,
+  BookingAttendance,
+  HrmIntegrationStatus,
+  HrmSyncPage,
+  HrmSyncRun,
 } from "../types";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 const TOKEN_KEY = "ictu-meeting-token";
+
+type ApiErrorPayload = {
+  detail?: unknown;
+  message?: unknown;
+};
+
+type ValidationErrorItem = {
+  loc?: unknown;
+  msg?: unknown;
+};
+
+function validationErrorMessage(item: unknown): string | null {
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object") return null;
+
+  const validationItem = item as ValidationErrorItem;
+  const location = Array.isArray(validationItem.loc)
+    ? validationItem.loc.map(String)
+    : [];
+  if (location.includes("email")) return "Email không đúng định dạng.";
+  if (location.includes("password")) return "Mật khẩu không hợp lệ.";
+  return typeof validationItem.msg === "string" ? validationItem.msg : null;
+}
+
+export function apiErrorMessage(payload: unknown, fallback = "Không thể kết nối tới máy chủ"): string {
+  if (!payload || typeof payload !== "object") return fallback;
+
+  const { detail, message } = payload as ApiErrorPayload;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = [...new Set(detail.map(validationErrorMessage).filter((item): item is string => Boolean(item)))];
+    if (messages.length) return messages.join(" ");
+  }
+  if (detail && typeof detail === "object") {
+    const normalized = validationErrorMessage(detail);
+    if (normalized) return normalized;
+  }
+  if (typeof message === "string" && message.trim()) return message;
+  return fallback;
+}
 
 export const authStorage = {
   get: () => window.localStorage.getItem(TOKEN_KEY),
@@ -46,9 +101,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    if (response.status === 401) window.dispatchEvent(new Event("ictu-auth-expired"));
     const payload = await response.json().catch(() => null);
-    throw new Error(payload?.detail ?? "Không thể kết nối tới máy chủ");
+    if (response.status === 401 && path !== "/auth/login") {
+      window.dispatchEvent(new Event("ictu-auth-expired"));
+    }
+    throw new Error(apiErrorMessage(payload));
   }
   return response.json() as Promise<T>;
 }
@@ -60,6 +117,8 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   me: () => request<Account>("/auth/me"),
+  updateProfile: (payload: { full_name: string; department: string }) =>
+    request<Account>("/auth/profile", { method: "PATCH", body: JSON.stringify(payload) }),
   logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<{ message: string }>("/auth/change-password", {
@@ -70,6 +129,29 @@ export const api = {
 
   createMeeting: (payload: MeetingInput) =>
     request<Meeting[]>("/meetings", { method: "POST", body: JSON.stringify(payload) }),
+
+  chatbotAiStatus: () => request<ChatbotAiStatus>("/chatbot/ai/status"),
+
+  sendChatbotMessage: (
+    message: string,
+    draft: ChatbotBookingDraft,
+    history: ChatbotConversationMessage[],
+  ) => request<ChatbotConversationTurn>("/chatbot/conversation", {
+    method: "POST",
+    body: JSON.stringify({ message, draft, history }),
+  }),
+
+  previewChatbotBooking: (payload: ChatbotBookingDraft) =>
+    request<ChatbotBookingPreview>("/chatbot/bookings/preview", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  confirmChatbotBooking: (confirmationToken: string) =>
+    request<ChatbotBookingConfirmation>("/chatbot/bookings/confirm", {
+      method: "POST",
+      body: JSON.stringify({ confirmation_token: confirmationToken }),
+    }),
 
   updateMeeting: (id: number, payload: Partial<MeetingInput> & { requester_email: string }) =>
     request<Meeting>(`/meetings/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
@@ -111,6 +193,22 @@ export const api = {
     return request<Room[]>(`/rooms/available?${params.toString()}`);
   },
 
+  recommendRooms: (payload: {
+    start_time: string;
+    end_time: string;
+    expected_attendees: number;
+    recurrence?: "weekly" | "monthly" | null;
+    recurrence_count?: number;
+    equipment_ids?: number[];
+    required_features?: Array<"projector" | "display" | "microphone" | "video_conferencing">;
+    preferred_building?: string;
+    page?: number;
+    page_size?: number;
+  }) => request<RoomRecommendationPage>("/rooms/recommendations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+
   listRooms: () => request<Room[]>("/rooms"),
 
   listEmployees: () => request<Employee[]>("/employees"),
@@ -120,6 +218,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ room_id: roomId, meeting_id: meetingId, requester_email: requesterEmail }),
     }),
+
+  bookingQr: (bookingId: number) => request<BookingQr>(`/bookings/${bookingId}/qr`),
+  inspectBookingQr: (qrToken: string) => request<BookingQrInspection>("/bookings/qr/inspect", {
+    method: "POST",
+    body: JSON.stringify({ qr_token: qrToken }),
+  }),
+  checkInBooking: (qrToken: string) => request<BookingAttendance>("/bookings/qr/check-in", {
+    method: "POST",
+    body: JSON.stringify({ qr_token: qrToken }),
+  }),
+  checkOutBooking: (qrToken: string) => request<BookingAttendance>("/bookings/qr/check-out", {
+    method: "POST",
+    body: JSON.stringify({ qr_token: qrToken }),
+  }),
 
   listEquipment: (options: { startTime?: string; endTime?: string; category?: string; status?: EquipmentStatus } = {}) => {
     const params = new URLSearchParams();
@@ -150,6 +262,8 @@ export const api = {
     request<Equipment[]>(`/admin/equipment?${new URLSearchParams({ requester_email: requesterEmail })}`),
   createEquipment: (payload: EquipmentAdminInput) =>
     request<Equipment>("/admin/equipment", { method: "POST", body: JSON.stringify(payload) }),
+  createEquipmentBulk: (payload: EquipmentBulkAdminInput) =>
+    request<EquipmentBulkAdminResult>("/admin/equipment/bulk", { method: "POST", body: JSON.stringify(payload) }),
   updateEquipment: (id: number, payload: Partial<EquipmentAdminInput> & { requester_email: string }) =>
     request<Equipment>(`/admin/equipment/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   deactivateEquipment: (id: number, requesterEmail: string) =>
@@ -181,6 +295,8 @@ export const api = {
 
   notifications: (email: string) =>
     request<Notification[]>(`/notifications?${new URLSearchParams({ email })}`),
+  markAllNotificationsRead: (email: string) =>
+    request<{ message: string }>("/notifications/read-all", { method: "POST", body: JSON.stringify({ email }) }),
   markNotificationRead: (id: number, email: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: "POST", body: JSON.stringify({ email }) }),
 
@@ -205,6 +321,16 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ can_book: canBook, reason }),
     }),
+  hrmStatus: () => request<HrmIntegrationStatus>("/admin/integrations/hrm/status"),
+  runHrmSync: (records?: Array<Record<string, unknown>>) => request<HrmSyncRun>("/admin/integrations/hrm/sync", {
+    method: "POST",
+    body: JSON.stringify(records ? { records } : {}),
+  }),
+  hrmHistory: (page = 1, pageSize = 10, status?: string) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    if (status) params.set("status", status);
+    return request<HrmSyncPage>(`/admin/integrations/hrm/history?${params.toString()}`);
+  },
   reportOverview: (params: URLSearchParams) =>
     request<ReportOverview>(`/admin/reports/overview?${params.toString()}`),
   reportExportUrl: (format: "xlsx" | "pdf", params: URLSearchParams) => {
@@ -218,7 +344,9 @@ export async function downloadAuthenticated(url: string): Promise<void> {
   const response = await fetch(url, {
     headers: authStorage.get() ? { Authorization: `Bearer ${authStorage.get()}` } : {},
   });
-  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail ?? "Không thể xuất báo cáo");
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(await response.json().catch(() => null), "Không thể xuất báo cáo"));
+  }
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "ictu-meeting-report";
   const link = document.createElement("a");

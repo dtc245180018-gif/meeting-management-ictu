@@ -27,6 +27,24 @@ describe("InstallAppButton", () => {
     expect(screen.getByRole("status")).toHaveTextContent("biểu tượng cài đặt");
   });
 
+  it("shows Safari installation instructions on iPhone", () => {
+    const originalUserAgent = navigator.userAgent;
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)",
+    });
+
+    render(<InstallAppButton />);
+    fireEvent.click(screen.getByRole("button", { name: "Cài ứng dụng" }));
+    expect(screen.getByRole("status")).toHaveTextContent("mở trang bằng Safari");
+    expect(screen.getByRole("status")).toHaveTextContent("Thêm vào Màn hình chính");
+
+    Object.defineProperty(navigator, "userAgent", {
+      configurable: true,
+      value: originalUserAgent,
+    });
+  });
+
   it("removes the install action after the app is installed", async () => {
     render(<InstallAppButton location="header" />);
     expect(screen.getByRole("button", { name: "Tải ứng dụng" })).toBeInTheDocument();
