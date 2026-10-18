@@ -648,7 +648,8 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .pwa-install-auth .pwa-install-button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 42px; border: 1px solid #b9d3ea; border-radius: 4px; color: var(--ictu-blue); background: #eef7fe; font-size: .8rem; font-weight: 800; }
 .pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
 .pwa-install-auth .pwa-install-button:disabled { cursor: default; color: #55718b; background: #eef2f6; }
-.pwa-install-notice { position: fixed; z-index: 100; right: 18px; bottom: 18px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; pointer-events: none; }
+.pwa-install { position: relative; z-index: 210; }
+.pwa-install-notice { position: fixed; z-index: 211; right: 18px; bottom: 88px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; pointer-events: none; }
 .pwa-install-dialog-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(4, 29, 52, .5); }
 .pwa-install-dialog { width: min(440px, 100%); padding: 22px; border: 1px solid #b8d2e5; border-radius: 12px; color: #23435c; background: #fff; box-shadow: 0 24px 70px rgba(0, 35, 68, .34); }
 .pwa-install-dialog h2 { margin: 0 0 10px; color: var(--ictu-navy); font-size: 1.05rem; }
@@ -961,6 +962,7 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .hrm-history article > details span { display: block; margin-top: 5px; color: #9b3434; }
 
 @media (max-width: 640px) {
+  .pwa-install-notice { right: 14px; bottom: calc(76px + env(safe-area-inset-bottom)); width: calc(100vw - 28px); }
   .chatbot-launcher { right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); min-height: 50px; padding-right: 14px; }
   .chatbot-panel { right: 8px; bottom: 74px; left: 8px; width: auto; height: min(720px, calc(100vh - 88px - env(safe-area-inset-bottom))); border-radius: 13px; }
   .chatbot-composer > button, .chatbot-confirmation button, .chatbot-success button { width: auto; }

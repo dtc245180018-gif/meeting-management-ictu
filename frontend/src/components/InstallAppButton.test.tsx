@@ -19,7 +19,7 @@ describe("InstallAppButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Đồng ý, cài ứng dụng" }));
 
     await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("status")).toHaveTextContent("Đang hoàn tất cài đặt");
+    expect(await screen.findByRole("status")).toHaveTextContent("Trình duyệt đang hoàn tất cài đặt");
   });
 
   it("shows Chrome instructions when no install prompt is available", () => {

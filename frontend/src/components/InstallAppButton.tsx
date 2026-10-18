@@ -58,12 +58,17 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
       return;
     }
 
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
-    setMessage(choice.outcome === "accepted"
-      ? "Đang hoàn tất cài đặt ứng dụng..."
-      : "Bạn đã đóng hộp thoại cài đặt. Có thể bấm Cài ứng dụng để thử lại sau.");
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallPrompt(null);
+      setMessage(choice.outcome === "accepted"
+        ? "Trình duyệt đang hoàn tất cài đặt ứng dụng..."
+        : "Bạn đã đóng hộp thoại cài đặt. Có thể bấm Cài ứng dụng để thử lại sau.");
+    } catch {
+      setInstallPrompt(null);
+      setMessage("Không thể mở hộp thoại cài đặt của trình duyệt. Hãy tải lại trang rồi thử lại.");
+    }
   };
 
   if (installed) return null;
