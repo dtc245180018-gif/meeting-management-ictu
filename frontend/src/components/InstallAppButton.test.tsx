@@ -16,6 +16,7 @@ describe("InstallAppButton", () => {
     render(<InstallAppButton />);
     window.dispatchEvent(event);
     fireEvent.click(await screen.findByRole("button", { name: "Cài ứng dụng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Đồng ý, cài ứng dụng" }));
 
     await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
     expect(await screen.findByRole("status")).toHaveTextContent("Đang hoàn tất cài đặt");
@@ -24,6 +25,7 @@ describe("InstallAppButton", () => {
   it("shows Chrome instructions when no install prompt is available", () => {
     render(<InstallAppButton />);
     fireEvent.click(screen.getByRole("button", { name: "Cài ứng dụng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Đồng ý, cài ứng dụng" }));
     expect(screen.getByRole("status")).toHaveTextContent("biểu tượng cài đặt");
   });
 
@@ -36,6 +38,8 @@ describe("InstallAppButton", () => {
 
     render(<InstallAppButton />);
     fireEvent.click(screen.getByRole("button", { name: "Cài ứng dụng" }));
+    expect(screen.getByRole("dialog")).toHaveTextContent("Thêm vào Màn hình chính");
+    fireEvent.click(screen.getByRole("button", { name: "Xem hướng dẫn" }));
     expect(screen.getByRole("status")).toHaveTextContent("mở trang bằng Safari");
     expect(screen.getByRole("status")).toHaveTextContent("Thêm vào Màn hình chính");
 

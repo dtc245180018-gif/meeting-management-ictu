@@ -649,6 +649,15 @@ footer { padding: 26px; color: #7b8a9b; font-size: .78rem; text-align: center; }
 .pwa-install-auth .pwa-install-button:hover { border-color: var(--ictu-blue); background: #e2f1fc; }
 .pwa-install-auth .pwa-install-button:disabled { cursor: default; color: #55718b; background: #eef2f6; }
 .pwa-install-notice { position: fixed; z-index: 100; right: 18px; bottom: 18px; width: min(440px, calc(100vw - 36px)); padding: 12px 14px; border: 1px solid #f0cd84; border-radius: 6px; color: #70490f; background: #fff8e8; box-shadow: 0 10px 30px rgba(0, 48, 92, .16); font-size: .78rem; line-height: 1.5; pointer-events: none; }
+.pwa-install-dialog-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(4, 29, 52, .5); }
+.pwa-install-dialog { width: min(440px, 100%); padding: 22px; border: 1px solid #b8d2e5; border-radius: 12px; color: #23435c; background: #fff; box-shadow: 0 24px 70px rgba(0, 35, 68, .34); }
+.pwa-install-dialog h2 { margin: 0 0 10px; color: var(--ictu-navy); font-size: 1.05rem; }
+.pwa-install-dialog p { margin: 0; font-size: .8rem; line-height: 1.6; }
+.pwa-install-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.pwa-install-dialog-actions button { min-height: 38px; padding: 7px 13px; border-radius: 6px; font-size: .76rem; font-weight: 800; }
+.pwa-install-dialog-cancel { border: 1px solid #b8cad8; color: #38566c; background: #fff; }
+.pwa-install-dialog-confirm { border: 1px solid var(--ictu-blue); color: #fff; background: var(--ictu-blue); }
+.pwa-install-dialog-confirm:hover { background: var(--ictu-navy); }
 .password-field { position: relative; display: grid; gap: 7px; pointer-events: auto; }
 .password-input-wrap { position: relative; min-width: 0; pointer-events: auto; }
 .password-input-wrap input { padding-right: 68px; }
