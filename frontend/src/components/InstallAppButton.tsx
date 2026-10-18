@@ -24,7 +24,6 @@ function isIosDevice() {
 export function InstallAppButton({ location = "auth" }: { location?: "auth" | "sidebar" | "header" }) {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(isStandaloneMode);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [message, setMessage] = useState("");
   const iosDevice = isIosDevice();
 
@@ -49,7 +48,6 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
   }, []);
 
   const install = async () => {
-    setConfirmOpen(false);
     if (installed) return;
     if (!installPrompt) {
       setMessage(iosDevice
@@ -78,7 +76,7 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
       className="pwa-install-button"
       type="button"
       title="Cài Meeting Management ICTU trên thiết bị"
-      onClick={() => setConfirmOpen(true)}
+      onClick={() => void install()}
     >
       {location === "header" ? <svg className="app-store-icon" viewBox="0 0 28 28" aria-hidden="true">
         <rect x="1" y="1" width="26" height="26" rx="6" />
@@ -87,21 +85,5 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
       <span className="pwa-install-label">{location === "header" ? "Tải ứng dụng" : "Cài ứng dụng"}</span>
     </button>
     {message && <span className="pwa-install-notice" role="status">{message}</span>}
-    {confirmOpen && <div className="pwa-install-dialog-backdrop" role="presentation">
-      <section className="pwa-install-dialog" role="dialog" aria-modal="true" aria-labelledby="pwa-install-dialog-title">
-        <h2 id="pwa-install-dialog-title">Cài Meeting Management ICTU?</h2>
-        {iosDevice ? (
-          <p>iPhone và iPad không cho phép website tự bấm “Thêm vào Màn hình chính”. Hãy mở trang bằng Safari, chạm nút <strong>Chia sẻ</strong>, chọn <strong>Thêm vào Màn hình chính</strong>, rồi bấm <strong>Thêm</strong>.</p>
-        ) : installPrompt ? (
-          <p>Sau khi bạn đồng ý, trình duyệt sẽ mở hộp thoại cài đặt ứng dụng ngay.</p>
-        ) : (
-          <p>Trình duyệt chưa cung cấp hộp thoại cài đặt tự động. Sau khi đồng ý, tôi sẽ hướng dẫn bạn cài ứng dụng.</p>
-        )}
-        <div className="pwa-install-dialog-actions">
-          <button type="button" className="pwa-install-dialog-cancel" onClick={() => setConfirmOpen(false)}>Hủy</button>
-          <button type="button" className="pwa-install-dialog-confirm" onClick={() => void install()}>{iosDevice ? "Xem hướng dẫn" : "Đồng ý, cài ứng dụng"}</button>
-        </div>
-      </section>
-    </div>}
   </div>;
 }
