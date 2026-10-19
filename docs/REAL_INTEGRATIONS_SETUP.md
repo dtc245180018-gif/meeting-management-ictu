@@ -39,6 +39,7 @@ GOOGLE_REDIRECT_URI=http://localhost:8000/api/integrations/google/callback
 GOOGLE_TOKEN_ENCRYPTION_KEY=<kết quả lệnh Fernet>
 GOOGLE_OAUTH_STATE_SECRET=<kết quả lệnh token_urlsafe>
 GOOGLE_CALENDAR_ID=primary
+GOOGLE_ALLOWED_DOMAIN=ictu.edu.vn
 ```
 
 Khởi động lại backend, mở trang Tổng quan và bấm **Kết nối Google Calendar**.

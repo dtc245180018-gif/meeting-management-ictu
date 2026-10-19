@@ -25,6 +25,7 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(isStandaloneMode);
   const [message, setMessage] = useState("");
+  const iosDevice = isIosDevice();
 
   useEffect(() => {
     const capturePrompt = (event: Event) => {
@@ -49,18 +50,23 @@ export function InstallAppButton({ location = "auth" }: { location?: "auth" | "s
   const install = async () => {
     if (installed) return;
     if (!installPrompt) {
-      setMessage(isIosDevice()
+      setMessage(iosDevice
         ? "Trên iPhone/iPad: mở trang bằng Safari, chạm Chia sẻ, chọn Thêm vào Màn hình chính rồi xác nhận Thêm."
         : "Trong Chrome, bấm biểu tượng cài đặt bên trái ngôi sao hoặc chọn ⋮ → Truyền, lưu và chia sẻ → Cài đặt trang dưới dạng ứng dụng.");
       return;
     }
 
-    await installPrompt.prompt();
-    const choice = await installPrompt.userChoice;
-    setInstallPrompt(null);
-    setMessage(choice.outcome === "accepted"
-      ? "Đang hoàn tất cài đặt ứng dụng..."
-      : "Bạn đã đóng hộp thoại cài đặt. Có thể bấm Cài ứng dụng để thử lại sau.");
+    try {
+      await installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      setInstallPrompt(null);
+      setMessage(choice.outcome === "accepted"
+        ? "Trình duyệt đang hoàn tất cài đặt ứng dụng..."
+        : "Bạn đã đóng hộp thoại cài đặt. Có thể bấm Cài ứng dụng để thử lại sau.");
+    } catch {
+      setInstallPrompt(null);
+      setMessage("Không thể mở hộp thoại cài đặt của trình duyệt. Hãy tải lại trang rồi thử lại.");
+    }
   };
 
   if (installed) return null;

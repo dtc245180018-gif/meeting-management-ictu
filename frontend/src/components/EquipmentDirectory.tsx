@@ -16,6 +16,15 @@ const statusLabel: Record<EquipmentStatus, string> = {
   inactive: "Ngừng sử dụng",
 };
 
+const categoryLabel: Record<string, string> = {
+  display: "Màn hình",
+  microphone: "Micro",
+  projector: "Máy chiếu",
+  video_conferencing: "Thiết bị họp trực tuyến",
+};
+
+const getCategoryLabel = (category: string) => categoryLabel[category] ?? category;
+
 
 export function EquipmentDirectory() {
   const [items, setItems] = useState<Equipment[]>([]);
@@ -87,7 +96,7 @@ export function EquipmentDirectory() {
       <label>Loại thiết bị
         <select aria-label="Loại thiết bị" value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="">Tất cả</option>
-          {categories.map((item) => <option value={item} key={item}>{item}</option>)}
+          {categories.map((item) => <option value={item} key={item}>{getCategoryLabel(item)}</option>)}
         </select>
       </label>
       <label>Trạng thái
@@ -111,7 +120,7 @@ export function EquipmentDirectory() {
       {items.map((item) => <article className={`equipment-card ${item.status}`} key={item.id}>
         <div><strong>{item.code}</strong><b className={`equipment-status ${item.status}`}>{statusLabel[item.status]}</b></div>
         <h3>{item.name}</h3>
-        <span>{item.category} · {item.location}</span>
+        <span>{getCategoryLabel(item.category)} · {item.location}</span>
       </article>)}
     </div>}
     <p className="subtle">Trạng thái “Đã được đặt” được hệ thống tính theo đúng khoảng thời gian tìm kiếm.</p>

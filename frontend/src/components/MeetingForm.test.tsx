@@ -53,6 +53,7 @@ describe("MeetingForm room-aware creation", () => {
       total_pages: 1,
     });
     vi.mocked(api.availableEquipment).mockResolvedValue(equipment);
+    vi.mocked(api.suggestTimes).mockResolvedValue([]);
     vi.mocked(api.createMeeting).mockResolvedValue([{
       id: 42,
       title: "Họp kiểm thử",
@@ -199,5 +200,42 @@ describe("MeetingForm room-aware creation", () => {
     fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
     fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
     await waitFor(() => expect(screen.getByLabelText("Số người dự kiến")).toHaveValue(3));
+  });
+
+  it("searches the next seven days using the selected meeting duration and pending attendees", async () => {
+    vi.mocked(api.suggestTimes).mockResolvedValue([{
+      start_time: "2026-10-02T02:00:00Z",
+      end_time: "2026-10-02T02:30:00Z",
+    }]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
+    fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "pending@ictu.edu.vn" } });
+    fireEvent.change(screen.getByLabelText("Bắt đầu"), { target: { value: "2026-10-01T09:00" } });
+    fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-10-01T09:30" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý giờ trống" }));
+
+    await waitFor(() => expect(api.suggestTimes).toHaveBeenCalledWith(
+      ["leader@example.com", "pending@ictu.edu.vn"],
+      "2026-10-01T02:00:00.000Z",
+      "2026-10-08T02:00:00.000Z",
+      30,
+    ));
+    expect(await screen.findByText("09:00 02/10/2026 - 09:30")).toBeInTheDocument();
+  });
+
+  it("applies a suggested slot to the meeting form", async () => {
+    vi.mocked(api.suggestTimes).mockResolvedValue([{
+      start_time: "2026-10-02T02:00:00Z",
+      end_time: "2026-10-02T03:00:00Z",
+    }]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý giờ trống" }));
+    fireEvent.click(await screen.findByRole("button", { name: "09:00 02/10/2026 - 10:00" }));
+
+    expect(screen.getByLabelText("Bắt đầu")).toHaveValue("2026-10-02T09:00");
+    expect(screen.getByLabelText("Kết thúc")).toHaveValue("2026-10-02T10:00");
   });
 });

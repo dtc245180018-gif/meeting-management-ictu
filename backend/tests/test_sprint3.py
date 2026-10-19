@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
+from openpyxl import load_workbook
 from sqlalchemy import select
 
 from app import models
@@ -259,5 +261,13 @@ def test_admin_reports_cancellation_and_exports(client):
     pdf = client.get("/api/admin/reports/export?format=pdf", headers=admin_headers)
     assert excel.status_code == 200
     assert excel.content.startswith(b"PK")
+    workbook = load_workbook(BytesIO(excel.content))
+    assert workbook.sheetnames == ["Tổng quan", "Sử dụng phòng", "Thống kê hủy"]
+    assert workbook["Tổng quan"]["A3"].value == "BÁO CÁO SỬ DỤNG PHÒNG HỌP"
+    assert workbook["Tổng quan"].sheet_view.showGridLines is False
+    assert workbook["Tổng quan"]._images
+    assert workbook["Sử dụng phòng"].freeze_panes == "A7"
+    assert workbook["Sử dụng phòng"].page_setup.orientation == "landscape"
     assert pdf.status_code == 200
     assert pdf.content.startswith(b"%PDF")
+    assert b"/Subtype /Image" in pdf.content

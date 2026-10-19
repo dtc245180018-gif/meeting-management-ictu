@@ -11,7 +11,7 @@ from app.config import Settings
 from app.database import SessionLocal
 
 
-ORGANIZER = "leader@example.com"
+ORGANIZER = "leader@ictu.edu.vn"
 PARTICIPANT = "employee.one@example.com"
 
 
@@ -136,8 +136,22 @@ def test_google_connect_url_requests_offline_calendar_event_access(client, monke
     assert parsed["access_type"] == ["offline"]
     assert parsed["prompt"] == ["consent"]
     assert parsed["login_hint"] == [ORGANIZER]
+    assert parsed["hd"] == ["ictu.edu.vn"]
     assert "https://www.googleapis.com/auth/calendar.events" in parsed["scope"][0]
     assert parsed["state"][0]
+
+
+def test_google_connect_rejects_accounts_outside_ictu(client, monkeypatch):
+    settings = google_settings(Fernet.generate_key().decode())
+    monkeypatch.setattr(google_calendar, "get_settings", lambda: settings)
+
+    response = client.get(
+        "/api/integrations/google/connect",
+        params={"email": "employee@gmail.com"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Google Calendar chỉ hỗ trợ tài khoản @ictu.edu.vn"
 
 
 def test_google_oauth_callback_verifies_account_and_encrypts_refresh_token(client, monkeypatch):

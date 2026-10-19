@@ -16,7 +16,9 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     # Reuse the same application settings as a manual backend run. The root
     # file remains Docker-friendly, while backend/.env can supply local OAuth
     # and SMTP secrets without committing either file to Git.
