@@ -12,6 +12,9 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# Local QA artifacts
+tmp/
+
 # Environment
 .env
 backend/.env

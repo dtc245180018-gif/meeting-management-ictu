@@ -7,6 +7,7 @@ vi.mock("../services/api", () => ({
   api: {
     listEmployees: vi.fn(),
     availableRooms: vi.fn(),
+    recommendRooms: vi.fn(),
     availableEquipment: vi.fn(),
     createMeeting: vi.fn(),
     suggestTimes: vi.fn(),
@@ -44,7 +45,15 @@ describe("MeetingForm room-aware creation", () => {
     vi.clearAllMocks();
     vi.mocked(api.listEmployees).mockResolvedValue([]);
     vi.mocked(api.availableRooms).mockResolvedValue([room]);
+    vi.mocked(api.recommendRooms).mockResolvedValue({
+      items: [{ room, score: 1120, reasons: ["Sức chứa vừa đủ"], capacity_surplus: 3 }],
+      total: 1,
+      page: 1,
+      page_size: 5,
+      total_pages: 1,
+    });
     vi.mocked(api.availableEquipment).mockResolvedValue(equipment);
+    vi.mocked(api.suggestTimes).mockResolvedValue([]);
     vi.mocked(api.createMeeting).mockResolvedValue([{
       id: 42,
       title: "Họp kiểm thử",
@@ -61,8 +70,8 @@ describe("MeetingForm room-aware creation", () => {
     render(<MeetingForm onCreated={vi.fn()} />);
     fillRequiredFields();
     fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "one@ictu.edu.vn;two@ictu.edu.vn" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tìm phòng phù hợp" }));
-    await screen.findByText(/Đã tìm thấy 1 phòng phù hợp/);
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý phòng thông minh" }));
+    await screen.findByText(/Đã xếp hạng 1 phòng phù hợp/);
     fireEvent.click(screen.getByRole("button", { name: /Phòng A101/ }));
     fireEvent.click(screen.getByRole("button", { name: "Tạo lịch họp" }));
 
@@ -71,7 +80,7 @@ describe("MeetingForm room-aware creation", () => {
       expected_attendees: 3,
       participant_emails: ["one@ictu.edu.vn", "two@ictu.edu.vn"],
     })));
-    expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 3);
+    expect(api.recommendRooms).toHaveBeenCalledWith(expect.objectContaining({ expected_attendees: 3 }));
   });
 
   it("adds an attendee from the email suggestion list", async () => {
@@ -121,8 +130,8 @@ describe("MeetingForm room-aware creation", () => {
   it("clears the chosen room when the meeting time changes", async () => {
     render(<MeetingForm onCreated={vi.fn()} />);
     fillRequiredFields();
-    fireEvent.click(screen.getByRole("button", { name: "Tìm phòng phù hợp" }));
-    await screen.findByText(/Đã tìm thấy 1 phòng phù hợp/);
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý phòng thông minh" }));
+    await screen.findByText(/Đã xếp hạng 1 phòng phù hợp/);
     fireEvent.click(screen.getByRole("button", { name: /Phòng A101/ }));
     expect(screen.getByText(/Đã chọn/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Bắt đầu"), { target: { value: "2026-10-02T09:00" } });
@@ -155,13 +164,28 @@ describe("MeetingForm room-aware creation", () => {
     })));
   });
 
+  it("keeps smart room recommendations visible while finding and selecting equipment", async () => {
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý phòng thông minh" }));
+    await screen.findByRole("button", { name: /Phòng A101/ });
+    fireEvent.click(screen.getByRole("button", { name: /Phòng A101/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Tìm thiết bị" }));
+    await screen.findByRole("button", { name: /TB-MC-01/ });
+    expect(screen.getByRole("button", { name: /Phòng A101.*Đã chọn/ })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /TB-MC-01/ }));
+    expect(screen.getByRole("button", { name: /Phòng A101.*Đã chọn/ })).toBeInTheDocument();
+  });
+
   it("preserves an expected size larger than the named invitation list", async () => {
     render(<MeetingForm onCreated={vi.fn()} />);
     fillRequiredFields();
     fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "one@ictu.edu.vn;two@ictu.edu.vn" } });
     fireEvent.change(screen.getByLabelText("Số người dự kiến"), { target: { value: "20" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tìm phòng phù hợp" }));
-    await waitFor(() => expect(api.availableRooms).toHaveBeenCalledWith(expect.any(String), expect.any(String), 20));
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý phòng thông minh" }));
+    await waitFor(() => expect(api.recommendRooms).toHaveBeenCalledWith(expect.objectContaining({ expected_attendees: 20 })));
     fireEvent.click(screen.getByRole("button", { name: "Tạo lịch họp" }));
     await waitFor(() => expect(api.createMeeting).toHaveBeenCalledWith(expect.objectContaining({ expected_attendees: 20 })));
   });
@@ -176,5 +200,42 @@ describe("MeetingForm room-aware creation", () => {
     fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
     fireEvent.click(await screen.findByRole("button", { name: "Mời tất cả mọi người" }));
     await waitFor(() => expect(screen.getByLabelText("Số người dự kiến")).toHaveValue(3));
+  });
+
+  it("searches the next seven days using the selected meeting duration and pending attendees", async () => {
+    vi.mocked(api.suggestTimes).mockResolvedValue([{
+      start_time: "2026-10-02T02:00:00Z",
+      end_time: "2026-10-02T02:30:00Z",
+    }]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText("Người tổ chức"), { target: { value: "leader@example.com" } });
+    fireEvent.change(screen.getByLabelText("Người tham dự"), { target: { value: "pending@ictu.edu.vn" } });
+    fireEvent.change(screen.getByLabelText("Bắt đầu"), { target: { value: "2026-10-01T09:00" } });
+    fireEvent.change(screen.getByLabelText("Kết thúc"), { target: { value: "2026-10-01T09:30" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý giờ trống" }));
+
+    await waitFor(() => expect(api.suggestTimes).toHaveBeenCalledWith(
+      ["leader@example.com", "pending@ictu.edu.vn"],
+      "2026-10-01T02:00:00.000Z",
+      "2026-10-08T02:00:00.000Z",
+      30,
+    ));
+    expect(await screen.findByText("09:00 02/10/2026 - 09:30")).toBeInTheDocument();
+  });
+
+  it("applies a suggested slot to the meeting form", async () => {
+    vi.mocked(api.suggestTimes).mockResolvedValue([{
+      start_time: "2026-10-02T02:00:00Z",
+      end_time: "2026-10-02T03:00:00Z",
+    }]);
+    render(<MeetingForm onCreated={vi.fn()} />);
+    fillRequiredFields();
+
+    fireEvent.click(screen.getByRole("button", { name: "Gợi ý giờ trống" }));
+    fireEvent.click(await screen.findByRole("button", { name: "09:00 02/10/2026 - 10:00" }));
+
+    expect(screen.getByLabelText("Bắt đầu")).toHaveValue("2026-10-02T09:00");
+    expect(screen.getByLabelText("Kết thúc")).toHaveValue("2026-10-02T10:00");
   });
 });

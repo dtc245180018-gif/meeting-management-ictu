@@ -16,6 +16,15 @@ const statusLabel: Record<EquipmentStatus, string> = {
   inactive: "Ngừng sử dụng",
 };
 
+const categoryLabel: Record<string, string> = {
+  display: "Màn hình",
+  microphone: "Micro",
+  projector: "Máy chiếu",
+  video_conferencing: "Thiết bị họp trực tuyến",
+};
+
+const getCategoryLabel = (category: string) => categoryLabel[category] ?? category;
+
 
 export function EquipmentDirectory() {
   const [items, setItems] = useState<Equipment[]>([]);
@@ -71,16 +80,23 @@ export function EquipmentDirectory() {
     void load();
   };
 
-  return <section className="card wide-card equipment-directory">
-    <div className="section-heading">
-      <div><span className="eyebrow">US13 · Trạng thái theo thời gian</span><h2>Danh mục thiết bị</h2></div>
-      <span className="counter">{items.length} thiết bị</span>
-    </div>
+  return <div className="module-page equipment-directory-page">
+    <header className="module-page-heading">
+      <div><span>Tài nguyên ICTU</span><h1>Thiết bị</h1><p>Tra cứu thiết bị theo loại, trạng thái và khung thời gian sử dụng.</p></div>
+      <div className="module-heading-status"><strong>{items.length}</strong><span>thiết bị hiển thị</span></div>
+    </header>
+    <section className="module-summary-grid equipment-summary-grid" aria-label="Tổng quan thiết bị">
+      <article><span>Sẵn sàng</span><strong>{items.filter((item) => item.status === "available").length}</strong><small>Có thể sử dụng</small></article>
+      <article><span>Đã được đặt</span><strong>{items.filter((item) => item.status === "booked").length}</strong><small>Trong khung giờ chọn</small></article>
+      <article><span>Bảo trì / ngừng dùng</span><strong>{items.filter((item) => item.status === "maintenance" || item.status === "inactive").length}</strong><small>Cần kiểm tra trước khi dùng</small></article>
+    </section>
+    <section className="module-surface equipment-directory">
+    <div className="module-section-heading"><div><span>Danh mục tài sản</span><h2>Tìm thiết bị phù hợp</h2></div><p>Có thể bỏ trống thời gian để xem toàn bộ kho.</p></div>
     <form className="equipment-filter" onSubmit={search}>
       <label>Loại thiết bị
         <select aria-label="Loại thiết bị" value={category} onChange={(event) => setCategory(event.target.value)}>
           <option value="">Tất cả</option>
-          {categories.map((item) => <option value={item} key={item}>{item}</option>)}
+          {categories.map((item) => <option value={item} key={item}>{getCategoryLabel(item)}</option>)}
         </select>
       </label>
       <label>Trạng thái
@@ -92,9 +108,11 @@ export function EquipmentDirectory() {
           <option value="inactive">Ngừng sử dụng</option>
         </select>
       </label>
-      <label>Từ lúc<input aria-label="Thiết bị từ lúc" type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label>
-      <label>Đến lúc<input aria-label="Thiết bị đến lúc" type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label>
-      <div className="filter-actions"><button className="button primary" type="submit">Tìm thiết bị</button><button className="button secondary" type="button" onClick={reset}>Xóa lọc</button></div>
+      <details className="equipment-time-filter">
+        <summary>Kiểm tra theo khung giờ <small>Không bắt buộc</small></summary>
+        <div><label>Từ lúc<input aria-label="Thiết bị từ lúc" type="datetime-local" value={startTime} onChange={(event) => setStartTime(event.target.value)} /></label><label>Đến lúc<input aria-label="Thiết bị đến lúc" type="datetime-local" value={endTime} onChange={(event) => setEndTime(event.target.value)} /></label></div>
+      </details>
+      <div className="filter-actions"><button className="button primary" type="submit">Áp dụng bộ lọc</button><button className="button secondary" type="button" onClick={reset}>Đặt lại</button></div>
     </form>
     {message && <p className="error-banner inline-error">{message}</p>}
     {loading ? <p className="empty">Đang tải thiết bị...</p> : <div className="equipment-grid">
@@ -102,9 +120,10 @@ export function EquipmentDirectory() {
       {items.map((item) => <article className={`equipment-card ${item.status}`} key={item.id}>
         <div><strong>{item.code}</strong><b className={`equipment-status ${item.status}`}>{statusLabel[item.status]}</b></div>
         <h3>{item.name}</h3>
-        <span>{item.category} · {item.location}</span>
+        <span>{getCategoryLabel(item.category)} · {item.location}</span>
       </article>)}
     </div>}
-    <p className="subtle">Trạng thái “Đã được đặt” được Backend tính theo đúng khoảng thời gian tìm kiếm.</p>
-  </section>;
+    <p className="subtle">Trạng thái “Đã được đặt” được hệ thống tính theo đúng khoảng thời gian tìm kiếm.</p>
+    </section>
+  </div>;
 }

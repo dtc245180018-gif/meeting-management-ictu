@@ -6,7 +6,7 @@ import { AdminPanel } from "./AdminPanel";
 vi.mock("../services/api", () => ({
   api: {
     adminRooms: vi.fn(), adminEquipment: vi.fn(), createRoom: vi.fn(), updateRoom: vi.fn(), deactivateRoom: vi.fn(),
-    createEquipment: vi.fn(), updateEquipment: vi.fn(), deactivateEquipment: vi.fn(),
+    createEquipment: vi.fn(), createEquipmentBulk: vi.fn(), updateEquipment: vi.fn(), deactivateEquipment: vi.fn(),
   },
 }));
 
@@ -16,7 +16,7 @@ describe("AdminPanel forms", () => {
     vi.mocked(api.adminRooms).mockResolvedValue([]);
     vi.mocked(api.adminEquipment).mockResolvedValue([]);
     vi.mocked(api.createRoom).mockResolvedValue({ id: 99, name: "E201", capacity: 12, location: "Khu E" });
-    vi.mocked(api.createEquipment).mockResolvedValue({ id: 88, code: "TB-NEW-01", name: "Thiết bị mới", category: "demo", location: "Kho", status: "available", is_active: true });
+    vi.mocked(api.createEquipmentBulk).mockResolvedValue({ created_count: 10, items: [] });
   });
 
   it("submits the room administration form", async () => {
@@ -31,17 +31,17 @@ describe("AdminPanel forms", () => {
     })));
   });
 
-  it("submits the equipment administration form", async () => {
+  it("creates a batch of individually coded equipment", async () => {
     render(<AdminPanel adminEmail="leader@example.com" />);
     await screen.findByRole("button", { name: "Quản lý thiết bị" });
     fireEvent.click(screen.getByRole("button", { name: "Quản lý thiết bị" }));
-    fireEvent.change(screen.getByLabelText("Mã thiết bị quản trị"), { target: { value: "TB-NEW-01" } });
-    fireEvent.change(screen.getByLabelText("Tên thiết bị quản trị"), { target: { value: "Thiết bị mới" } });
-    fireEvent.change(screen.getByLabelText("Loại"), { target: { value: "demo" } });
-    fireEvent.change(screen.getByLabelText("Vị trí"), { target: { value: "Kho" } });
-    fireEvent.click(screen.getByRole("button", { name: "Thêm thiết bị" }));
-    await waitFor(() => expect(api.createEquipment).toHaveBeenCalledWith(expect.objectContaining({
-      requester_email: "leader@example.com", code: "TB-NEW-01", name: "Thiết bị mới",
+    fireEvent.change(screen.getByLabelText("Tiền tố mã thiết bị"), { target: { value: "TB-TV" } });
+    fireEvent.change(screen.getByLabelText("Số lượng thiết bị"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Tên thiết bị quản trị"), { target: { value: "TV" } });
+    fireEvent.click(screen.getByRole("button", { name: "Nhập kho" }));
+    await waitFor(() => expect(api.createEquipmentBulk).toHaveBeenCalledWith(expect.objectContaining({
+      requester_email: "leader@example.com", code_prefix: "TB-TV", quantity: 10, name: "TV", category: "display",
     })));
+    expect(await screen.findByText(/Đã thêm 10 thiết bị/)).toBeInTheDocument();
   });
 });

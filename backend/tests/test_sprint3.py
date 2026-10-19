@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 
+from openpyxl import load_workbook
 from sqlalchemy import select
 
 from app import models
@@ -151,6 +153,27 @@ def test_admin_user_management_and_last_admin_guard(client):
     ).status_code == 409
 
 
+def test_admin_can_create_an_external_email_account_that_can_log_in(client):
+    create_account("admin@ictu.edu.vn", models.AccountRole.ADMIN, "Quản trị viên")
+    headers, _ = login(client, "admin@ictu.edu.vn")
+    external_email = "external.user@gmail.com"
+
+    created = client.post(
+        "/api/admin/users",
+        headers=headers,
+        json={
+            "full_name": "Người dùng email ngoài",
+            "email": external_email,
+            "department": "Đối tác dự án",
+            "role": "participant",
+        },
+    )
+    assert created.status_code == 201, created.text
+    _, user = login(client, external_email)
+    assert user["email"] == external_email
+    assert user["role"] == "participant"
+
+
 def test_room_permission_cannot_be_bypassed_by_search_or_create(client):
     admin_id = create_account("admin@ictu.edu.vn", models.AccountRole.ADMIN, "Quản trị viên")
     organizer_id = create_account("organizer@ictu.edu.vn", models.AccountRole.ORGANIZER, "Người tổ chức")
@@ -238,5 +261,13 @@ def test_admin_reports_cancellation_and_exports(client):
     pdf = client.get("/api/admin/reports/export?format=pdf", headers=admin_headers)
     assert excel.status_code == 200
     assert excel.content.startswith(b"PK")
+    workbook = load_workbook(BytesIO(excel.content))
+    assert workbook.sheetnames == ["Tổng quan", "Sử dụng phòng", "Thống kê hủy"]
+    assert workbook["Tổng quan"]["A3"].value == "BÁO CÁO SỬ DỤNG PHÒNG HỌP"
+    assert workbook["Tổng quan"].sheet_view.showGridLines is False
+    assert workbook["Tổng quan"]._images
+    assert workbook["Sử dụng phòng"].freeze_panes == "A7"
+    assert workbook["Sử dụng phòng"].page_setup.orientation == "landscape"
     assert pdf.status_code == 200
     assert pdf.content.startswith(b"%PDF")
+    assert b"/Subtype /Image" in pdf.content

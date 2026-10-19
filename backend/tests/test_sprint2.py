@@ -199,6 +199,46 @@ def test_us14_equipment_admin_crud_maintenance_inactive_and_permission(client):
     )).status_code == 409
 
 
+def test_us14_admin_bulk_inventory_creates_unique_asset_codes_and_tracks_remaining(client):
+    created = client.post("/api/admin/equipment/bulk", json={
+        "requester_email": ADMIN,
+        "code_prefix": "TB-TV-DEMO",
+        "start_number": 1,
+        "quantity": 10,
+        "name": "TV demo",
+        "category": "display",
+        "location": "Kho A",
+    })
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["created_count"] == 10
+    assert [item["code"] for item in body["items"]] == [f"TB-TV-DEMO-{index:02d}" for index in range(1, 11)]
+
+    start = future_time(days=42)
+    first_id = body["items"][0]["id"]
+    meeting = client.post("/api/meetings", json=meeting_payload(
+        title="Đặt một TV", start_time=start, equipment_ids=[first_id],
+    ))
+    assert meeting.status_code == 201, meeting.text
+    available = client.get("/api/equipment/available", params={
+        "start_time": start.isoformat(), "end_time": (start + timedelta(hours=1)).isoformat(),
+        "category": "display",
+    }).json()
+    remaining_demo_tvs = [item for item in available if item["code"].startswith("TB-TV-DEMO-")]
+    assert len(remaining_demo_tvs) == 9
+
+    duplicate = client.post("/api/admin/equipment/bulk", json={
+        "requester_email": ADMIN,
+        "code_prefix": "TB-TV-DEMO",
+        "start_number": 10,
+        "quantity": 2,
+        "name": "TV demo",
+        "category": "display",
+        "location": "Kho A",
+    })
+    assert duplicate.status_code == 409
+
+
 def test_us14_cannot_maintain_equipment_in_use_now(client):
     equipment = equipment_by_code(client, "TB-MIC-01")
     start = datetime.now(timezone.utc) - timedelta(minutes=15)

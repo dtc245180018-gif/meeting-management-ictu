@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import calendar
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
 from contextlib import ExitStack
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from uuid import uuid4
 
@@ -22,10 +23,24 @@ _room_locks: defaultdict[int, Lock] = defaultdict(Lock)
 _equipment_locks: defaultdict[int, Lock] = defaultdict(Lock)
 
 
+@dataclass(frozen=True)
+class MeetingPlan:
+    organizer_email: str
+    participant_emails: list[str]
+    people: list[str]
+    occurrences: list[tuple[datetime, datetime]]
+    room: models.Room | None
+    equipment_items: list[models.Equipment]
+
+
 def meeting_query():
     return select(models.Meeting).options(
         selectinload(models.Meeting.participants),
         selectinload(models.Meeting.booking).selectinload(models.RoomBooking.room),
+        selectinload(models.Meeting.booking)
+        .selectinload(models.RoomBooking.attendances)
+        .selectinload(models.BookingAttendance.account)
+        .selectinload(models.UserAccount.employee),
         selectinload(models.Meeting.equipment_bookings).selectinload(models.EquipmentBooking.equipment),
         selectinload(models.Meeting.reminders),
         selectinload(models.Meeting.google_calendar_event),
@@ -124,6 +139,91 @@ def ensure_no_occurrence_overlaps(occurrences: list[tuple[datetime, datetime]]) 
             )
 
 
+def validate_meeting_request(
+    db: Session,
+    payload: schemas.MeetingCreate,
+    *,
+    account_id: int | None = None,
+    organizer_email: str | None = None,
+    lock_resources: bool = False,
+) -> MeetingPlan:
+    """Validate a complete request without writing any meeting data.
+
+    The chatbot preview and the final transactional create share this exact
+    validation path. A preview is advisory; the create call runs it again while
+    holding resource locks to protect against races.
+    """
+
+    organizer = (organizer_email or str(payload.organizer_email)).strip().lower()
+    participant_emails = normalize_emails(
+        [str(email) for email in payload.participant_emails], organizer
+    )
+    people = [organizer, *participant_emails]
+    occurrences = recurrence_times(payload)
+    ensure_no_occurrence_overlaps(occurrences)
+    for start_time, end_time in occurrences:
+        ensure_no_person_conflicts(db, people, start_time, end_time)
+
+    room: models.Room | None = None
+    if payload.room_id is not None:
+        account_services.ensure_room_access(db, account_id, payload.room_id)
+        room_stmt = select(models.Room).where(models.Room.id == payload.room_id)
+        if lock_resources:
+            room_stmt = room_stmt.with_for_update()
+        room = db.scalar(room_stmt)
+        if not room or not room.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy phòng họp",
+            )
+        required_capacity = max(payload.expected_attendees, len(participant_emails) + 1)
+        if room.capacity < required_capacity:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sức chứa phòng không đủ",
+            )
+        for start_time, end_time in occurrences:
+            ensure_room_available(db, room.id, start_time, end_time)
+
+    equipment_items: list[models.Equipment] = []
+    if payload.equipment_ids:
+        equipment_stmt = (
+            select(models.Equipment)
+            .where(models.Equipment.id.in_(payload.equipment_ids))
+            .order_by(models.Equipment.id)
+        )
+        if lock_resources:
+            equipment_stmt = equipment_stmt.with_for_update()
+        equipment_items = list(db.scalars(equipment_stmt).all())
+        if len(equipment_items) != len(payload.equipment_ids):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy thiết bị",
+            )
+        for equipment in equipment_items:
+            if not equipment.is_active or equipment.status == models.EquipmentStatus.INACTIVE:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Thiết bị {equipment.code} đã bị khóa",
+                )
+            if equipment.status == models.EquipmentStatus.MAINTENANCE:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Thiết bị {equipment.code} đang bảo trì",
+                )
+            for start_time, end_time in occurrences:
+                ensure_equipment_available(db, equipment.id, start_time, end_time)
+
+    return MeetingPlan(
+        organizer_email=organizer,
+        participant_emails=participant_emails,
+        people=people,
+        occurrences=occurrences,
+        room=room,
+        equipment_items=equipment_items,
+    )
+
+
 def create_meetings(
     db: Session,
     payload: schemas.MeetingCreate,
@@ -139,51 +239,19 @@ def create_meetings(
         for equipment_id in sorted(payload.equipment_ids):
             stack.enter_context(_equipment_locks[equipment_id])
 
-        organizer = (organizer_email or str(payload.organizer_email)).strip().lower()
-        participant_emails = normalize_emails([str(email) for email in payload.participant_emails], organizer)
-        people = [organizer, *participant_emails]
-        occurrences = recurrence_times(payload)
-        ensure_no_occurrence_overlaps(occurrences)
-        for start_time, end_time in occurrences:
-            ensure_no_person_conflicts(db, people, start_time, end_time)
-
-        room: models.Room | None = None
-        if payload.room_id is not None:
-            account_services.ensure_room_access(db, account_id, payload.room_id)
-            room = db.scalar(
-                select(models.Room)
-                .where(models.Room.id == payload.room_id)
-                .with_for_update()
-            )
-            if not room or not room.is_active:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy phòng họp")
-            required_capacity = max(payload.expected_attendees, len(participant_emails) + 1)
-            if room.capacity < required_capacity:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Sức chứa phòng không đủ")
-
-            # Check every recurrence before adding any meeting or booking.
-            for index, (start_time, end_time) in enumerate(occurrences):
-                ensure_room_available(db, room.id, start_time, end_time)
-
-        equipment_items: list[models.Equipment] = []
-        if payload.equipment_ids:
-            equipment_items = list(
-                db.scalars(
-                    select(models.Equipment)
-                    .where(models.Equipment.id.in_(payload.equipment_ids))
-                    .order_by(models.Equipment.id)
-                    .with_for_update()
-                ).all()
-            )
-            if len(equipment_items) != len(payload.equipment_ids):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy thiết bị")
-            for equipment in equipment_items:
-                if not equipment.is_active or equipment.status == models.EquipmentStatus.INACTIVE:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Thiết bị {equipment.code} đã bị khóa")
-                if equipment.status == models.EquipmentStatus.MAINTENANCE:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Thiết bị {equipment.code} đang bảo trì")
-                for start_time, end_time in occurrences:
-                    ensure_equipment_available(db, equipment.id, start_time, end_time)
+        plan = validate_meeting_request(
+            db,
+            payload,
+            account_id=account_id,
+            organizer_email=organizer_email,
+            lock_resources=True,
+        )
+        organizer = plan.organizer_email
+        participant_emails = plan.participant_emails
+        people = plan.people
+        occurrences = plan.occurrences
+        room = plan.room
+        equipment_items = plan.equipment_items
 
         recurrence_group = uuid4().hex if len(occurrences) > 1 else None
         meetings: list[models.Meeting] = []
@@ -600,6 +668,46 @@ def available_rooms(
     return [room for room in rooms if account_services.room_access(db, account_id, room.id)[0]]
 
 
+def available_rooms_for_occurrences(
+    db: Session,
+    occurrences: list[tuple[datetime, datetime]],
+    min_capacity: int,
+    account_id: int | None = None,
+) -> list[models.Room]:
+    """Return rooms available for every occurrence in a recurring request."""
+
+    candidates = list(
+        db.scalars(
+            select(models.Room)
+            .where(
+                models.Room.is_active.is_(True),
+                models.Room.capacity >= min_capacity,
+            )
+            .order_by(models.Room.capacity, models.Room.name)
+        ).all()
+    )
+    available: list[models.Room] = []
+    for room in candidates:
+        if not account_services.room_access(db, account_id, room.id)[0]:
+            continue
+        conflict = any(
+            db.scalar(
+                select(models.RoomBooking.id)
+                .where(
+                    models.RoomBooking.room_id == room.id,
+                    models.RoomBooking.status == models.BookingStatus.ACTIVE,
+                    models.RoomBooking.start_time < end_time,
+                    models.RoomBooking.end_time > start_time,
+                )
+                .limit(1)
+            )
+            for start_time, end_time in occurrences
+        )
+        if not conflict:
+            available.append(room)
+    return available
+
+
 def room_to_out(
     db: Session,
     room: models.Room,
@@ -827,6 +935,50 @@ def create_admin_equipment(db: Session, payload: schemas.EquipmentAdminCreate) -
     return equipment_to_out(db, equipment)
 
 
+def create_admin_equipment_bulk(
+    db: Session,
+    payload: schemas.EquipmentAdminBulkCreate,
+) -> schemas.EquipmentAdminBulkOut:
+    require_admin(str(payload.requester_email), db)
+    last_number = payload.start_number + payload.quantity - 1
+    width = max(2, len(str(last_number)))
+    codes = [
+        f"{payload.code_prefix}-{number:0{width}d}"
+        for number in range(payload.start_number, last_number + 1)
+    ]
+    existing_codes = set(
+        db.scalars(
+            select(models.Equipment.code).where(func.lower(models.Equipment.code).in_([code.lower() for code in codes]))
+        ).all()
+    )
+    if existing_codes:
+        conflicts = ", ".join(sorted(existing_codes))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Mã thiết bị đã tồn tại: {conflicts}",
+        )
+
+    items = [
+        models.Equipment(
+            code=code,
+            name=payload.name,
+            category=payload.category,
+            location=payload.location,
+            status=payload.status,
+            is_active=payload.status != models.EquipmentStatus.INACTIVE,
+        )
+        for code in codes
+    ]
+    db.add_all(items)
+    db.commit()
+    for item in items:
+        db.refresh(item)
+    return schemas.EquipmentAdminBulkOut(
+        created_count=len(items),
+        items=[equipment_to_out(db, item) for item in items],
+    )
+
+
 def update_admin_equipment(
     db: Session,
     equipment_id: int,
@@ -941,6 +1093,22 @@ def list_notifications(db: Session, email: str) -> list[schemas.NotificationOut]
         ).all()
     )
     return [notification_to_out(item, now) for item in items]
+
+
+def mark_all_notifications_read(db: Session, email: str) -> int:
+    normalized = email.strip().lower()
+    items = list(
+        db.scalars(
+            select(models.Reminder).where(
+                models.Reminder.recipient_email == normalized,
+                models.Reminder.is_read.is_(False),
+            )
+        ).all()
+    )
+    for item in items:
+        item.is_read = True
+    db.commit()
+    return len(items)
 
 
 def mark_notification_read(db: Session, notification_id: int, email: str) -> schemas.NotificationOut:

@@ -1,6 +1,5 @@
-const CACHE_NAME = "ictu-meeting-v3";
+const CACHE_NAME = "ictu-meeting-v8";
 const APP_SHELL = [
-  "/",
   "/manifest.webmanifest",
   "/assets/ICTU.png",
   "/assets/ICTU-192.png",
@@ -22,13 +21,31 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
   if (event.request.method !== "GET" || requestUrl.pathname.startsWith("/api/")) return;
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" })
+        .then(async (response) => {
+          if (response.ok) {
+            const copy = response.clone();
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put("/", copy);
+          }
+          return response;
+        })
+        .catch(() => caches.match("/")),
+    );
+    return;
+  }
   event.respondWith(
     fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      .then(async (response) => {
+        if (response.ok) {
+          const copy = response.clone();
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, copy);
+        }
         return response;
       })
-      .catch(() => caches.match(event.request).then((response) => response ?? caches.match("/"))),
+      .catch(() => caches.match(event.request)),
   );
 });

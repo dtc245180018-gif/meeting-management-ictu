@@ -10,6 +10,7 @@ interface Props {
 
 
 export function GoogleCalendarPanel({ email }: Props) {
+  const isIctuAccount = email.trim().toLowerCase().endsWith("@ictu.edu.vn");
   const [status, setStatus] = useState<GoogleConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -51,7 +52,7 @@ export function GoogleCalendarPanel({ email }: Props) {
 
   return <section className="card google-calendar-panel" aria-labelledby="google-calendar-title">
     <div className="section-heading">
-      <div><span className="eyebrow">US15 · Google Calendar API</span><h2 id="google-calendar-title">Lịch Google của bạn</h2></div>
+      <div><h2 id="google-calendar-title">Lịch Google của bạn</h2></div>
       {status?.connected && <span className="integration-state connected">Đã kết nối</span>}
     </div>
     {loading && <p className="empty">Đang kiểm tra kết nối...</p>}
@@ -60,7 +61,11 @@ export function GoogleCalendarPanel({ email }: Props) {
       <strong>Backend chưa có thông tin OAuth.</strong>
       <span>Thêm các biến sau vào backend/.env rồi khởi động lại: {status.missing_settings.join(", ")}.</span>
     </div>}
-    {!loading && status?.configured && !status.connected && <div className="integration-content">
+    {!loading && status?.configured && !status.connected && !isIctuAccount && <div className="integration-warning">
+      <strong>Chỉ tài khoản Google ICTU được phép kết nối.</strong>
+      <span>Bạn vẫn có thể đăng nhập và sử dụng hệ thống bằng tài khoản hiện tại, nhưng Google Calendar yêu cầu email @ictu.edu.vn.</span>
+    </div>}
+    {!loading && status?.configured && !status.connected && isIctuAccount && <div className="integration-content">
       <p>Kết nối để hệ thống tạo, cập nhật và hủy sự kiện thật trên Google Calendar; lời mời được Google gửi tới người tham dự.</p>
       <button className="button primary" type="button" onClick={() => void connect()}>Kết nối Google Calendar</button>
     </div>}

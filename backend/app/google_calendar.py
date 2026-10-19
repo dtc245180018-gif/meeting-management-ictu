@@ -54,6 +54,21 @@ def _require_configured(settings: Settings) -> None:
         )
 
 
+def _allowed_domain(settings: Settings) -> str:
+    return settings.google_allowed_domain.strip().lower().lstrip("@")
+
+
+def _require_allowed_account(email: str, settings: Settings) -> str:
+    normalized = email.strip().lower()
+    domain = _allowed_domain(settings)
+    if not domain or "@" not in normalized or normalized.rsplit("@", 1)[1] != domain:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Google Calendar chỉ hỗ trợ tài khoản @{domain or 'ictu.edu.vn'}",
+        )
+    return normalized
+
+
 def _urlsafe_encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
 
@@ -96,6 +111,7 @@ def _verify_state(value: str, settings: Settings) -> str:
 def authorization_url(email: str) -> str:
     settings = get_settings()
     _require_configured(settings)
+    normalized_email = _require_allowed_account(email, settings)
     params = {
         "client_id": settings.google_client_id,
         "redirect_uri": settings.google_redirect_uri,
@@ -104,8 +120,9 @@ def authorization_url(email: str) -> str:
         "access_type": "offline",
         "include_granted_scopes": "true",
         "prompt": "consent",
-        "login_hint": email.strip().lower(),
-        "state": _state(email, settings),
+        "login_hint": normalized_email,
+        "hd": _allowed_domain(settings),
+        "state": _state(normalized_email, settings),
     }
     return f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
 
@@ -136,7 +153,7 @@ def _google_error(response: httpx.Response, fallback: str) -> str:
 def complete_oauth(db: Session, code: str, state_value: str) -> models.GoogleCalendarConnection:
     settings = get_settings()
     _require_configured(settings)
-    requested_email = _verify_state(state_value, settings)
+    requested_email = _require_allowed_account(_verify_state(state_value, settings), settings)
     with httpx.Client(timeout=20) as client:
         token_response = client.post(GOOGLE_TOKEN_URL, data={
             "code": code,
@@ -169,6 +186,12 @@ def complete_oauth(db: Session, code: str, state_value: str) -> models.GoogleCal
             )
         user_data = user_response.json()
     google_email = str(user_data.get("email", "")).strip().lower()
+    if user_data.get("email_verified") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản Google chưa xác minh email",
+        )
+    _require_allowed_account(google_email, settings)
     if not google_email or google_email != requested_email:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

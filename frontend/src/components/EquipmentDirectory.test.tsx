@@ -24,12 +24,12 @@ describe("EquipmentDirectory", () => {
 
   it("sends category, status and time filters to the backend", async () => {
     render(<EquipmentDirectory />);
-    await screen.findByText("Máy chiếu");
+    await screen.findByRole("heading", { name: "Máy chiếu" });
     fireEvent.change(screen.getByLabelText("Loại thiết bị"), { target: { value: "projector" } });
     fireEvent.change(screen.getByLabelText("Trạng thái thiết bị"), { target: { value: "available" } });
     fireEvent.change(screen.getByLabelText("Thiết bị từ lúc"), { target: { value: "2026-10-01T09:00" } });
     fireEvent.change(screen.getByLabelText("Thiết bị đến lúc"), { target: { value: "2026-10-01T10:00" } });
-    fireEvent.click(screen.getByRole("button", { name: "Tìm thiết bị" }));
+    fireEvent.click(screen.getByRole("button", { name: "Áp dụng bộ lọc" }));
     await waitFor(() => expect(api.listEquipment).toHaveBeenLastCalledWith(expect.objectContaining({
       category: "projector", status: "available", startTime: expect.any(String), endTime: expect.any(String),
     })));

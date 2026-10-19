@@ -59,6 +59,20 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAl
     setEditParticipantInput("");
   };
 
+  const inviteAllEditParticipants = () => {
+    if (!editing) return;
+    const organizer = editing.organizer_email.toLowerCase();
+    const pending = editParticipantInput.split(/[;,\n]/).map((item) => item.trim().toLowerCase()).filter(Boolean);
+    const invitees = [...new Set([
+      ...editParticipantList,
+      ...pending,
+      ...employees.map((employee) => employee.email.toLowerCase()),
+    ])].filter((email) => email !== organizer);
+    setEditParticipantList(invitees);
+    setEditParticipantInput("");
+    setMessage(`Đã thêm ${invitees.length} người tham dự, không bao gồm người tổ chức.`);
+  };
+
   const saveEdit = async () => {
     if (!editing) return;
     if (!canManageAll && editing.organizer_email !== currentUserEmail.toLowerCase()) {
@@ -163,14 +177,13 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAl
     <section className="card wide-card">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">US02 · US06 · US07 · US08</span>
           <h2>Quản lý và đặt phòng</h2>
         </div>
         <span className="counter">{meetings.length} lịch</span>
       </div>
       {message && <p className="notice">{message}</p>}
       <div className="meeting-list">
-        {meetings.length === 0 && <div className="empty">Chưa có lịch họp. Hãy tạo lịch đầu tiên.</div>}
+        {meetings.length === 0 && <div className="empty">Không có cuộc họp trong ngày hoặc phạm vi đã chọn.</div>}
         {meetings.map((meeting) => (
           <article className={`meeting-item ${meeting.status}`} key={meeting.id}>
             <div className="meeting-date">
@@ -255,7 +268,11 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAl
                     <label>Bắt đầu<input type="datetime-local" value={editStart} onChange={(event) => setEditStart(event.target.value)} /></label>
                     <label>Kết thúc<input type="datetime-local" value={editEnd} onChange={(event) => setEditEnd(event.target.value)} /></label>
                   </div>
-                  <label>Người tham dự
+                  <div className="participant-label-row">
+                    <span>Người tham dự</span>
+                    <button type="button" onClick={inviteAllEditParticipants}>Mời tất cả mọi người</button>
+                  </div>
+                  <label>
                     <input value={editParticipantInput} onChange={(event) => { if (/[;,\n]/.test(event.target.value)) addEditParticipant(event.target.value); else setEditParticipantInput(event.target.value); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === "," || event.key === ";") { event.preventDefault(); addEditParticipant(editParticipantInput); } }} onBlur={() => addEditParticipant(editParticipantInput)} placeholder="Gõ tên hoặc email rồi nhấn Enter" />
                     {editParticipantInput.trim() && <div className="employee-suggestions">{employees.filter((employee) => `${employee.full_name} ${employee.email} ${employee.department}`.toLowerCase().includes(editParticipantInput.trim().toLowerCase()) && !editParticipantList.includes(employee.email)).slice(0, 6).map((employee) => <button type="button" key={employee.email} onMouseDown={(event) => event.preventDefault()} onClick={() => addEditParticipant(employee.email)}><strong>{employee.full_name}</strong><span>{employee.email} · {employee.department}</span></button>)}</div>}
                     <div className="participant-chips">{editParticipantList.map((email) => <span className="participant-chip" key={email}>{email}<button type="button" aria-label={`Xóa ${email}`} onClick={() => setEditParticipantList((current) => current.filter((item) => item !== email))}>×</button></span>)}</div>
@@ -307,6 +324,19 @@ export function MeetingList({ meetings, onChanged, currentUserEmail, canManageAl
               <strong>Người tham dự ({details.participants.length})</strong>
               {details.participants.length === 0 && <span>Không có người tham dự.</span>}
               {details.participants.map((participant) => <span className={`participant ${participant.status}`} key={participant.id}>{participant.email} · {participant.status}</span>)}
+            </div>
+            <div className="participants attendance-history">
+              <strong>Thời gian check-in / check-out ({details.booking?.attendances?.length ?? 0})</strong>
+              {!details.booking?.attendances?.length && <span>Chưa có ai check-in.</span>}
+              {details.booking?.attendances?.map((attendance) => (
+                <div className="attendance-entry" key={attendance.id}>
+                  <span><strong>{attendance.full_name}</strong> · {attendance.email}</span>
+                  <small>
+                    Check-in: {attendance.checked_in_at ? formatIctuDateTime(attendance.checked_in_at) : "Chưa check-in"}
+                    {" · "}Check-out: {attendance.checked_out_at ? formatIctuDateTime(attendance.checked_out_at) : "Chưa check-out"}
+                  </small>
+                </div>
+              ))}
             </div>
           </div>
         </div>

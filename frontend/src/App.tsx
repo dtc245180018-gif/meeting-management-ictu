@@ -5,17 +5,20 @@ import { RoomDirectory } from "./components/RoomDirectory";
 import { EquipmentDirectory } from "./components/EquipmentDirectory";
 import { AdminPanel } from "./components/AdminPanel";
 import { NotificationCenter } from "./components/NotificationCenter";
-import { GoogleCalendarPanel } from "./components/GoogleCalendarPanel";
 import { LoginPage } from "./components/LoginPage";
 import { InstallAppButton } from "./components/InstallAppButton";
+import { BookingChatbot } from "./components/BookingChatbot";
+import { QrAttendancePanel } from "./components/QrAttendancePanel";
+import { ProfilePage } from "./components/ProfilePage";
+import { MeetingCalendar } from "./components/MeetingCalendar";
 import { api, authStorage } from "./services/api";
 import type { Account, Employee, Meeting } from "./types";
 import { filterMeetings } from "./utils/meetingFilters";
 import { loadAllHistory } from "./utils/historyPagination";
-import { formatIctuDateTime } from "./utils/dateTime";
+import { formatIctuDate, formatIctuTime } from "./utils/dateTime";
 import { countPendingInvitations, scopeDashboardMeetings } from "./utils/dashboard";
 
-type Page = "overview" | "create" | "calendar" | "notifications" | "rooms" | "equipment" | "admin";
+type Page = "overview" | "create" | "calendar" | "notifications" | "rooms" | "equipment" | "qr" | "profile" | "admin";
 
 const TEST_ACCOUNT: Account = {
   id: 1,
@@ -31,6 +34,50 @@ const TEST_ACCOUNT: Account = {
 
 function isMobileViewport() {
   return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 640px)").matches;
+}
+
+function isMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    || (/Macintosh/i.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+}
+
+function QrScanIcon() {
+  return <svg className="qr-scan-icon" viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M4 9V6a2 2 0 0 1 2-2h3M15 4h3a2 2 0 0 1 2 2v3M20 15v3a2 2 0 0 1-2 2h-3M9 20H6a2 2 0 0 1-2-2v-3" />
+    <path d="M8 8h3v3H8zM14 8h2v2h-2zM8 14h2v2H8zM13 13h3v3h-3z" />
+    <path className="qr-scan-line" d="M6 12h12" />
+  </svg>;
+}
+
+function LiveDateTime() {
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(new Date()), 1_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const date = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(currentTime);
+  const time = new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).format(currentTime);
+
+  return <div className="live-date-time" aria-live="off">
+    <span className="live-status-dot" aria-hidden="true" />
+    <span className="live-date">{date.charAt(0).toUpperCase() + date.slice(1)}</span>
+    <strong>{time}</strong>
+  </div>;
 }
 
 export default function App() {
@@ -91,11 +138,11 @@ export default function App() {
       />
     </>;
   }
-  return <AuthenticatedApp account={account} onLogout={logout} />;
+  return <AuthenticatedApp account={account} onAccountUpdated={setAccount} onLogout={logout} />;
 }
 
 
-function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: () => Promise<void> }) {
+function AuthenticatedApp({ account, onAccountUpdated, onLogout }: { account: Account; onAccountUpdated: (account: Account) => void; onLogout: () => Promise<void> }) {
   const [page, setPage] = useState<Page>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isMobileViewport);
   const [focusedMeetingId, setFocusedMeetingId] = useState<number | null>(null);
@@ -114,6 +161,7 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
   const [systemMessage, setSystemMessage] = useState("");
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [lastSeenMeetingId, setLastSeenMeetingId] = useState(0);
+  const [quickQrRequested, setQuickQrRequested] = useState(false);
   const pageSize = 5;
   const activeUser = { email: account.email, label: account.full_name };
   const activeRole = account.role;
@@ -273,6 +321,11 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
     if (isMobileViewport()) setSidebarCollapsed(true);
   };
 
+  const openQuickQr = () => {
+    setQuickQrRequested(isMobileDevice());
+    goTo("qr");
+  };
+
   const searchCalendar = (event?: FormEvent) => {
     event?.preventDefault();
     setFilterEmail(calendarEmailInput.trim());
@@ -308,7 +361,6 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
   const renderHistoryFilters = () => (
     <form className="filter-card" onSubmit={searchCalendar}>
       <div>
-        <span className="eyebrow">US06 · Lịch họp</span>
         <strong>Lọc cuộc họp</strong>
       </div>
       <select value={calendarMode} onChange={(event) => setCalendarMode(event.target.value as typeof calendarMode)} aria-label="Phạm vi lịch">
@@ -342,9 +394,9 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
     </form>
   );
 
-  const renderMeetings = (items: Meeting[], showPagination = false) => (
+  const renderMeetings = (items: Meeting[], showPagination = false, allowFocus = true) => (
     <>
-      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} canManageAll={activeRole === "admin"} focusMeetingId={focusedMeetingId} onFocusHandled={() => setFocusedMeetingId(null)} />
+      <MeetingList meetings={items} onChanged={loadMeetings} currentUserEmail={activeUser.email} canManageAll={activeRole === "admin"} focusMeetingId={allowFocus ? focusedMeetingId : null} onFocusHandled={allowFocus ? () => setFocusedMeetingId(null) : undefined} />
       {showPagination && totalPages > 1 && (
         <div className="pagination" aria-label="Phân trang lịch sử">
           <button disabled={historyPage === 1} onClick={() => setHistoryPage((current) => current - 1)}>Trước</button>
@@ -370,6 +422,8 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
           <button className={page === "notifications" ? "active" : ""} title="Thông báo" aria-current={page === "notifications" ? "page" : undefined} onClick={() => goTo("notifications")}><span className="nav-icon nav-icon-indicator">♢{unreadNotificationCount > 0 && <span className="nav-dot" aria-label="Có thông báo mới" />}</span><span className="nav-label">Thông báo</span></button>
           <button className={page === "rooms" ? "active" : ""} title="Phòng họp" aria-current={page === "rooms" ? "page" : undefined} onClick={() => goTo("rooms")}><span className="nav-icon">⌗</span><span className="nav-label">Phòng họp</span></button>
           <button className={page === "equipment" ? "active" : ""} title="Thiết bị" aria-current={page === "equipment" ? "page" : undefined} onClick={() => goTo("equipment")}><span className="nav-icon">⚙</span><span className="nav-label">Thiết bị</span></button>
+          <button className={page === "qr" ? "active" : ""} title="Check-in QR" aria-current={page === "qr" ? "page" : undefined} onClick={() => goTo("qr")}><span className="nav-icon"><QrScanIcon /></span><span className="nav-label">Check-in QR</span></button>
+          <button className={page === "profile" ? "active" : ""} title="Tài khoản cá nhân" aria-current={page === "profile" ? "page" : undefined} onClick={() => goTo("profile")}><span className="nav-icon">●</span><span className="nav-label">Tài khoản cá nhân</span></button>
           {activeRole === "admin" && <button className={page === "admin" ? "active" : ""} title="Quản trị" aria-current={page === "admin" ? "page" : undefined} onClick={() => goTo("admin")}><span className="nav-icon">♜</span><span className="nav-label">Quản trị</span></button>}
         </nav>
         <div className="sidebar-footer-actions">
@@ -392,6 +446,8 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
         <div className="header-user">
           <button className="sidebar-reopen" type="button" aria-label="Mở thanh điều hướng" onClick={() => setSidebarCollapsed(false)}>☰</button>
           <div><strong>{activeUser.label}</strong><span>{activeUser.email} · {activeRole}</span></div>
+          <button className="header-qr-button" type="button" onClick={openQuickQr} title={isMobileDevice() ? "Mở camera quét QR" : "Mở trang quét QR"}><QrScanIcon /><b>Quét QR</b></button>
+          <button className="header-avatar-button" type="button" onClick={() => goTo("profile")} title="Mở trang cá nhân" aria-label={`Trang cá nhân của ${activeUser.label}`}>{activeUser.label.trim().charAt(0).toUpperCase()}</button>
           <button className="logout-button" type="button" onClick={() => void onLogout()}>Đăng xuất</button>
         </div>
       </header>
@@ -401,72 +457,113 @@ function AuthenticatedApp({ account, onLogout }: { account: Account; onLogout: (
       {systemMessage && <div className="logout-notice" role="status">{systemMessage}</div>}
       <main>
         {page === "overview" && (
-        <section className="hero">
-          <div>
-              <span className="eyebrow light">ICTU MEETING · SPRINT 3</span>
-            <h1>Lịch họp rõ ràng,<br />phối hợp hiệu quả.</h1>
-            <p>Quản lý lịch, thành viên và phòng họp trong một không gian thống nhất dành cho ICTU.</p>
+        <section className="overview-hero" aria-labelledby="overview-title">
+          <div className="overview-hero-copy">
+            <span className="overview-kicker">Không gian làm việc ICTU</span>
+            <h1 id="overview-title">Tổng quan</h1>
+            <LiveDateTime />
+            <p>Xin chào <strong>{activeUser.label}</strong>. Theo dõi lịch họp và xử lý công việc trong ngày tại một nơi.</p>
+            <div className="overview-hero-actions">
+              {activeRole !== "participant" ? (
+                <button className="dashboard-button primary" type="button" onClick={() => goTo("create")}><span>＋</span>Tạo lịch họp</button>
+              ) : (
+                <button className="dashboard-button primary" type="button" onClick={() => goTo("calendar")}><span>▣</span>Xem lịch họp</button>
+              )}
+              <button className="dashboard-button secondary" type="button" onClick={() => goTo("rooms")}><span>⌗</span>Tìm phòng</button>
+            </div>
           </div>
-          <div className="stats">
-            <div><strong>{scopedMeetings.length}</strong><span>Tổng lịch</span></div>
-            <div><strong>{scheduled}</strong><span>Sắp tới</span></div>
-            <div><strong>{booked}</strong><span>Đã có phòng</span></div>
-            <div><strong>{withoutRoom}</strong><span>Chưa có phòng</span></div>
+          <div className="overview-hero-visual" aria-hidden="true">
+            <div className="overview-logo-orbit"><img src="/assets/ICTU.png" alt="" /></div>
+            <span className="visual-card card-one">Lịch</span>
+            <span className="visual-card card-two">Phòng</span>
+            <span className="visual-card card-three">ICTU</span>
           </div>
         </section>
         )}
 
-        {page === "overview" && <section className="sprint-brief" aria-labelledby="product-vision-title">
-          <div className="brief-card vision-card">
-            <div>
-              <span className="eyebrow">Tầm nhìn sản phẩm</span>
-              <h2 id="product-vision-title">Họp đúng lúc, đúng chỗ, tối ưu nguồn lực.</h2>
-            </div>
-            <p>Trở thành giải pháp quản lý lịch họp số 1, giúp tổ chức họp thông minh, tiết kiệm thời gian và sử dụng tài nguyên hiệu quả.</p>
-          </div>
-        </section>}
-
         {error && <div className="error-banner">{error}. Hãy kiểm tra Backend tại cổng 8000.</div>}
 
         {page === "overview" && (
-          <section className="overview-grid" aria-label="Thống kê toàn hệ thống">
-            <p className="subtle" style={{ gridColumn: "1 / -1", margin: 0 }}>{activeRole === "admin" ? "Góc nhìn quản trị · tổng hợp cuộc họp và tài nguyên toàn hệ thống." : "Góc nhìn nhân viên · thông báo và lịch liên quan đến tài khoản hiện tại."}</p>
-            <div className="overview-card"><span>Cuộc họp hôm nay</span><strong>{todayMeetings}</strong><button onClick={() => goTo("calendar")}>Xem lịch →</button></div>
-            <div className="overview-card"><span>Phòng đã đặt</span><strong>{booked}</strong><button onClick={() => goTo("rooms")}>Quản lý phòng →</button></div>
-            <div className="overview-card"><span>Lời mời chờ phản hồi</span><strong>{pendingInvites}</strong><button onClick={showMyInvitations}>Xem lời mời →</button></div>
-            <div className="overview-card"><span>Thông báo chưa đọc</span><strong>{unreadNotificationCount}</strong><button onClick={() => goTo("notifications")}>Quản lý thông báo →</button></div>
+          <section className="overview-summary" aria-labelledby="overview-summary-title">
+            <div className="overview-section-heading">
+              <div><span>Hoạt động hôm nay</span><h2 id="overview-summary-title">Thông tin cần chú ý</h2></div>
+              <p>{activeRole === "admin" ? "Dữ liệu toàn hệ thống" : "Dữ liệu liên quan đến tài khoản của bạn"}</p>
+            </div>
+            <div className="overview-metrics">
+              <article className="metric-card metric-blue">
+                <div className="metric-card-top"><span>Cuộc họp hôm nay</span><b aria-hidden="true">▣</b></div>
+                <strong>{todayMeetings}</strong>
+                <small>{scheduled} cuộc họp sắp diễn ra</small>
+                <button type="button" onClick={() => goTo("calendar")}>Xem lịch <span>→</span></button>
+              </article>
+              <article className="metric-card metric-orange">
+                <div className="metric-card-top"><span>Phòng đã đặt</span><b aria-hidden="true">⌗</b></div>
+                <strong>{booked}</strong>
+                <small>{withoutRoom} lịch chưa có phòng</small>
+                <button type="button" onClick={() => goTo("rooms")}>Xem phòng <span>→</span></button>
+              </article>
+              <article className="metric-card metric-green">
+                <div className="metric-card-top"><span>Lời mời chờ phản hồi</span><b aria-hidden="true">✓</b></div>
+                <strong>{pendingInvites}</strong>
+                <small>Cần xác nhận tham dự</small>
+                <button type="button" onClick={showMyInvitations}>Xem lời mời <span>→</span></button>
+              </article>
+              <article className="metric-card metric-navy">
+                <div className="metric-card-top"><span>Thông báo chưa đọc</span><b aria-hidden="true">♢</b></div>
+                <strong>{unreadNotificationCount}</strong>
+                <small>{scopedMeetings.length} lịch trong hệ thống</small>
+                <button type="button" onClick={() => goTo("notifications")}>Mở thông báo <span>→</span></button>
+              </article>
+            </div>
           </section>
         )}
         {page === "overview" && (
           <section className="card recent-meetings" aria-labelledby="recent-meetings-title">
             <div className="section-heading">
-              <div><span className="eyebrow">Lịch gần nhất</span><h2 id="recent-meetings-title">Cuộc họp sắp diễn ra</h2></div>
-              <button className="button secondary" onClick={() => goTo("calendar")}>Xem tất cả</button>
+              <div><span className="eyebrow">Lịch làm việc</span><h2 id="recent-meetings-title">Cuộc họp sắp diễn ra</h2></div>
+              <button className="dashboard-button compact secondary" onClick={() => goTo("calendar")}>Xem tất cả <span>→</span></button>
             </div>
             <div className="recent-list">
               {recentMeetings.length === 0 && <p className="empty">Chưa có cuộc họp nào.</p>}
               {recentMeetings.map((meeting) => (
                 <div className="recent-item" key={meeting.id}>
-                  <strong>{meeting.title}</strong>
-                  <span>{formatIctuDateTime(meeting.start_time)} · {meeting.booking?.room.name ?? "Chưa đặt phòng"}</span>
+                  <div className="recent-date"><strong>{formatIctuDate(meeting.start_time).split("/")[0]}</strong><span>Tháng {formatIctuDate(meeting.start_time).split("/")[1]}</span></div>
+                  <div className="recent-copy"><strong>{meeting.title}</strong><span>{formatIctuTime(meeting.start_time)} – {formatIctuTime(meeting.end_time)} · {meeting.organizer_email}</span></div>
+                  <span className={`recent-room ${meeting.booking ? "booked" : "pending"}`}>{meeting.booking?.room.name ?? "Chưa có phòng"}</span>
+                  <button type="button" onClick={() => openMeetingFromNotification(meeting.id)}>Chi tiết</button>
                 </div>
               ))}
             </div>
           </section>
         )}
-        {page === "overview" && <div className="page-layout"><GoogleCalendarPanel email={activeUser.email} /></div>}
         <div className="page-layout">
           {page === "create" && activeRole !== "participant" && <MeetingForm onCreated={loadMeetings} organizerEmail={activeUser.email} />}
-          {page === "calendar" && <div className="content-column">{renderHistoryFilters()}{renderMeetings(pagedMeetings, true)}</div>}
+          {page === "calendar" && <MeetingCalendar
+            meetings={visibleMeetings}
+            account={account}
+            onChanged={loadMeetings}
+            focusMeetingId={focusedMeetingId}
+            onFocusHandled={() => setFocusedMeetingId(null)}
+            advancedContent={<>{renderHistoryFilters()}{renderMeetings(pagedMeetings, true, false)}</>}
+          />}
           {page === "notifications" && <NotificationCenter email={activeUser.email} onOpenMeeting={openMeetingFromNotification} onUnreadCountChange={setUnreadNotificationCount} />}
           {page === "rooms" && <RoomDirectory meetings={meetings} />}
           {page === "equipment" && <EquipmentDirectory />}
+          {page === "qr" && <QrAttendancePanel account={account} meetings={meetings} autoStartScan={quickQrRequested} onAutoStartConsumed={() => setQuickQrRequested(false)} />}
+          {page === "profile" && <ProfilePage account={account} onUpdated={onAccountUpdated} onLogout={onLogout} />}
           {page === "admin" && activeRole === "admin" && <AdminPanel adminEmail={activeUser.email} />}
         </div>
       </main>
 
       <footer>© 2026 Meeting Management ICTU · Phát triển bởi Nguyễn Ngọc Thắng</footer>
       </div>
+      <BookingChatbot
+        organizerEmail={activeUser.email}
+        organizerName={activeUser.label}
+        canBook={activeRole === "admin" || activeRole === "organizer"}
+        onCreated={loadMeetings}
+        onViewMeetings={() => goTo("calendar")}
+      />
     </div>
   );
 }
