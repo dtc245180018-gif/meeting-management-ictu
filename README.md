@@ -18,6 +18,7 @@ Gemini API · Google Calendar OAuth · Docker Compose · PWA.
 | [Kịch bản demo toàn hệ thống](docs/DEMO_MANUAL_SCRIPT.md) | Luồng demo thủ công trước mentor |
 | [Tích hợp thật](docs/REAL_INTEGRATIONS_SETUP.md) | Google Calendar, email và Gemini |
 | [PWA trên iPhone](docs/IPHONE_PWA_SETUP.md) | Chạy HTTPS bằng Cloudflare Tunnel và cài lên màn hình chính |
+| [Triển khai Vercel](docs/VERCEL_DEPLOYMENT.md) | Triển khai frontend, FastAPI và PostgreSQL cloud cho production |
 | [Quy trình đóng góp](CONTRIBUTING.md) | Gitflow, quy ước commit, Pull Request và kiểm thử bắt buộc |
 
 ---

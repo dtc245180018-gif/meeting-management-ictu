@@ -26,3 +26,5 @@ backend/sprint3_credentials.local.*
 .vscode/
 .DS_Store
 Thumbs.db
+.vercel/
+.env.local
