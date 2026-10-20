@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import font_roboto
 from fastapi import HTTPException, status
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as ExcelImage
@@ -413,7 +414,9 @@ def export_excel(report: schemas.ReportOverviewOut) -> bytes:
 
 
 def _pdf_font() -> str:
+    roboto_regular = Path(font_roboto.__file__).resolve().parent / "files" / "Roboto-Regular.ttf"
     candidates = [
+        roboto_regular,
         Path("C:/Windows/Fonts/arial.ttf"),
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     ]

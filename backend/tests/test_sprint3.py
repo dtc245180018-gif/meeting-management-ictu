@@ -4,7 +4,7 @@ from io import BytesIO
 from openpyxl import load_workbook
 from sqlalchemy import select
 
-from app import models
+from app import models, report_services
 from app.database import SessionLocal
 from app.passwords import hash_password
 
@@ -271,3 +271,8 @@ def test_admin_reports_cancellation_and_exports(client):
     assert pdf.status_code == 200
     assert pdf.content.startswith(b"%PDF")
     assert b"/Subtype /Image" in pdf.content
+
+
+def test_report_assets_and_unicode_font_are_packaged():
+    assert report_services._logo_path() is not None
+    assert report_services._pdf_font() == "ICTUUnicode"
