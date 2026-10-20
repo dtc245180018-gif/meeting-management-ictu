@@ -349,9 +349,17 @@ export async function downloadAuthenticated(url: string): Promise<void> {
   }
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const filename = disposition.match(/filename="?([^";]+)"?/)?.[1] ?? "ictu-meeting-report";
+  const objectUrl = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(await response.blob());
+  link.href = objectUrl;
   link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(link.href);
+  // Safari/PWA and slower production browsers may still be reading the Blob
+  // after click() returns. Keep the object URL alive briefly, then clean up.
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+  }, 2_000);
 }

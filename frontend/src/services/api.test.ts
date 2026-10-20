@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api, apiErrorMessage, authStorage } from "./api";
+import { api, apiErrorMessage, authStorage, downloadAuthenticated } from "./api";
 
 
 describe("API error handling", () => {
@@ -36,5 +36,35 @@ describe("API error handling", () => {
     expect(expired).not.toHaveBeenCalled();
 
     window.removeEventListener("ictu-auth-expired", expired);
+  });
+
+  it("keeps an exported Blob alive until the browser has started the download", async () => {
+    vi.useFakeTimers();
+    authStorage.set("report-token");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(
+      new Blob(["report-bytes"]),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": 'attachment; filename="ictu-report.pdf"',
+        },
+      },
+    ));
+    const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:ictu-report");
+    const revokeObjectUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+
+    await downloadAuthenticated("/api/admin/reports/export?format=pdf");
+
+    expect(createObjectUrl).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+    expect(document.querySelector('a[download="ictu-report.pdf"]')).not.toBeNull();
+    expect(revokeObjectUrl).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(document.querySelector('a[download="ictu-report.pdf"]')).toBeNull();
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:ictu-report");
+    vi.useRealTimers();
   });
 });
