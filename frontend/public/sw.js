@@ -1,4 +1,4 @@
-const CACHE_NAME = "ictu-meeting-v9";
+const CACHE_NAME = "ictu-meeting-v10";
 const APP_SHELL = [
   "/manifest.webmanifest",
   "/assets/ICTU.png",
